@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="Analysis" basedir="." default="war">
+	<property file="build.properties" />
+
+	<property name="flower.dir" value="/flower" />
+	<property name="m4.dir" value="m4" />
+	<property name="build.dir" value="build" />
+	<property name="lib.dir" value="lib" />
+	<property name="src.dir" value="src" />
+	<property name="web.dir" value="web" />
+
+	<path id="classpath.build">
+		<fileset dir="${lib.dir}">
+			<include name="*.jar" />
+		</fileset>
+		<fileset dir="${gfv3.dir}/glassfish/modules">
+			<include name="*.jar" />
+		</fileset>
+	</path>
+
+	<target name="init">
+	  	<mkdir dir="${m4.dir}" />
+                <mkdir dir="${build.dir}" />
+		<delete>
+			<fileset dir="${build.dir}" includes="**/*" />
+			<fileset dir="${m4.dir}" includes="**/*" />
+		</delete>
+		<mkdir dir="${build.dir}/WEB-INF/lib" />
+		<mkdir dir="${build.dir}/WEB-INF/classes" />
+	</target>
+
+	<target name="compile" depends="preprocess">
+		<javac srcdir="${src.dir}" destdir="${build.dir}/WEB-INF/classes" fork="no" includeantruntime="false" classpathref="classpath.build" />
+	</target>
+
+	<target name="preprocess" depends="init">
+	  	<exec executable="/bin/sh">
+		  	<arg line='-c "m4 -D _FD_=${flower.dir} ${src.dir}/java/name/justinthomas/flower/analysis/persistence/resource.properties.m4 &gt; ${src.dir}/java/name/justinthomas/flower/analysis/persistence/resource.properties"' />
+		</exec>
+	</target>
+
+	<target name="war" depends="pre-war">
+		<war destfile="dist/${ant.project.name}.war" webxml="${build.dir}/WEB-INF/web.xml">
+			<fileset dir="${build.dir}">
+				<include name="WEB-INF/**" />
+			</fileset>
+		</war>
+	</target>
+
+	<target name="pre-war" depends="compile">
+		<copy todir="${build.dir}/WEB-INF/lib">
+			<fileset dir="${lib.dir}">
+				<include name="**/*" />
+			</fileset>
+		</copy>
+		<copy todir="${build.dir}/WEB-INF">
+			<fileset dir="${web.dir}/WEB-INF">
+				<include name="**/*" />
+			</fileset>
+		</copy>
+		<copy todir="${build.dir}/WEB-INF/classes">
+		  	<fileset id="resources" dir="${src.dir}/java">
+			  	<include name="**/*.properties" />
+			</fileset>
+		</copy>
+	</target>
+</project>
