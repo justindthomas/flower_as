@@ -331,7 +331,7 @@ public class FlowManager {
         long year = 365 * day;
         long month = year / 12;
 
-        long flowRetention = week;
+        long flowRetention = day;
 
         Date now = new Date();
         Date start = new Date();
@@ -346,22 +346,15 @@ public class FlowManager {
 
         Integer secondsDeleted = 0;
 
-        try {
-            for (PersistentSecond persistentSecond : cursor) {
-                expiredSeconds.add(persistentSecond.second);
+        for (PersistentSecond persistentSecond : cursor) {
+            expiredSeconds.add(persistentSecond.second);
 
-                if (++secondsDeleted % 100 == 0) {
-                    System.out.println(secondsDeleted + " seconds marked for deletion...");
-                }
-            }
-        } catch (SecondaryIntegrityException e) {
-            System.err.println(e.getMessage());
-            cursor.close();
-            for (String name : environment.getDatabaseNames()) {
-                System.out.println("Database: " + name);
+            if (++secondsDeleted % 1000 == 0) {
+                System.out.println(secondsDeleted + " seconds marked for deletion...");
             }
         }
 
+        System.out.println(secondsDeleted + " total seconds marked for deletion...");
 
         cursor.close();
 
@@ -385,10 +378,12 @@ public class FlowManager {
         for (Long second : seconds) {
             dataAccessor.flowsBySecond.delete(second);
 
-            if (++secondCount % 100 == 0) {
-                System.out.println("Seconds deleted: " + secondCount);
+            if (++secondCount % 1000 == 0) {
+                System.out.println("Seconds of flows deleted: " + secondCount);
             }
         }
+
+        System.out.println("Total seconds of flows deleted: " + secondCount);
 
         printEnvironmentStatistics(environment);
         closeStore(entityStore);

@@ -16,15 +16,15 @@ import name.justinthomas.flower.analysis.statistics.StatisticsManager;
  *
  * @author justin
  */
-//@Singleton
-//@Startup
-//@DependsOn("ConfigurationManager")
+@Singleton
+@Startup
+@DependsOn("ConfigurationManager")
 public class Cleaner implements Runnable {
 
     private static Cleaner instance;
     private static ScheduledThreadPoolExecutor executor;
 
-    //@PostConstruct
+    @PostConstruct
     public void setup() {
         System.out.println("Setting Cleaner to run in 3 minutes and every 4 hours.");
 
@@ -44,9 +44,9 @@ public class Cleaner implements Runnable {
         FlowManager flowManager = FlowManager.getFlowManager();
         flowManager.cleanFlows();
 
-        System.out.println("Cleaning statistics...");
-        StatisticsManager statisticsManager = new StatisticsManager();
-        statisticsManager.cleanStatisticalIntervals();
+        //System.out.println("Cleaning statistics...");
+        //StatisticsManager statisticsManager = new StatisticsManager();
+        //statisticsManager.cleanStatisticalIntervals();
 
         if (DEBUG >= 1) {
             System.out.println("Cleaning completed.");
