@@ -44,9 +44,9 @@ public class Cleaner implements Runnable {
         FlowManager flowManager = FlowManager.getFlowManager();
         flowManager.cleanFlows();
 
-        //System.out.println("Cleaning statistics...");
-        //StatisticsManager statisticsManager = new StatisticsManager();
-        //statisticsManager.cleanStatisticalIntervals();
+        System.out.println("Cleaning statistics...");
+        StatisticsManager statisticsManager = new StatisticsManager();
+        statisticsManager.cleanStatisticalIntervals();
 
         if (DEBUG >= 1) {
             System.out.println("Cleaning completed.");

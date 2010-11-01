@@ -1,12 +1,12 @@
 package name.justinthomas.flower.analysis.statistics;
 
+import com.sleepycat.je.CheckpointConfig;
 import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
 import com.sleepycat.je.StatsConfig;
 import com.sleepycat.persist.EntityCursor;
 import com.sleepycat.persist.EntityStore;
-import com.sleepycat.persist.PrimaryIndex;
 import com.sleepycat.persist.StoreConfig;
 import java.io.File;
 import java.io.FileWriter;
@@ -81,7 +81,7 @@ public class StatisticsManager {
     private StoreConfig getStoreConfig(Boolean readOnly) {
         StoreConfig storeConfig = new StoreConfig();
         storeConfig.setAllowCreate(true);
-        if(readOnly) {
+        if (readOnly) {
             storeConfig.setReadOnly(true);
         } else {
             storeConfig.setReadOnly(false);
@@ -99,49 +99,6 @@ public class StatisticsManager {
         }
     }
 
-    private ArrayList<IntervalKey> identifyExpiredIntervals() {
-        System.out.println("Identifying expired intervals...");
-        Environment environment;
-        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
-        StatisticsAccessor dataAccessor = new StatisticsAccessor(entityStore);
-
-        long second = 1000;
-        long minute = 60 * second;
-        long hour = 60 * minute;
-        long day = 24 * hour;
-        long week = 7 * day;
-        long year = 365 * day;
-        long month = year / 12;
-
-        long statisticsRetention = month * 2;
-
-        Date now = new Date();
-        Date startDate = new Date();
-        startDate.setTime(now.getTime() - (year * 1));
-
-        Date endDate = new Date();
-        endDate.setTime(now.getTime() - statisticsRetention);
-
-        Long start = startDate.getTime() / configurationManager.getResolution().get("High");
-        IntervalKey startKey = new IntervalKey(start, configurationManager.getResolution().get("High"));
-        Long end = endDate.getTime() / configurationManager.getResolution().get("High");
-        IntervalKey endKey = new IntervalKey(end, configurationManager.getResolution().get("High"));
-
-        PrimaryIndex<IntervalKey, StatisticalInterval> startIndex = dataAccessor.intervalByKey;
-        EntityCursor<StatisticalInterval> cursor = startIndex.entities(startKey, true, endKey, true);
-
-        ArrayList<IntervalKey> expiredIntervals = new ArrayList();
-        while(cursor.next() != null) {
-            expiredIntervals.add(cursor.current().getSecond());
-        }
-
-        printEnvironmentStatistics(environment);
-        closeStore(entityStore);
-        closeEnvironment(environment);
-
-        return expiredIntervals;
-    }
-
     public void cleanStatisticalIntervals() {
         ArrayList<IntervalKey> keys = identifyExpiredIntervals();
 
@@ -151,19 +108,15 @@ public class StatisticsManager {
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(false));
         StatisticsAccessor dataAccessor = new StatisticsAccessor(entityStore);
 
-        for(IntervalKey key : keys) {
+        for (IntervalKey key : keys) {
             dataAccessor.intervalByKey.delete(key);
         }
 
-        printEnvironmentStatistics(environment);
         closeStore(entityStore);
+        recordEnvironmentStatistics(environment);
+        cleanLog(environment);
+        checkpoint(environment);
         closeEnvironment(environment);
-    }
-
-    private void printEnvironmentStatistics(Environment environment) {
-        StatsConfig config = new StatsConfig();
-        config.setClear(true);
-        System.err.println(environment.getStats(config));
     }
 
     private HashMap<IntervalKey, StatisticalInterval> flowToInterval(Flow flow, Long interval) {
@@ -563,6 +516,93 @@ public class StatisticsManager {
                     }
                 }
             }        // Add the default node (with newly acquired flows) to the default network
+            writer.close();
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
+    }
+
+    private ArrayList<IntervalKey> identifyExpiredIntervals() {
+        System.out.println("Identifying expired intervals...");
+
+        Environment environment;
+        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
+        StatisticsAccessor dataAccessor = new StatisticsAccessor(entityStore);
+
+        long second = 1000;
+        long minute = 60 * second;
+        long hour = 60 * minute;
+        long day = 24 * hour;
+        long week = 7 * day;
+        long year = 365 * day;
+        long month = year / 12;
+
+        long intervalRetention = 6 * month;
+
+        Date now = new Date();
+        Date start = new Date();
+        start.setTime(now.getTime() - (year * 1));
+
+        Date intervalCutoff = new Date();
+        intervalCutoff.setTime(now.getTime() - intervalRetention);
+
+        ArrayList<IntervalKey> expiredIntervals = new ArrayList();
+
+        for (Long resolution : configurationManager.getResolution().values()) {
+            IntervalKey startKey = new IntervalKey();
+            startKey.resolution = resolution;
+            startKey.interval = start.getTime() / resolution;
+
+            IntervalKey endKey = new IntervalKey();
+            endKey.resolution = resolution;
+            endKey.interval = intervalCutoff.getTime() / resolution;
+
+            EntityCursor<StatisticalInterval> cursor = dataAccessor.intervalByKey.entities(startKey, true, endKey, true);
+
+            Integer intervalsDeleted = 0;
+
+            for (StatisticalInterval statisticalInterval : cursor) {
+                expiredIntervals.add(statisticalInterval.key);
+
+                if (++intervalsDeleted % 1000 == 0) {
+                    System.out.println(intervalsDeleted + " intervals marked for deletion at a resolution of " + resolution + " milliseconds...");
+                }
+            }
+
+            System.out.println(intervalsDeleted + " total seconds marked for deletion at a resolution of " + resolution + " milliseconds...");
+            cursor.close();
+        }
+
+        closeStore(entityStore);
+        closeEnvironment(environment);
+
+        return expiredIntervals;
+    }
+
+    private void cleanLog(Environment environment) {
+        try {
+            environment.cleanLog();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void checkpoint(Environment environment) {
+        CheckpointConfig checkpointConfig = new CheckpointConfig();
+        try {
+            environment.checkpoint(checkpointConfig);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void recordEnvironmentStatistics(Environment environment) {
+        try {
+            FileWriter writer = new FileWriter("/traces/databasestatistics.txt", true);
+            writer.append("Date: " + new Date() + "\n");
+            StatsConfig config = new StatsConfig();
+            config.setClear(true);
+            writer.append(environment.getStats(config).toStringVerbose());
             writer.close();
         } catch (IOException ioe) {
             ioe.printStackTrace();
