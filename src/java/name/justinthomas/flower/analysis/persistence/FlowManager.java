@@ -1,17 +1,18 @@
 package name.justinthomas.flower.analysis.persistence;
 
+import com.sleepycat.je.CheckpointConfig;
 import com.sleepycat.je.DatabaseException;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
 import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
-import com.sleepycat.je.SecondaryIntegrityException;
 import com.sleepycat.je.StatsConfig;
 import com.sleepycat.persist.EntityCursor;
 import com.sleepycat.persist.EntityStore;
 import com.sleepycat.persist.ForwardCursor;
-import com.sleepycat.persist.SecondaryIndex;
 import com.sleepycat.persist.StoreConfig;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 
 import java.net.InetAddress;
@@ -358,7 +359,6 @@ public class FlowManager {
 
         cursor.close();
 
-        printEnvironmentStatistics(environment);
         closeStore(entityStore);
         closeEnvironment(environment);
 
@@ -385,14 +385,40 @@ public class FlowManager {
 
         System.out.println("Total seconds of flows deleted: " + secondCount);
 
-        printEnvironmentStatistics(environment);
         closeStore(entityStore);
+        recordEnvironmentStatistics(environment);
+        cleanLog(environment);
+        checkpoint(environment);
         closeEnvironment(environment);
     }
 
-    private void printEnvironmentStatistics(Environment environment) {
-        StatsConfig config = new StatsConfig();
-        config.setClear(true);
-        System.err.println(environment.getStats(config));
+    private void cleanLog(Environment environment) {
+        try {
+            environment.cleanLog();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void checkpoint(Environment environment) {
+        CheckpointConfig checkpointConfig = new CheckpointConfig();
+        try {
+            environment.checkpoint(checkpointConfig);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void recordEnvironmentStatistics(Environment environment) {
+        try {
+            FileWriter writer = new FileWriter("/traces/databasestatistics.txt", true);
+            writer.append("Date: " + new Date() + "\n");
+            StatsConfig config = new StatsConfig();
+            config.setClear(true);
+            writer.append(environment.getStats(config).toStringVerbose());
+            writer.close();
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
     }
 }
