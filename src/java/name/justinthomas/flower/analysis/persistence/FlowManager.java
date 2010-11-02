@@ -336,7 +336,7 @@ public class FlowManager {
 
         Date now = new Date();
         Date start = new Date();
-        start.setTime(now.getTime() - (year * 1));
+        start.setTime(0l);
 
         Date flowCutoff = new Date();
         flowCutoff.setTime(now.getTime() - flowRetention);

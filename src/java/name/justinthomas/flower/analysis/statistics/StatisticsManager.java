@@ -529,22 +529,9 @@ public class StatisticsManager {
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
         StatisticsAccessor dataAccessor = new StatisticsAccessor(entityStore);
 
-        long second = 1000;
-        long minute = 60 * second;
-        long hour = 60 * minute;
-        long day = 24 * hour;
-        long week = 7 * day;
-        long year = 365 * day;
-        long month = year / 12;
-
-        long intervalRetention = 6 * month;
-
         Date now = new Date();
         Date start = new Date();
-        start.setTime(now.getTime() - (year * 1));
-
-        Date intervalCutoff = new Date();
-        intervalCutoff.setTime(now.getTime() - intervalRetention);
+        start.setTime(0l);
 
         ArrayList<IntervalKey> expiredIntervals = new ArrayList();
 
@@ -555,7 +542,9 @@ public class StatisticsManager {
 
             IntervalKey endKey = new IntervalKey();
             endKey.resolution = resolution;
-            endKey.interval = intervalCutoff.getTime() / resolution;
+            endKey.interval = (now.getTime() / resolution) - 100000;
+            // The above line keeps 100000 of any resolution around.  At it's most fine (10000 ms), this is about a week and a half.
+            // At it's most coarse (10000000 ms), this is about 30 years.
 
             EntityCursor<StatisticalInterval> cursor = dataAccessor.intervalByKey.entities(startKey, true, endKey, true);
 
