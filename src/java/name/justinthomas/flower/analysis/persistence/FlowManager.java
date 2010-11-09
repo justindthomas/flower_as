@@ -51,7 +51,7 @@ public class FlowManager {
             Context context = new InitialContext();
             flowManager = (FlowManager) context.lookup("java:global/Analysis/FlowManager");
         } catch (NamingException ne) {
-            ne.printStackTrace();
+            System.err.println("Could not locate FlowManager using JNDI: " + ne.getExplanation());
         }
         return flowManager;
     }
@@ -75,11 +75,6 @@ public class FlowManager {
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
         }
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        super.finalize();
     }
 
     private Environment setupEnvironment() {
@@ -134,7 +129,7 @@ public class FlowManager {
         try {
             store.close();
         } catch (DatabaseException e) {
-            e.printStackTrace();
+            System.err.println("Error closing EntityStore: " + e.getMessage());
         }
     }
 
@@ -194,11 +189,9 @@ public class FlowManager {
             }
 
         } catch (InterruptedException ie) {
-            System.err.println("FlowManager interrupted during getFlows...");
-            ie.printStackTrace();
+            System.err.println("FlowManager interrupted during getFlows: " + ie.getMessage());
         } catch (UnknownHostException uhe) {
-            System.err.println("FlowManager interrupted during getFlows...");
-            uhe.printStackTrace();
+            System.err.println("FlowManager interrupted during getFlows: " + uhe.getMessage());
         } finally {
             closeStore(readOnlyEntityStore);
             closeEnvironment(environment);
@@ -239,8 +232,7 @@ public class FlowManager {
                 }
             }
         } catch (ClassNotFoundException cnfe) {
-            System.err.println("ClassNotFoundException caught in " + cnfe.getStackTrace()[0].getMethodName() + ": " + cnfe.getMessage());
-            cnfe.printStackTrace();
+            System.err.println("ClassNotFoundException caught: " + cnfe.getMessage());
         }
 
         if (!cancelVolume) {
@@ -311,8 +303,8 @@ public class FlowManager {
     private void cleanLog(Environment environment) {
         try {
             environment.cleanLog();
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (DatabaseException e) {
+            System.err.println("Error running cleanLog: " + e.getMessage());
         }
     }
 
@@ -320,8 +312,8 @@ public class FlowManager {
         CheckpointConfig checkpointConfig = new CheckpointConfig();
         try {
             environment.checkpoint(checkpointConfig);
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (DatabaseException e) {
+            System.err.println("Error running checkpoint: " + e.getMessage());
         }
     }
 
@@ -334,7 +326,7 @@ public class FlowManager {
             writer.append(environment.getStats(config).toStringVerbose());
             writer.close();
         } catch (IOException ioe) {
-            ioe.printStackTrace();
+            System.err.println("Error writing database statistics: " + ioe.getMessage());
         }
     }
 }

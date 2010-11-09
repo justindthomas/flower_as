@@ -26,7 +26,7 @@ public class Cleaner implements Runnable {
     private static ScheduledThreadPoolExecutor executor;
 
     @PostConstruct
-    public void setup() {
+    protected void setup() {
         System.out.println("Setting Cleaner to run in 3 minutes and every 4 hours.");
 
         instance = new Cleaner();

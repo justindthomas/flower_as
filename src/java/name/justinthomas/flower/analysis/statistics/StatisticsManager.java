@@ -96,7 +96,7 @@ public class StatisticsManager {
         try {
             store.close();
         } catch (DatabaseException e) {
-            e.printStackTrace();
+            System.err.println("Error closing EntityStore: " + e.getMessage());
         }
     }
 
@@ -351,12 +351,12 @@ public class StatisticsManager {
                         }
                     }
                 } catch (DatabaseException e) {
-                    e.printStackTrace();
+                    System.err.println("Database error: " + e.getMessage());
                 } finally {
                     cursor.close();
                 }
             } catch (DatabaseException e) {
-                e.printStackTrace();
+                System.err.println("Database error: " + e.getMessage());
             } finally {
                 closeStore(store);
             }
@@ -503,12 +503,12 @@ public class StatisticsManager {
                         }
                     }
                 } catch (DatabaseException e) {
-                    e.printStackTrace();
+                    System.err.println("Database error: " + e.getMessage());
                 } finally {
                     cursor.close();
                 }
             } catch (DatabaseException e) {
-                e.printStackTrace();
+                System.err.println("Database error: " + e.getMessage());
             } finally {
                 closeStore(readOnlyEntityStore);
             }
@@ -518,7 +518,6 @@ public class StatisticsManager {
             System.err.println("Stopped FlowManager during network build");
         } catch (Exception e) {
             System.err.println("Exception caught in " + e.getStackTrace()[0].getMethodName() + ": " + e.getMessage());
-            e.printStackTrace();
         } finally {
             closeEnvironment(environment);
         }
@@ -554,7 +553,7 @@ public class StatisticsManager {
             }        // Add the default node (with newly acquired flows) to the default network
             writer.close();
         } catch (IOException ioe) {
-            ioe.printStackTrace();
+            System.err.println("Error creating trace file: " + ioe.getMessage());
         }
     }
 
@@ -607,8 +606,8 @@ public class StatisticsManager {
     private void cleanLog(Environment environment) {
         try {
             environment.cleanLog();
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (DatabaseException e) {
+            System.err.println("Database error running cleanLog: " + e.getMessage());
         }
     }
 
@@ -616,8 +615,8 @@ public class StatisticsManager {
         CheckpointConfig checkpointConfig = new CheckpointConfig();
         try {
             environment.checkpoint(checkpointConfig);
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (DatabaseException e) {
+            System.err.println("Database error running checkpoint: " + e.getMessage());
         }
     }
 
@@ -630,7 +629,7 @@ public class StatisticsManager {
             writer.append(environment.getStats(config).toStringVerbose());
             writer.close();
         } catch (IOException ioe) {
-            ioe.printStackTrace();
+            System.err.println("Error recording environment statistics: " + ioe.getMessage());
         }
     }
 }
