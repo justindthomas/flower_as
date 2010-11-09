@@ -39,7 +39,7 @@ public class ConfigurationManager {
     private String userDirectory = null;
     private String statisticsDirectory = null;
     private String frequencyDirectory = null;
-    private HashMap<String, Long> resolution = null;
+    private HashMap<Long, Boolean> resolution = null;
     private String configurationDirectory = "configuration";
     private Properties properties;
     private HashMap<String, String> managedNetworks = null;
@@ -302,11 +302,11 @@ public class ConfigurationManager {
         this.directoryDomains = directoryDomains;
     }
 
-    public HashMap<String, Long> getResolution() {
+    public HashMap<Long, Boolean> getResolution() {
         return resolution;
     }
 
-    public void setResolution(HashMap<String, Long> resolution) {
+    public void setResolution(HashMap<Long, Boolean> resolution) {
         this.resolution = resolution;
     }
 }

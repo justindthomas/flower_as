@@ -6,9 +6,7 @@ import name.justinthomas.flower.analysis.statistics.StatisticsManager;
 import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
 import com.sleepycat.je.StatsConfig;
-import com.sleepycat.persist.EntityCursor;
 import com.sleepycat.persist.EntityStore;
-import com.sleepycat.persist.ForwardCursor;
 import com.sleepycat.persist.StoreConfig;
 import java.io.File;
 import java.io.FileWriter;
@@ -22,6 +20,7 @@ import java.net.UnknownHostException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.PostConstruct;
 import javax.ejb.DependsOn;
@@ -36,6 +35,7 @@ import javax.servlet.http.HttpSession;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolume;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
+import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
 
 @Singleton
 @Startup
@@ -138,104 +138,68 @@ public class FlowManager {
         }
     }
 
-    public ArrayList<Flow> getFlows(Constraints constraints) {
-        ArrayList<Flow> flows = new ArrayList<Flow>();
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/" + configurationManager.getFlowDirectory());
-
-        try {
-            if (!environmentHome.exists()) {
-                if (!environmentHome.mkdirs()) {
-                    throw new Exception("Could not open or create base statistics directory.");
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
-        }
-
-        Environment environment;
-        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Flow", getStoreConfig(true));
-
-        FlowAccessor dataAccessor = new FlowAccessor(entityStore);
-
-        EntityCursor<PersistentSecond> cursor = dataAccessor.flowsBySecond.entities(constraints.startTime.getTime() / 1000, true, constraints.endTime.getTime() / 1000, true);
-
-        for (PersistentSecond second : cursor) {
-            try {
-                for (PersistentFlow flow : second.getFlows()) {
-                    flows.add(new Flow(flow));
-                }
-            } catch (UnknownHostException uhe) {
-                uhe.printStackTrace();
-            }
-        }
-
-        cursor.close();
-        closeStore(entityStore);
-        closeEnvironment(environment);
-        return flows;
-    }
-
     @Lock(LockType.READ)
     public void getFlows(HttpSession session, String constraintsString) {
 
+        System.out.println("getFlows called.");
         Constraints constraints = new Constraints(constraintsString);
         SessionManager.getPackets(session).clear();
 
+        StatisticsManager statisticsManager = new StatisticsManager();
+        LinkedList<StatisticalInterval> intervals = statisticsManager.getStatisticalIntervals(session, constraints);
+
+        LinkedHashMap<Long, Long> flowIDs = new LinkedHashMap();
+
+        for (StatisticalInterval interval : intervals) {
+            for (Long id : interval.flowIDs) {
+                flowIDs.put(id, null);
+            }
+        }
+
+        System.out.println("Total flagged IDs: " + flowIDs.size());
         Environment environment;
         EntityStore readOnlyEntityStore = new EntityStore(environment = setupEnvironment(), "Flow", this.getStoreConfig(true));
-
         FlowAccessor dataAccessor = new FlowAccessor(readOnlyEntityStore);
 
-        ForwardCursor<PersistentSecond> cursor = dataAccessor.flowsBySecond.entities(constraints.startTime.getTime() / 1000, true, constraints.endTime.getTime() / 1000, true);
-
-
-        // We only want to do this query once, so make it count.
-        if (FlowManager.DEBUG >= 1) {
+        if (DEBUG >= 1) {
             System.out.println("Iterating over query results.");
         }
 
-        Integer packetsProcessed = 0;
+        Integer flowsProcessed = 0;
         try {
-            for (PersistentSecond second : cursor) {
-                for (PersistentFlow flow : second.getFlows()) {
+            for (Long id : flowIDs.keySet()) {
+                if (dataAccessor.flowById.contains(id)) {
+                    PersistentFlow pflow = dataAccessor.flowById.get(id);
                     Boolean select = false;
-                    if (constraints.sourceAddressList.isEmpty() || constraints.sourceAddressList.contains(InetAddress.getByName(flow.source))) {
+                    if (constraints.sourceAddressList.isEmpty() || constraints.sourceAddressList.contains(InetAddress.getByName(pflow.source))) {
                         select = true;
-                    } else if (constraints.destinationAddressList.isEmpty() || constraints.destinationAddressList.contains(InetAddress.getByName(flow.destination))) {
+                    } else if (constraints.destinationAddressList.isEmpty() || constraints.destinationAddressList.contains(InetAddress.getByName(pflow.destination))) {
                         select = true;
                     }
 
                     if (select) {
-                        SessionManager.getPackets(session).add(new Flow(flow));
-                    }
-
-                    if (Thread.currentThread().isInterrupted()) {
-                        System.out.println("Stopping FlowManager (getPackets) ...");
-                        throw new InterruptedException();
+                        SessionManager.getPackets(session).add(new Flow(pflow));
                     }
 
                     if (DEBUG > 0) {
-                        if (++packetsProcessed % 10000 == 0) {
-                            System.out.println("Packets processed: " + packetsProcessed);
+                        if (++flowsProcessed % 10000 == 0) {
+                            System.out.println("Flows processed: " + flowsProcessed);
                         }
                     }
 
                     if (Thread.currentThread().isInterrupted()) {
-                        //System.out.println("FlowManager Interrupted");
                         throw new InterruptedException();
                     }
                 }
             }
+
         } catch (InterruptedException ie) {
-            System.err.println("FlowManager interrupted during getPackets...");
+            System.err.println("FlowManager interrupted during getFlows...");
             ie.printStackTrace();
         } catch (UnknownHostException uhe) {
-            System.err.println("FlowManager interrupted during getPackets...");
+            System.err.println("FlowManager interrupted during getFlows...");
             uhe.printStackTrace();
         } finally {
-            //System.out.println("Completed processing packets: " + packetsProcessed);
-
-            cursor.close();
             closeStore(readOnlyEntityStore);
             closeEnvironment(environment);
         }
@@ -317,73 +281,25 @@ public class FlowManager {
         return networkList;
     }
 
-    private ArrayList<Long> identifyExpiredFlows() {
-        System.out.println("Identifying expired flows...");
-
-        Environment environment;
-        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Flow", this.getStoreConfig(true));
-        FlowAccessor dataAccessor = new FlowAccessor(entityStore);
-
-        long second = 1000;
-        long minute = 60 * second;
-        long hour = 60 * minute;
-        long day = 24 * hour;
-        long week = 7 * day;
-        long year = 365 * day;
-        long month = year / 12;
-
-        long flowRetention = day;
-
-        Date now = new Date();
-        Date start = new Date();
-        start.setTime(0l);
-
-        Date flowCutoff = new Date();
-        flowCutoff.setTime(now.getTime() - flowRetention);
-
-        EntityCursor<PersistentSecond> cursor = dataAccessor.flowsBySecond.entities(start.getTime() / 1000, true, flowCutoff.getTime() / 1000, true);
-
-        ArrayList<Long> expiredSeconds = new ArrayList();
-
-        Integer secondsDeleted = 0;
-
-        for (PersistentSecond persistentSecond : cursor) {
-            expiredSeconds.add(persistentSecond.second);
-
-            if (++secondsDeleted % 1000 == 0) {
-                System.out.println(secondsDeleted + " seconds marked for deletion...");
-            }
-        }
-
-        System.out.println(secondsDeleted + " total seconds marked for deletion...");
-
-        cursor.close();
-
-        closeStore(entityStore);
-        closeEnvironment(environment);
-
-        return expiredSeconds;
-    }
-
-    public void cleanFlows() {
-        ArrayList<Long> seconds = identifyExpiredFlows();
-
+    public void cleanFlows(ArrayList<Long> flowIDs) {
         System.out.println("Deleting expired flows...");
 
         Environment environment;
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Flow", this.getStoreConfig(false));
         FlowAccessor dataAccessor = new FlowAccessor(entityStore);
 
-        int secondCount = 0;
-        for (Long second : seconds) {
-            dataAccessor.flowsBySecond.delete(second);
+        int deletedCount = 0;
+        for (Long flowID : flowIDs) {
+            if (dataAccessor.flowById.contains(flowID)) {
+                dataAccessor.flowById.delete(flowID);
 
-            if (++secondCount % 1000 == 0) {
-                System.out.println("Seconds of flows deleted: " + secondCount);
+                if (++deletedCount % 1000 == 0) {
+                    System.out.println("Flows deleted: " + deletedCount);
+                }
             }
         }
 
-        System.out.println("Total seconds of flows deleted: " + secondCount);
+        System.out.println("Total flows deleted: " + deletedCount);
 
         closeStore(entityStore);
         recordEnvironmentStatistics(environment);

@@ -35,12 +35,13 @@ public class PersistentConfiguration {
     // permits the use of unencrypted LDAP for Active Directory authentication
     public Boolean unsafeLdap = false;
 
-    public HashMap<String, Long> resolution = new HashMap();
+    // milliseconds, clean flows
+    public HashMap<Long, Boolean> resolution = new HashMap();
 
     public PersistentConfiguration() {
-        resolution.put("High",         10000l);
-        resolution.put("MediumHigh",   100000l);
-        resolution.put("MediumLow",    1000000l);
-        resolution.put("Low",          10000000l);
+        resolution.put(10000l, true);
+        resolution.put(100000l, true);
+        resolution.put(1000000l, true);
+        resolution.put(10000000l, true);
     }
 }

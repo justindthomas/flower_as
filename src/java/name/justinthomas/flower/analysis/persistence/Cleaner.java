@@ -4,6 +4,7 @@
  */
 package name.justinthomas.flower.analysis.persistence;
 
+import java.util.ArrayList;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.PostConstruct;
@@ -32,7 +33,6 @@ public class Cleaner implements Runnable {
         executor = new ScheduledThreadPoolExecutor(1);
         executor.scheduleAtFixedRate(instance, 3, 240, TimeUnit.MINUTES);
     }
-
     private static Integer DEBUG = 1;
 
     private void clean() {
@@ -40,13 +40,13 @@ public class Cleaner implements Runnable {
             System.out.println("Cleaning databases...");
         }
 
-        System.out.println("Cleaning flows...");
-        FlowManager flowManager = FlowManager.getFlowManager();
-        flowManager.cleanFlows();
-
         System.out.println("Cleaning statistics...");
         StatisticsManager statisticsManager = new StatisticsManager();
-        statisticsManager.cleanStatisticalIntervals();
+        ArrayList<Long> flowIDs = statisticsManager.cleanStatisticalIntervals();
+
+        System.out.println("Cleaning flows...");
+        FlowManager flowManager = FlowManager.getFlowManager();
+        flowManager.cleanFlows(flowIDs);
 
         if (DEBUG >= 1) {
             System.out.println("Cleaning completed.");

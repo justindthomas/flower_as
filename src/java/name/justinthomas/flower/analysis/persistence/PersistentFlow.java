@@ -4,7 +4,8 @@
  */
 package name.justinthomas.flower.analysis.persistence;
 
-import com.sleepycat.persist.model.Persistent;
+import com.sleepycat.persist.model.Entity;
+import com.sleepycat.persist.model.PrimaryKey;
 import java.util.Date;
 import name.justinthomas.flower.analysis.element.Flow;
 
@@ -12,9 +13,12 @@ import name.justinthomas.flower.analysis.element.Flow;
  *
  * @author justin
  */
-@Persistent
+@Entity(version = 11082010)
 public class PersistentFlow {
 
+    @PrimaryKey(sequence="ID")
+    Long id;
+    
     public Date startTimeStamp = null;
     public Date lastTimeStamp = null;
     public String ethernetType = null;
@@ -38,7 +42,7 @@ public class PersistentFlow {
             System.err.println("Error in HashTableFlow(Flow): " + e.getMessage());
         }
 
-        
+
         this.ethernetType = flow.ethernetType;
         this.lastTimeStamp = flow.lastTimeStamp;
         this.startTimeStamp = flow.startTimeStamp;
@@ -59,6 +63,7 @@ public class PersistentFlow {
         this.sourcePort = this.destinationPort;
         this.destinationPort = tempPort;
     }
+
     private PersistentFlow() {
     }
 }

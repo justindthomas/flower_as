@@ -16,8 +16,8 @@ import com.sleepycat.persist.PrimaryIndex;
 public class FlowAccessor {
 
     public FlowAccessor(EntityStore store) throws DatabaseException {
-        flowsBySecond = store.getPrimaryIndex(Long.class, PersistentSecond.class);
+        flowById = store.getPrimaryIndex(Long.class, PersistentFlow.class);
     }
 
-    public PrimaryIndex<Long,PersistentSecond> flowsBySecond;
+    public PrimaryIndex<Long,PersistentFlow> flowById;
 }

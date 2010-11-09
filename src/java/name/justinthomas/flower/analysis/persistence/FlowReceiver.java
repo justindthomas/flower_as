@@ -60,14 +60,16 @@ public class FlowReceiver {
         }
     }
 
-    public void addFlow(Flow flow) {
-        this.addFlow(flow, null);
+    public Long addFlow(Flow flow) {
+        return this.addFlow(flow, null);
     }
 
-    public void addFlow(Flow flow, HttpServletRequest request) {
+    public Long addFlow(Flow flow, HttpServletRequest request) {
         if ((flow.protocol == 6) || (flow.protocol == 17)) {
             frequencyManager.addPort(flow.protocol, flow.ports);
         }
+
+        PersistentFlow pflow = flow.toHashTableFlow();
 
         try {
             setupEnvironment();
@@ -81,18 +83,19 @@ public class FlowReceiver {
             entityStore = new EntityStore(environment, "Flow", storeConfig);
             try {
                 FlowAccessor dataAccessor = new FlowAccessor(entityStore);
-                Long second = flow.startTimeStamp.getTime() / 1000;
+                //Long second = flow.startTimeStamp.getTime() / 1000;
 
-                PersistentSecond persistentSecond = null;
-                if(dataAccessor.flowsBySecond.contains(second)) {
-                    persistentSecond = dataAccessor.flowsBySecond.get(second);
-                } else {
-                    persistentSecond = new PersistentSecond(second);
-                }
-                persistentSecond.flows.add(flow.toHashTableFlow());
+                //PersistentSecond persistentSecond = null;
+                //if(dataAccessor.flowsBySecond.contains(second)) {
+                //    persistentSecond = dataAccessor.flowsBySecond.get(second);
+                //} else {
+                //    persistentSecond = new PersistentSecond(second);
+                // }
+                //persistentSecond.flows.add(flow.toHashTableFlow());
 
-                dataAccessor.flowsBySecond.put(persistentSecond);
+                //dataAccessor.flowsBySecond.put(persistentSecond);
 
+                dataAccessor.flowById.put(pflow);
             } catch (DatabaseException e) {
                 System.err.println("addVolume Failed: " + e.getMessage());
                 if (request != null) {
@@ -109,5 +112,7 @@ public class FlowReceiver {
         } finally {
             closeEnvironment();
         }
+
+        return pflow.id;
     }
 }

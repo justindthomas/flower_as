@@ -48,10 +48,10 @@ public class FlowInsert {
                 Flow flow = new Flow(xflow);
 
                 FlowReceiver receiver = new FlowReceiver();
-                receiver.addFlow(flow, request);
+                Long flowID = receiver.addFlow(flow, request);
 
                 StatisticsManager statisticsManager = new StatisticsManager();
-                statisticsManager.addStatisticalSeconds(flow);
+                statisticsManager.addStatisticalSeconds(flow, flowID);
                 
             } catch (Exception e) {
                 e.printStackTrace();

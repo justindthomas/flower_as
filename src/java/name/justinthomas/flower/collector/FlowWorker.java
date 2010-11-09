@@ -379,10 +379,10 @@ public class FlowWorker implements Runnable {
             Flow flow = new Flow(xnetflow);
             
             FlowReceiver flowReceiver = new FlowReceiver();
-            flowReceiver.addFlow(flow);
+            Long flowID = flowReceiver.addFlow(flow);
 
             StatisticsManager statisticsManager = new StatisticsManager();
-            statisticsManager.addStatisticalSeconds(flow);
+            statisticsManager.addStatisticalSeconds(flow, flowID);
         }
 
         return flows;

@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
@@ -99,8 +100,8 @@ public class StatisticsManager {
         }
     }
 
-    public void cleanStatisticalIntervals() {
-        ArrayList<IntervalKey> keys = identifyExpiredIntervals();
+    public ArrayList<Long> cleanStatisticalIntervals() {
+        HashMap<IntervalKey, Boolean> keys = identifyExpiredIntervals();
 
         System.out.println("Deleting expired intervals...");
 
@@ -108,8 +109,14 @@ public class StatisticsManager {
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(false));
         StatisticsAccessor dataAccessor = new StatisticsAccessor(entityStore);
 
-        for (IntervalKey key : keys) {
-            dataAccessor.intervalByKey.delete(key);
+        ArrayList<Long> flowIDs = new ArrayList();
+        for (Entry<IntervalKey, Boolean> key : keys.entrySet()) {
+            if (key.getValue()) {
+                for (Long flowID : dataAccessor.intervalByKey.get(key.getKey()).flowIDs) {
+                    flowIDs.add(flowID);
+                }
+            }
+            dataAccessor.intervalByKey.delete(key.getKey());
         }
 
         closeStore(entityStore);
@@ -117,9 +124,11 @@ public class StatisticsManager {
         cleanLog(environment);
         checkpoint(environment);
         closeEnvironment(environment);
+
+        return flowIDs;
     }
 
-    private HashMap<IntervalKey, StatisticalInterval> flowToInterval(Flow flow, Long interval) {
+    private HashMap<IntervalKey, StatisticalInterval> flowToInterval(Flow flow, Long interval, Long flowID) {
         HashMap<IntervalKey, StatisticalInterval> normalized = new HashMap<IntervalKey, StatisticalInterval>();
 
         Long startSecond = (flow.startTimeStamp.getTime() / interval);
@@ -129,13 +138,13 @@ public class StatisticsManager {
         for (long l = startSecond; l <= endSecond; l++) {
             StatisticalInterval sInterval = new StatisticalInterval();
             sInterval.key = new IntervalKey(l, interval);
-            normalized.put(new IntervalKey(l, interval), sInterval.addFlow(new StatisticalFlow(spread, flow)));
+            normalized.put(new IntervalKey(l, interval), sInterval.addFlow(new StatisticalFlow(spread, flow), flowID));
         }
 
         return normalized;
     }
 
-    public void addStatisticalSeconds(Flow flow) {
+    public void addStatisticalSeconds(Flow flow, Long flowID) {
         EntityStore entityStore = null;
         EntityStore entityStoreRO = null;
         Environment environment = null;
@@ -150,13 +159,13 @@ public class StatisticsManager {
                 StatisticsAccessor dataAccessor = new StatisticsAccessor(entityStore);
                 StatisticsAccessor dataAccessorRO = new StatisticsAccessor(entityStoreRO);
 
-                for (Long interval : configurationManager.getResolution().values()) {
-                    HashMap<IntervalKey, StatisticalInterval> normalized = flowToInterval(flow, interval);
+                for (Long interval : configurationManager.getResolution().keySet()) {
+                    HashMap<IntervalKey, StatisticalInterval> normalized = flowToInterval(flow, interval, flowID);
 
                     for (Entry<IntervalKey, StatisticalInterval> entry : normalized.entrySet()) {
                         if (dataAccessorRO.intervalByKey.get(entry.getKey()) != null) {
                             StatisticalInterval stored = dataAccessorRO.intervalByKey.get(entry.getKey());
-                            stored = stored.addSecond(normalized.get(entry.getKey()));
+                            stored = stored.addInterval(normalized.get(entry.getKey()));
                             dataAccessor.intervalByKey.put(stored);
                         } else {
                             dataAccessor.intervalByKey.put(normalized.get(entry.getKey()));
@@ -177,7 +186,7 @@ public class StatisticsManager {
     }
 
     private Long getResolution(long duration, Integer bins) {
-        List<Long> resolutions = new ArrayList(configurationManager.getResolution().values());
+        List<Long> resolutions = new ArrayList(configurationManager.getResolution().keySet());
 
         // This sorts the resolutions from highest to lowest (smallest number to largest number)
         Collections.sort(resolutions);
@@ -210,6 +219,33 @@ public class StatisticsManager {
 
         System.out.println("Setting resolution to: " + returnValue);
         return returnValue;
+    }
+
+    public LinkedList<StatisticalInterval> getStatisticalIntervals(HttpSession session, Constraints constraints) {
+        LinkedList<StatisticalInterval> intervals = new LinkedList();
+
+        Long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
+        Environment environment;
+        Long resolution = getResolution(duration, null);
+
+        EntityStore store = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
+        StatisticsAccessor accessor = new StatisticsAccessor(store);
+        Long start = constraints.startTime.getTime() / resolution;
+        IntervalKey startKey = new IntervalKey(start, resolution);
+        Long end = constraints.endTime.getTime() / resolution;
+        IntervalKey endKey = new IntervalKey(end, resolution);
+
+        EntityCursor<StatisticalInterval> cursor = accessor.intervalByKey.entities(startKey, true, endKey, true);
+
+        for (StatisticalInterval interval : cursor) {
+            intervals.add(interval);
+        }
+
+        cursor.close();
+        closeStore(store);
+        closeEnvironment(environment);
+
+        return intervals;
     }
 
     public LinkedHashMap<Date, HashMap<String, Long>> getVolumeByTime(HttpSession session, Constraints constraints, Integer bins)
@@ -522,7 +558,7 @@ public class StatisticsManager {
         }
     }
 
-    private ArrayList<IntervalKey> identifyExpiredIntervals() {
+    private HashMap<IntervalKey, Boolean> identifyExpiredIntervals() {
         System.out.println("Identifying expired intervals...");
 
         Environment environment;
@@ -533,16 +569,16 @@ public class StatisticsManager {
         Date start = new Date();
         start.setTime(0l);
 
-        ArrayList<IntervalKey> expiredIntervals = new ArrayList();
+        HashMap<IntervalKey, Boolean> expiredIntervals = new HashMap();
 
-        for (Long resolution : configurationManager.getResolution().values()) {
+        for (Entry<Long, Boolean> resolution : configurationManager.getResolution().entrySet()) {
             IntervalKey startKey = new IntervalKey();
-            startKey.resolution = resolution;
-            startKey.interval = start.getTime() / resolution;
+            startKey.resolution = resolution.getKey();
+            startKey.interval = start.getTime() / resolution.getKey();
 
             IntervalKey endKey = new IntervalKey();
-            endKey.resolution = resolution;
-            endKey.interval = (now.getTime() / resolution) - 100000;
+            endKey.resolution = resolution.getKey();
+            endKey.interval = (now.getTime() / resolution.getKey()) - 100000;
             // The above line keeps 100000 of any resolution around.  At it's most fine (10000 ms), this is about a week and a half.
             // At it's most coarse (10000000 ms), this is about 30 years.
 
@@ -551,7 +587,7 @@ public class StatisticsManager {
             Integer intervalsDeleted = 0;
 
             for (StatisticalInterval statisticalInterval : cursor) {
-                expiredIntervals.add(statisticalInterval.key);
+                expiredIntervals.put(statisticalInterval.key, resolution.getValue());
 
                 if (++intervalsDeleted % 1000 == 0) {
                     System.out.println(intervalsDeleted + " intervals marked for deletion at a resolution of " + resolution + " milliseconds...");
