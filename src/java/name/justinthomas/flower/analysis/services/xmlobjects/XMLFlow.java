@@ -6,9 +6,7 @@
 package name.justinthomas.flower.analysis.services.xmlobjects;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.List;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlType;
 
