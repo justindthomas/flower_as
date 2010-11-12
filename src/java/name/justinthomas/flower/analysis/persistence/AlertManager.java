@@ -20,7 +20,7 @@ public class AlertManager {
 
     public void addAlert(PersistentAlert alert) {
         Environment environment;
-        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(true));
+        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(false));
         AlertAccessor accessor = new AlertAccessor(entityStore);
 
         accessor.alertById.put(alert);
