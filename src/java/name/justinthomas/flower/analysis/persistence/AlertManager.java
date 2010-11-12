@@ -14,6 +14,10 @@ public class AlertManager {
     private static final Integer DEBUG = 2;
     private ConfigurationManager configurationManager;
 
+    public AlertManager() {
+        this.configurationManager = ConfigurationManager.getConfigurationManager();
+    }
+
     public void addAlert(PersistentAlert alert) {
         Environment environment;
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(true));
