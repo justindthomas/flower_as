@@ -37,6 +37,7 @@ public class ConfigurationManager {
     private String baseDirectory = null;
     private String flowDirectory = null;
     private String userDirectory = null;
+    private String alertDirectory = null;
     private String statisticsDirectory = null;
     private String frequencyDirectory = null;
     private HashMap<Long, Boolean> resolution = null;
@@ -74,6 +75,7 @@ public class ConfigurationManager {
     private void reload() {
         this.flowDirectory = configuration.flowDirectory;
         this.userDirectory = configuration.userDirectory;
+        this.alertDirectory = configuration.alertDirectory;
         this.frequencyDirectory = configuration.frequencyDirectory;
         //System.out.println("Frequency Directory as Loaded: " + frequencyDirectory);
         this.managedNetworks = configuration.managedNetworks;
@@ -184,114 +186,100 @@ public class ConfigurationManager {
         return configurationManager;
     }
 
-    @Lock(LockType.READ)
     public String getBaseDirectory() {
         return baseDirectory;
     }
 
-    @Lock(LockType.WRITE)
     public void setBaseDirectory(String baseDirectory) {
         this.baseDirectory = baseDirectory;
     }
 
-    @Lock(LockType.READ)
     public String getConfigurationDirectory() {
         return configurationDirectory;
     }
 
-    @Lock(LockType.WRITE)
     public void setConfigurationDirectory(String configurationDirectory) {
         this.configurationDirectory = configurationDirectory;
     }
 
-    @Lock(LockType.READ)
     public String getFlowDirectory() {
         return flowDirectory;
     }
 
-    @Lock(LockType.WRITE)
     public void setFlowDirectory(String flowDirectory) {
         this.flowDirectory = flowDirectory;
     }
 
-    @Lock(LockType.READ)
     public String getFrequencyDirectory() {
         return frequencyDirectory;
     }
 
-    @Lock(LockType.WRITE)
     public void setFrequencyDirectory(String frequencyDirectory) {
         this.frequencyDirectory = frequencyDirectory;
     }
 
-    @Lock(LockType.READ)
     public String getHost() {
         return host;
     }
 
-    @Lock(LockType.WRITE)
     public void setHost(String host) {
         this.host = host;
     }
 
-    @Lock(LockType.WRITE)
     public HashMap<String, String> getManagedNetworks() {
         return managedNetworks;
     }
 
-    @Lock(LockType.WRITE)
     public void setManagedNetworks(HashMap<String, String> managedNetworks) {
         this.managedNetworks = managedNetworks;
     }
 
-    @Lock(LockType.READ)
     public String getPassword() {
         return password;
     }
 
-    @Lock(LockType.WRITE)
     public void setPassword(String password) {
         this.password = password;
     }
 
-    @Lock(LockType.READ)
     public String getUser() {
         return user;
     }
 
-    @Lock(LockType.WRITE)
     public void setUser(String user) {
         this.user = user;
     }
 
-    @Lock(LockType.READ)
     public String getUserDirectory() {
         return userDirectory;
     }
 
-    @Lock(LockType.WRITE)
     public void setUserDirectory(String userDirectory) {
         this.userDirectory = userDirectory;
     }
 
-    @Lock(LockType.WRITE)
     public PersistentConfiguration getConfiguration() {
         return configuration;
     }
 
-    @Lock(LockType.WRITE)
     public void setConfiguration(PersistentConfiguration configuration) {
         this.configuration = configuration;
     }
 
-    @Lock(LockType.READ)
     public String getStatisticsDirectory() {
         return statisticsDirectory;
     }
 
-    @Lock(LockType.WRITE)
     public void setStatisticsDirectory(String statisticsDirectory) {
         this.statisticsDirectory = statisticsDirectory;
+    }
+
+    public String getAlertDirectory() {
+        return alertDirectory;
+    }
+
+    public void setAlertDirectory(String alertDirectory) {
+        this.alertDirectory = alertDirectory;
     }
 
     public HashMap<String, HashMap<String, Boolean>> getDirectoryDomains() {

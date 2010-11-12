@@ -6,7 +6,9 @@ import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebService;
 import javax.xml.ws.WebServiceContext;
+import name.justinthomas.flower.analysis.persistence.AlertManager;
 import name.justinthomas.flower.analysis.persistence.ConfigurationManager;
+import name.justinthomas.flower.analysis.persistence.PersistentAlert;
 
 /**
  *
@@ -32,7 +34,12 @@ public class Alerts {
             @WebParam(name = "packet") String packet) {
 
 
-        System.out.println(date + "," + usec + "," + sourceAddress + "," + destinationAddress + "," + sourcePort + "," + destinationPort + "," + alert);
+        AlertManager alertManager = new AlertManager();
+        PersistentAlert palert = new PersistentAlert(date, usec, sourceAddress, destinationAddress, sourcePort, destinationPort, alert, packet);
+        alertManager.addAlert(palert);
+
+        System.out.println(palert);
+        
         return true;
     }
 

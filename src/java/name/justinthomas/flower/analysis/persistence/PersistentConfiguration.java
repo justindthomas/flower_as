@@ -25,6 +25,7 @@ public class PersistentConfiguration {
     public String frequencyDirectory = "frequency";
     public String statisticsDirectory = "statistics";
     public String userDirectory = "users";
+    public String alertDirectory = "alerts";
 
     // <Network Address/CIDR, Description>
     public HashMap<String, String> managedNetworks = new HashMap();
