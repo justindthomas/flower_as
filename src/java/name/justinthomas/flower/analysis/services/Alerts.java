@@ -32,7 +32,7 @@ public class Alerts {
             @WebParam(name = "packet") String packet) {
 
 
-
+        System.out.println(date + "," + usec + "," + sourceAddress + "," + destinationAddress + "," + sourcePort + "," + destinationPort + "," + alert);
         return true;
     }
 
