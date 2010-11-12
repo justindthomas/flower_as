@@ -39,6 +39,10 @@ public class PersistentAlert {
     @XmlElement
     public String packet;
 
+    protected PersistentAlert() {
+
+    }
+    
     public PersistentAlert(Long date, Long usec, String sourceAddress, String destinationAddress, Integer sourcePort, Integer destinationPort, String alert, String packet) {
         this.date = date;
         this.usec = usec;
