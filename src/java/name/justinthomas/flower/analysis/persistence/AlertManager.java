@@ -5,9 +5,10 @@ import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
 import com.sleepycat.persist.EntityStore;
+import com.sleepycat.persist.ForwardCursor;
 import com.sleepycat.persist.StoreConfig;
 import java.io.File;
-
+import java.util.ArrayList;
 
 public class AlertManager {
 
@@ -23,10 +24,50 @@ public class AlertManager {
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(false));
         AlertAccessor accessor = new AlertAccessor(entityStore);
 
+        Long second = alert.date;
+        PersistentAlertSecond psecond;
+        if (accessor.alertsBySecond.contains(second)) {
+            psecond = accessor.alertsBySecond.get(second);
+        } else {
+            psecond = new PersistentAlertSecond();
+            psecond.second = second;
+        }
+
         accessor.alertById.put(alert);
+
+        System.out.println("Adding: " + alert.id + " to: " + psecond.second);
+        psecond.alerts.add(alert.id);
+        accessor.alertsBySecond.put(psecond);
 
         closeStore(entityStore);
         closeEnvironment(environment);
+    }
+
+    public ArrayList<PersistentAlert> getAlerts(Constraints constraints) {
+        ArrayList<PersistentAlert> alerts = new ArrayList();
+
+        System.out.println("Getting alerts from: " + constraints.startTime + " to: " + constraints.endTime);
+        Long start = constraints.startTime.getTime() / 1000;
+        Long end = constraints.endTime.getTime() / 1000;
+
+        Environment environment;
+        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(false));
+        AlertAccessor accessor = new AlertAccessor(entityStore);
+
+        ForwardCursor<PersistentAlertSecond> cursor = accessor.alertsBySecond.entities(start, true, end, true);
+
+        for(PersistentAlertSecond psecond : cursor) {
+            System.out.println("Alerts at " + psecond.getSecond() + ":" + psecond.alerts.size());
+            for(Long alertID : psecond.alerts) {
+                alerts.add(accessor.alertById.get(alertID));
+            }
+        }
+
+        cursor.close();
+        closeStore(entityStore);
+        closeEnvironment(environment);
+
+        return alerts;
     }
 
     private Environment setupEnvironment() {
