@@ -11,8 +11,9 @@ import com.sleepycat.persist.PrimaryIndex;
 public class AlertAccessor {
     public AlertAccessor(EntityStore store) throws DatabaseException {
         alertById = store.getPrimaryIndex(Long.class, PersistentAlert.class);
+        alertsBySecond = store.getPrimaryIndex(Long.class, PersistentAlertSecond.class);
     }
 
     public PrimaryIndex<Long,PersistentAlert> alertById;
-
+    public PrimaryIndex<Long,PersistentAlertSecond> alertsBySecond;
 }

@@ -1,5 +1,7 @@
 package name.justinthomas.flower.analysis.services;
 
+import java.util.ArrayList;
+import java.util.List;
 import javax.annotation.Resource;
 import javax.ejb.EJB;
 import javax.jws.WebMethod;
@@ -8,6 +10,7 @@ import javax.jws.WebService;
 import javax.xml.ws.WebServiceContext;
 import name.justinthomas.flower.analysis.persistence.AlertManager;
 import name.justinthomas.flower.analysis.persistence.ConfigurationManager;
+import name.justinthomas.flower.analysis.persistence.Constraints;
 import name.justinthomas.flower.analysis.persistence.PersistentAlert;
 
 /**
@@ -41,6 +44,25 @@ public class Alerts {
         System.out.println(palert);
         
         return true;
+    }
+
+    @WebMethod(operationName = "getAlerts")
+    public List<PersistentAlert> getAlerts(
+            @WebParam(name = "username") String username,
+            @WebParam(name = "password") String password,
+            @WebParam(name = "constraints") String constraintsString) {
+        UserAction userAction = new UserAction();
+
+        ArrayList<PersistentAlert> alerts = new ArrayList();
+
+        if(userAction.authenticate(username, password).authorized) {
+            System.out.println("Retrieving alerts...");
+            AlertManager alertManager = new AlertManager();
+            Constraints constraints = new Constraints(constraintsString);
+            alerts.addAll(alertManager.getAlerts(constraints));
+        }
+
+        return alerts;
     }
 
 }
