@@ -43,6 +43,18 @@ public class AlertManager {
         closeEnvironment(environment);
     }
 
+    public Boolean deleteAlert(Long alert) {
+        Environment environment;
+        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(false));
+        AlertAccessor accessor = new AlertAccessor(entityStore);
+
+        accessor.alertById.delete(alert);
+
+        closeStore(entityStore);
+        closeEnvironment(environment);
+        return true;
+    }
+
     public ArrayList<PersistentAlert> getAlerts(Constraints constraints) {
         ArrayList<PersistentAlert> alerts = new ArrayList();
 
