@@ -46,6 +46,20 @@ public class Alerts {
         return true;
     }
 
+    @WebMethod(operationName = "deleteAlert")
+    public Boolean deleteAlert(
+            @WebParam(name = "username") String username,
+            @WebParam(name = "password") String password,
+            @WebParam(name = "record") Long record) {
+        UserAction userAction = new UserAction();
+        if(userAction.authenticate(username, password).authorized) {
+            System.out.println("Deleting alert...");
+            AlertManager alertManager = new AlertManager();
+            return alertManager.deleteAlert(record);
+        }
+        return false;
+    }
+
     @WebMethod(operationName = "getAlerts")
     public List<PersistentAlert> getAlerts(
             @WebParam(name = "username") String username,

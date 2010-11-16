@@ -19,6 +19,7 @@ import javax.xml.bind.annotation.XmlType;
 @XmlType
 public class PersistentAlert {
 
+    @XmlElement
     @PrimaryKey(sequence="ID")
     long id;
 
