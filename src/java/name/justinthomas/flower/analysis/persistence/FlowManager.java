@@ -282,7 +282,7 @@ public class FlowManager {
 
         int deletedCount = 0;
         for (Long flowID : flowIDs) {
-            if (dataAccessor.flowById.contains(flowID)) {
+            if ((flowID != null) && dataAccessor.flowById.contains(flowID)) {
                 dataAccessor.flowById.delete(flowID);
 
                 if (++deletedCount % 1000 == 0) {

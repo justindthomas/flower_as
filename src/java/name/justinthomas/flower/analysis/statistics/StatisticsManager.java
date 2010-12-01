@@ -108,16 +108,22 @@ public class StatisticsManager {
         Environment environment;
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(false));
         StatisticsAccessor dataAccessor = new StatisticsAccessor(entityStore);
-
+        int nullIDs = 0;
         ArrayList<Long> flowIDs = new ArrayList();
         for (Entry<IntervalKey, Boolean> key : keys.entrySet()) {
             if (key.getValue()) {
                 for (Long flowID : dataAccessor.intervalByKey.get(key.getKey()).flowIDs) {
-                    flowIDs.add(flowID);
+                    if(flowID != null) {
+                        flowIDs.add(flowID);
+                    } else {
+                        nullIDs++;
+                    }
                 }
             }
             dataAccessor.intervalByKey.delete(key.getKey());
         }
+
+        System.out.println("Null flow IDs found in StatisticalIntervals: " + nullIDs);
 
         closeStore(entityStore);
         recordEnvironmentStatistics(environment);
