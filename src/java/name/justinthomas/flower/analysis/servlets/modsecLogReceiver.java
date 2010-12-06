@@ -5,11 +5,11 @@
 package name.justinthomas.flower.analysis.servlets;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
 import javax.servlet.ServletException;
 import javax.servlet.ServletInputStream;
 import javax.servlet.annotation.WebServlet;
@@ -37,6 +37,14 @@ public class modsecLogReceiver extends HttpServlet {
         response.setContentType("text/html;charset=UTF-8");
         PrintWriter out = response.getWriter();
         try {
+            Enumeration<String> names = request.getHeaderNames();
+
+            while(names.hasMoreElements()) {
+                String n = names.nextElement();
+                System.out.println("Header Name: " + n);
+                System.out.println("Header Data: " + request.getHeader(n));
+            }
+
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ServletInputStream is = request.getInputStream();
 
@@ -46,7 +54,7 @@ public class modsecLogReceiver extends HttpServlet {
 
             baos.close();
 
-            //System.out.println("Data: " + baos.toString() + "Length: " + request.getContentLength());
+            System.out.println("Data: " + baos.toString() + "Length: " + request.getContentLength());
 
         } finally {
             out.close();
