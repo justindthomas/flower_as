@@ -1,13 +1,9 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package name.justinthomas.flower.analysis.persistence;
 
 import com.sleepycat.persist.model.Entity;
 import com.sleepycat.persist.model.PrimaryKey;
 import java.util.Date;
+import java.util.LinkedList;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlType;
 
@@ -18,6 +14,14 @@ import javax.xml.bind.annotation.XmlType;
 @Entity
 @XmlType
 public class PersistentAlert {
+
+    public enum SourceType {
+        SNORT,
+        MODSECURITY
+    }
+
+    @XmlElement
+    public SourceType type;
 
     @XmlElement
     @PrimaryKey(sequence="ID")
@@ -35,16 +39,39 @@ public class PersistentAlert {
     public Integer sourcePort;
     @XmlElement
     public Integer destinationPort;
+
+    // Snort-specific Fields
     @XmlElement
     public String alert;
     @XmlElement
     public String packet;
 
-    protected PersistentAlert() {
+    // mod_security-specific Fields
+    @XmlElement
+    public String auditLogHeader;
+    @XmlElement
+    public String requestHeaders;
+    @XmlElement
+    public String requestBody;
+    @XmlElement
+    public String intermediateResponseBody;
+    @XmlElement
+    public String finalResponseHeaders;
+    @XmlElement
+    public String auditLogTrailer;
+    @XmlElement
+    public String requestBodyNoFiles;
+    @XmlElement
+    public LinkedList<String> matchedRules;
+    @XmlElement
+    public String finalBoundary;
+
+    public PersistentAlert() {
 
     }
     
     public PersistentAlert(Long date, Long usec, String sourceAddress, String destinationAddress, Integer sourcePort, Integer destinationPort, String alert, String packet) {
+        this.type = SourceType.SNORT;
         this.date = date;
         this.usec = usec;
         this.sourceAddress = sourceAddress;
@@ -53,6 +80,25 @@ public class PersistentAlert {
         this.destinationPort = destinationPort;
         this.alert = alert;
         this.packet = packet;
+    }
+
+    public PersistentAlert(Long date, String sourceAddress, String destinationAddress, Integer sourcePort, Integer destinationPort, String auditLogHeader, String requestHeaders, String requestBody, String intermediateResponseBody, String finalResponseHeaders, String auditLogTrailer, String requestBodyNoFiles, LinkedList<String> matchedRules, String finalBoundary) {
+        this.type = SourceType.MODSECURITY;
+        this.id = id;
+        this.date = date;
+        this.sourceAddress = sourceAddress;
+        this.destinationAddress = destinationAddress;
+        this.sourcePort = sourcePort;
+        this.destinationPort = destinationPort;
+        this.auditLogHeader = auditLogHeader;
+        this.requestHeaders = requestHeaders;
+        this.requestBody = requestBody;
+        this.intermediateResponseBody = intermediateResponseBody;
+        this.finalResponseHeaders = finalResponseHeaders;
+        this.auditLogTrailer = auditLogTrailer;
+        this.requestBodyNoFiles = requestBodyNoFiles;
+        this.matchedRules = matchedRules;
+        this.finalBoundary = finalBoundary;
     }
 
     @Override

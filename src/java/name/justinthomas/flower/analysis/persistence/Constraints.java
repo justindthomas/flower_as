@@ -10,6 +10,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import name.justinthomas.flower.analysis.persistence.PersistentAlert.SourceType;
 
 /**
  *
@@ -23,13 +24,14 @@ public class Constraints {
     public ArrayList<Integer> destinationPortList = new ArrayList<Integer>();
     public Date startTime = new Date();
     public Date endTime = new Date();
-    public Boolean ipv4 = new Boolean(true);
-    public Boolean ipv6 = new Boolean(true);
+    public Boolean ipv4 = true;
+    public Boolean ipv6 = true;
     public ArrayList<InetAddress> sourceAddressList = new ArrayList<InetAddress>();
     public ArrayList<InetAddress> destinationAddressList = new ArrayList<InetAddress>();
     public ArrayList<Integer> protocolList = new ArrayList<Integer>();
     public Integer maxFlowSize = 0;
     public Integer minFlowSize = 0;
+    public SourceType alertType;
     public static final SimpleDateFormat timeDateFormat = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
 
     public Constraints(String pattern) {
@@ -126,6 +128,10 @@ public class Constraints {
                 } catch (UnknownHostException uhe) {
                     System.err.println("Couldn't parse destination host parameter: " + uhe.getMessage());
                 }
+            } else if (token[x].toLowerCase().equals("snort")) {
+                alertType = SourceType.SNORT;
+            } else if (token[x].toLowerCase().equals("modsecurity")) {
+                alertType = SourceType.MODSECURITY;
             }
         }
     }

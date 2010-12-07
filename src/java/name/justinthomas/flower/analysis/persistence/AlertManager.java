@@ -71,7 +71,10 @@ public class AlertManager {
         for(PersistentAlertSecond psecond : cursor) {
             System.out.println("Alerts at " + psecond.getSecond() + ":" + psecond.alerts.size());
             for(Long alertID : psecond.alerts) {
-                alerts.add(accessor.alertById.get(alertID));
+                PersistentAlert alert = accessor.alertById.get(alertID);
+                if((constraints.alertType == null) || (constraints.alertType == alert.type)) {
+                    alerts.add(accessor.alertById.get(alertID));
+                }
             }
         }
 
