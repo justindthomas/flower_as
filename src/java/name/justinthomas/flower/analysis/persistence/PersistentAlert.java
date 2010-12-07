@@ -63,8 +63,6 @@ public class PersistentAlert {
     public String requestBodyNoFiles;
     @XmlElement
     public LinkedList<String> matchedRules;
-    @XmlElement
-    public String finalBoundary;
 
     public PersistentAlert() {
 
@@ -82,9 +80,8 @@ public class PersistentAlert {
         this.packet = packet;
     }
 
-    public PersistentAlert(Long date, String sourceAddress, String destinationAddress, Integer sourcePort, Integer destinationPort, String auditLogHeader, String requestHeaders, String requestBody, String intermediateResponseBody, String finalResponseHeaders, String auditLogTrailer, String requestBodyNoFiles, LinkedList<String> matchedRules, String finalBoundary) {
+    public PersistentAlert(Long date, String sourceAddress, String destinationAddress, Integer sourcePort, Integer destinationPort, String auditLogHeader, String requestHeaders, String requestBody, String intermediateResponseBody, String finalResponseHeaders, String auditLogTrailer, String requestBodyNoFiles, LinkedList<String> matchedRules) {
         this.type = SourceType.MODSECURITY;
-        this.id = id;
         this.date = date;
         this.sourceAddress = sourceAddress;
         this.destinationAddress = destinationAddress;
@@ -98,7 +95,6 @@ public class PersistentAlert {
         this.auditLogTrailer = auditLogTrailer;
         this.requestBodyNoFiles = requestBodyNoFiles;
         this.matchedRules = matchedRules;
-        this.finalBoundary = finalBoundary;
     }
 
     @Override

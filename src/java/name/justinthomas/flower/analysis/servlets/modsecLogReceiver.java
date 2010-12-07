@@ -18,6 +18,7 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import name.justinthomas.flower.analysis.persistence.AlertManager;
 import name.justinthomas.flower.analysis.persistence.PersistentAlert;
 
 /**
@@ -42,9 +43,8 @@ public class modsecLogReceiver extends HttpServlet {
         response.setContentType("text/html;charset=UTF-8");
         PrintWriter out = response.getWriter();
         try {
-            //AlertManager alertManager = new AlertManager();
-            //alertManager.addAlert(this.getAlert(request));
-            this.getAlert(request);
+            AlertManager alertManager = new AlertManager();
+            alertManager.addAlert(this.getAlert(request));
         } finally {
             out.close();
         }
@@ -134,7 +134,21 @@ public class modsecLogReceiver extends HttpServlet {
             pe.printStackTrace();
         }
 
-        PersistentAlert palert = new PersistentAlert();
+        PersistentAlert palert = new PersistentAlert(
+                date.getTime(),
+                networkInformation[0],
+                networkInformation[2],
+                Integer.valueOf(networkInformation[1]),
+                Integer.valueOf(networkInformation[3]),
+                auditLogHeader.toString(),
+                requestHeaders.toString(),
+                requestBody.toString(),
+                intermediateResponseBody.toString(),
+                finalResponseHeaders.toString(),
+                auditLogTrailer.toString(),
+                requestBodyNoFiles.toString(),
+                matchedRules);
+
         System.out.println("Date: " + date.toString() + " Source: " + networkInformation[0] + " Data: " + auditLogHeader + " Length: " + request.getContentLength());
         return palert;
     }
