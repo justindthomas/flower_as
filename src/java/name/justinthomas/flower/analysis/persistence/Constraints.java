@@ -129,8 +129,10 @@ public class Constraints {
                     System.err.println("Couldn't parse destination host parameter: " + uhe.getMessage());
                 }
             } else if (token[x].toLowerCase().equals("snort")) {
+                System.out.println("Alert Type: SNORT");
                 alertType = SourceType.SNORT;
             } else if (token[x].toLowerCase().equals("modsecurity")) {
+                System.out.println("Alert Type: MODSECURITY");
                 alertType = SourceType.MODSECURITY;
             }
         }

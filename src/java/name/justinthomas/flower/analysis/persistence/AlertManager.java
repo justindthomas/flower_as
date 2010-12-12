@@ -59,6 +59,7 @@ public class AlertManager {
         ArrayList<PersistentAlert> alerts = new ArrayList();
 
         System.out.println("Getting alerts from: " + constraints.startTime + " to: " + constraints.endTime);
+        System.out.println("Alert type requested: " + constraints.alertType);
         Long start = constraints.startTime.getTime() / 1000;
         Long end = constraints.endTime.getTime() / 1000;
 
@@ -72,6 +73,7 @@ public class AlertManager {
             System.out.println("Alerts at " + psecond.getSecond() + ":" + psecond.alerts.size());
             for(Long alertID : psecond.alerts) {
                 PersistentAlert alert = accessor.alertById.get(alertID);
+                System.out.println("Alert type: " + alert.type);
                 if((constraints.alertType == null) || (constraints.alertType == alert.type)) {
                     alerts.add(accessor.alertById.get(alertID));
                 }

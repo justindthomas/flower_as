@@ -135,7 +135,7 @@ public class modsecLogReceiver extends HttpServlet {
         }
 
         PersistentAlert palert = new PersistentAlert(
-                date.getTime(),
+                date.getTime() / 1000,
                 networkInformation[0],
                 networkInformation[2],
                 Integer.valueOf(networkInformation[1]),
