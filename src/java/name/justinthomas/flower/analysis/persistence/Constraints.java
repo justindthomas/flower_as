@@ -36,8 +36,8 @@ public class Constraints {
 
     public Constraints(String pattern) {
         // Set the default constraints to try to avoid querying records that are being written
-        startTime.setTime(startTime.getTime() - 600000);
-        endTime.setTime(endTime.getTime() - 600000);
+        //startTime.setTime(startTime.getTime() - 600000);
+        //endTime.setTime(endTime.getTime() - 600000);
 
         if (pattern != null) {
             parsePattern(pattern);
