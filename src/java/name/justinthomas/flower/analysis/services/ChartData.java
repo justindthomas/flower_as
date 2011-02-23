@@ -166,7 +166,7 @@ public class ChartData {
         if (volumes == null) {
             if (!SessionManager.isHistogramBuilding(session)) {
                 SessionManager.isHistogramBuilding(session, true);
-                //System.out.println("Starting volume build thread.");
+                System.out.println("Starting volume build thread: " + constraints + ", " + nmb_bins);
                 BuildDataVolumeList task = new BuildDataVolumeList(session, constraints, nmb_bins);
                 threadManager.start(user, new TimedThread(task));
             }

@@ -1,6 +1,8 @@
 package name.justinthomas.flower.analysis.statistics;
 
 import com.sleepycat.persist.model.Persistent;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import name.justinthomas.flower.analysis.element.Flow;
@@ -9,7 +11,7 @@ import name.justinthomas.flower.analysis.element.Flow;
  *
  * @author justin
  */
-@Persistent
+@Persistent(version = 022211)
 public class StatisticalFlow {
 
     String source;
@@ -31,8 +33,15 @@ public class StatisticalFlow {
             source = flow.getUnfixedSourceAddress().getHostAddress();
             destination = flow.getUnfixedDestinationAddress().getHostAddress();
 
-            StatisticalFlowDetail bytes = new StatisticalFlowDetail(StatisticalFlowDetail.Count.BYTE, flow.protocol, flow.getUnfixedSourcePort(), flow.getUnfixedDestinationPort());
-            StatisticalFlowDetail packets = new StatisticalFlowDetail(StatisticalFlowDetail.Count.PACKET, flow.protocol, flow.getUnfixedSourcePort(), flow.getUnfixedDestinationPort());
+            StatisticalFlowDetail.Version version = null;
+            if(flow.getUnfixedSourceAddress() instanceof Inet4Address) {
+                version = StatisticalFlowDetail.Version.IPV4;
+            } else if(flow.getUnfixedSourceAddress() instanceof Inet6Address) {
+                version = StatisticalFlowDetail.Version.IPV6;
+            }
+
+            StatisticalFlowDetail bytes = new StatisticalFlowDetail(StatisticalFlowDetail.Count.BYTE, version, flow.protocol, flow.getUnfixedSourcePort(), flow.getUnfixedDestinationPort());
+            StatisticalFlowDetail packets = new StatisticalFlowDetail(StatisticalFlowDetail.Count.PACKET, version, flow.protocol, flow.getUnfixedSourcePort(), flow.getUnfixedDestinationPort());
 
             if (count.containsKey(bytes)) {
                 count.put(bytes, (flow.bytesSent.longValue() / spread) + count.get(bytes));

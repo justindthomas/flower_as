@@ -12,14 +12,20 @@ public class StatisticalFlowDetail {
         PACKET, BYTE;
     }
 
+    public static enum Version {
+        IPV6, IPV4;
+    }
+
     protected Count type;
+    protected Version version;
     protected Integer protocol;
     protected Integer source;
     protected Integer destination;
 
     protected StatisticalFlowDetail() { }
-    public StatisticalFlowDetail(Count type, Integer protocol, Integer source, Integer destination) {
+    public StatisticalFlowDetail(Count type, Version version, Integer protocol, Integer source, Integer destination) {
         this.type = type;
+        this.version = version;
         this.protocol = protocol;
         this.source = source;
         this.destination = destination;
@@ -40,6 +46,7 @@ public class StatisticalFlowDetail {
     public int hashCode() {
         int hash = 3;
         hash = 70 * hash + (this.type != null ? this.type.hashCode() : 0);
+        hash = 72 * hash + (this.version != null ? this.version.hashCode() : 0);
         hash = 74 * hash + (this.protocol != null ? this.protocol.hashCode() : 0);
         hash = 79 * hash + (this.source != null ? this.source.hashCode() : 0);
         hash = 83 * hash + (this.destination != null ? this.destination.hashCode() : 0);
@@ -76,5 +83,13 @@ public class StatisticalFlowDetail {
 
     public void setType(Count type) {
         this.type = type;
+    }
+
+    public Version getVersion() {
+        return version;
+    }
+
+    public void setVersion(Version version) {
+        this.version = version;
     }
 }

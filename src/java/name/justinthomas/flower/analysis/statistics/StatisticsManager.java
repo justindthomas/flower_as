@@ -254,7 +254,7 @@ public class StatisticsManager {
         return intervals;
     }
 
-    public LinkedHashMap<Date, HashMap<String, Long>> getVolumeByTime(HttpSession session, Constraints constraints, Integer bins)
+    public LinkedHashMap<Date, HashMap<String, Long>> getVolumeByTime(Constraints constraints, Integer bins)
             throws ClassNotFoundException {
 
         LinkedHashMap<Date, HashMap<String, Long>> consolidated = new LinkedHashMap<Date, HashMap<String, Long>>();
@@ -272,6 +272,8 @@ public class StatisticsManager {
             System.out.println("Populating consolidated map");
         }
         Long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
+        System.out.println("Duration: " + duration);
+
         Long interval = duration / bins;
 
         // Populate consolidated with an entry for each minute that we want to graph
@@ -282,6 +284,7 @@ public class StatisticsManager {
             interim.put("tcp", 0l);
             interim.put("udp", 0l);
             interim.put("icmp", 0l);
+            interim.put("icmpv6", 0l);
             interim.put("ipsec", 0l);
             interim.put("ipv4", 0l);
             interim.put("ipv6", 0l);
@@ -318,16 +321,36 @@ public class StatisticsManager {
                         Long totalVolume = 0l;
                         Long tcpVolume = 0l;
                         Long udpVolume = 0l;
+                        Long ipv4Volume = 0l;
+                        Long ipv6Volume = 0l;
+                        Long icmpVolume = 0l;
+                        Long icmpv6Volume = 0l;
+                        Long ipsecVolume = 0l;
+
                         for (StatisticalFlow entry : second.flows.values()) {
                             for (Entry<StatisticalFlowDetail, Long> volume : entry.getCount().entrySet()) {
                                 if (volume.getKey().getType().equals(StatisticalFlowDetail.Count.BYTE)) {
                                     totalVolume += volume.getValue();
-                                    if (volume.getKey().getProtocol().equals(6)) {
-                                        tcpVolume += volume.getValue();
+                                    switch (volume.getKey().getProtocol()) {
+                                        case 1:
+                                            icmpVolume += volume.getValue();
+                                            break;
+                                        case 6:
+                                            tcpVolume += volume.getValue();
+                                            break;
+                                        case 17:
+                                            udpVolume += volume.getValue();
+                                            break;
+                                        case 50:
+                                            ipsecVolume += volume.getValue();
+                                            break;
+                                        case 51:
+                                            ipsecVolume += volume.getValue();
+                                            break;
+                                        case 58:
+                                            icmpv6Volume += volume.getValue();
                                     }
-                                    if (volume.getKey().getProtocol().equals(17)) {
-                                        udpVolume += volume.getValue();
-                                    }
+                                    
                                 }
                             }
                         }

@@ -206,7 +206,7 @@ public class FlowManager {
         StatisticsManager statisticsManager = new StatisticsManager();
 
         try {
-            LinkedHashMap<Date, HashMap<String, Long>> bins = statisticsManager.getVolumeByTime(session, new Constraints(constraints), nmb_bins);
+            LinkedHashMap<Date, HashMap<String, Long>> bins = statisticsManager.getVolumeByTime(new Constraints(constraints), nmb_bins);
 
             for (Date date : bins.keySet()) {
                 XMLDataVolume volume = new XMLDataVolume();
