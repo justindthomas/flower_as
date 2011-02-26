@@ -52,7 +52,17 @@ public class ChartData {
     @WebMethod(operationName = "getNetworkMap")
     public XMLNetworkList getNetworkMap(
             @WebParam(name = "constraints") String constraints,
-            @WebParam(name = "user") String user) {
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password) {
+
+        UserAction userAction = new UserAction();
+
+        if(!userAction.authenticate(user, password).authorized) {
+            XMLNetworkList xmlNetworkList = new XMLNetworkList();
+            xmlNetworkList.ready = true;
+
+            return (xmlNetworkList);
+        }
 
         MessageContext messageContext = serviceContext.getMessageContext();
         HttpSession session = ((HttpServletRequest) messageContext.get(MessageContext.SERVLET_REQUEST)).getSession();
@@ -106,7 +116,17 @@ public class ChartData {
     @WebMethod(operationName = "getPackets")
     public XMLFlowSet getPackets(
             @WebParam(name = "constraints") String constraints,
-            @WebParam(name = "user") String user) {
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password) {
+
+        UserAction userAction = new UserAction();
+
+        if(!userAction.authenticate(user, password).authorized) {
+            XMLFlowSet xmlFlowList = new XMLFlowSet();
+            xmlFlowList.finished = true;
+
+            return (xmlFlowList);
+        }
 
         MessageContext messageContext = serviceContext.getMessageContext();
         HttpSession session = ((HttpServletRequest) messageContext.get(MessageContext.SERVLET_REQUEST)).getSession();
@@ -152,7 +172,17 @@ public class ChartData {
     public XMLDataVolumeList getDataVolume(
             @WebParam(name = "constraints") String constraints,
             @WebParam(name = "nmb_bins") Integer nmb_bins,
-            @WebParam(name = "user") String user) {
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password) {
+
+        UserAction userAction = new UserAction();
+
+        if(!userAction.authenticate(user, password).authorized) {
+            XMLDataVolumeList xmlDataVolumeList = new XMLDataVolumeList();
+            xmlDataVolumeList.ready = true;
+
+            return (xmlDataVolumeList);
+        }
 
         MessageContext messageContext = serviceContext.getMessageContext();
         HttpSession session = ((HttpServletRequest) messageContext.get(MessageContext.SERVLET_REQUEST)).getSession();

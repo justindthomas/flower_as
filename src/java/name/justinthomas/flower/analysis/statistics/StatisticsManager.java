@@ -288,6 +288,7 @@ public class StatisticsManager {
             interim.put("ipsec", 0l);
             interim.put("ipv4", 0l);
             interim.put("ipv6", 0l);
+            interim.put("sixinfour", 0l);
 
             consolidated.put(new Date(constraints.startTime.getTime() + (j++ * interval)), interim);
         }
@@ -326,11 +327,13 @@ public class StatisticsManager {
                         Long icmpVolume = 0l;
                         Long icmpv6Volume = 0l;
                         Long ipsecVolume = 0l;
+                        Long sixinfourVolume = 0l;
 
                         for (StatisticalFlow entry : second.flows.values()) {
                             for (Entry<StatisticalFlowDetail, Long> volume : entry.getCount().entrySet()) {
                                 if (volume.getKey().getType().equals(StatisticalFlowDetail.Count.BYTE)) {
                                     totalVolume += volume.getValue();
+
                                     switch (volume.getKey().getProtocol()) {
                                         case 1:
                                             icmpVolume += volume.getValue();
@@ -340,6 +343,14 @@ public class StatisticsManager {
                                             break;
                                         case 17:
                                             udpVolume += volume.getValue();
+                                            if(volume.getKey().getSource() == 4500 || volume.getKey().getDestination() == 4500) {
+                                                ipsecVolume += volume.getValue();
+                                            } else if(volume.getKey().getSource() == 500 || volume.getKey().getDestination() == 500) {
+                                                ipsecVolume += volume.getValue();
+                                            }
+                                            break;
+                                        case 41:
+                                            sixinfourVolume += volume.getValue();
                                             break;
                                         case 50:
                                             ipsecVolume += volume.getValue();
@@ -350,7 +361,12 @@ public class StatisticsManager {
                                         case 58:
                                             icmpv6Volume += volume.getValue();
                                     }
-                                    
+
+                                    if(volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV4)) {
+                                        ipv4Volume += volume.getValue();
+                                    } else if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV6)) {
+                                        ipv6Volume += volume.getValue();
+                                    }
                                 }
                             }
                         }
@@ -365,6 +381,12 @@ public class StatisticsManager {
                                 consolidated.get(bin).put("total", consolidated.get(bin).get("total") + totalVolume);
                                 consolidated.get(bin).put("tcp", consolidated.get(bin).get("tcp") + tcpVolume);
                                 consolidated.get(bin).put("udp", consolidated.get(bin).get("udp") + udpVolume);
+                                consolidated.get(bin).put("icmp", consolidated.get(bin).get("icmp") + icmpVolume);
+                                consolidated.get(bin).put("icmpv6", consolidated.get(bin).get("icmpv6") + icmpv6Volume);
+                                consolidated.get(bin).put("ipv4", consolidated.get(bin).get("ipv4") + ipv4Volume);
+                                consolidated.get(bin).put("ipv6", consolidated.get(bin).get("ipv6") + ipv6Volume);
+                                consolidated.get(bin).put("ipsec", consolidated.get(bin).get("ipsec") + ipsecVolume);
+                                consolidated.get(bin).put("sixinfour", consolidated.get(bin).get("sixinfour") + sixinfourVolume);
                             }
                         }
 
