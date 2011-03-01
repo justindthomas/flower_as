@@ -48,11 +48,11 @@ public class Alerts {
 
     @WebMethod(operationName = "deleteAlert")
     public Boolean deleteAlert(
-            @WebParam(name = "username") String username,
+            @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "record") Long record) {
         UserAction userAction = new UserAction();
-        if(userAction.authenticate(username, password).authorized) {
+        if(userAction.authenticate(user, password).authorized) {
             System.out.println("Deleting alert...");
             AlertManager alertManager = new AlertManager();
             return alertManager.deleteAlert(record);
@@ -62,14 +62,14 @@ public class Alerts {
 
     @WebMethod(operationName = "getAlerts")
     public List<PersistentAlert> getAlerts(
-            @WebParam(name = "username") String username,
+            @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "constraints") String constraintsString) {
         UserAction userAction = new UserAction();
 
         ArrayList<PersistentAlert> alerts = new ArrayList();
 
-        if(userAction.authenticate(username, password).authorized) {
+        if(userAction.authenticate(user, password).authorized) {
             System.out.println("Retrieving alerts...");
             AlertManager alertManager = new AlertManager();
             Constraints constraints = new Constraints(constraintsString);
