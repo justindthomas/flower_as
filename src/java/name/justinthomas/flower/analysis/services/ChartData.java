@@ -42,7 +42,6 @@ public class ChartData {
     FlowManager flowManager;
     @EJB
     ConfigurationManager configurationManager;
-
     @Resource
     private WebServiceContext serviceContext;
 
@@ -57,7 +56,7 @@ public class ChartData {
 
         UserAction userAction = new UserAction();
 
-        if(!userAction.authenticate(user, password).authorized) {
+        if (!userAction.authenticate(user, password).authorized) {
             XMLNetworkList xmlNetworkList = new XMLNetworkList();
             xmlNetworkList.ready = true;
 
@@ -121,7 +120,7 @@ public class ChartData {
 
         UserAction userAction = new UserAction();
 
-        if(!userAction.authenticate(user, password).authorized) {
+        if (!userAction.authenticate(user, password).authorized) {
             XMLFlowSet xmlFlowList = new XMLFlowSet();
             xmlFlowList.finished = true;
 
@@ -177,7 +176,7 @@ public class ChartData {
 
         UserAction userAction = new UserAction();
 
-        if(!userAction.authenticate(user, password).authorized) {
+        if (!userAction.authenticate(user, password).authorized) {
             XMLDataVolumeList xmlDataVolumeList = new XMLDataVolumeList();
             xmlDataVolumeList.ready = true;
 
@@ -269,19 +268,33 @@ public class ChartData {
      * Web service operation
      */
     @WebMethod(operationName = "getManagedNetworks")
-    public XMLNetworkList getManagedNetworks() {
-        LinkedHashMap<String, InetNetwork> networks = new ManagedNetworks().getNetworks();
-        XMLNetworkList networkList = new XMLNetworkList();
+    public XMLNetworkList getManagedNetworks(
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password) {
 
-        for(Entry<String, InetNetwork> entry : networks.entrySet()) {
-            XMLNetwork xnetwork = new XMLNetwork();
-            xnetwork.address = entry.getValue().getAddress().getHostAddress();
-            xnetwork.mask = entry.getValue().getMask();
-            xnetwork.name = entry.getValue().getName();
+        UserAction userAction = new UserAction();
 
-            networkList.networks.add(xnetwork);
+        if (!userAction.authenticate(user, password).authorized) {
+            XMLNetworkList networkList = new XMLNetworkList();
+            networkList.ready = true;
+
+            return (networkList);
         }
 
-        return networkList;
+        {
+            LinkedHashMap<String, InetNetwork> networks = new ManagedNetworks().getNetworks();
+            XMLNetworkList networkList = new XMLNetworkList();
+
+            for (Entry<String, InetNetwork> entry : networks.entrySet()) {
+                XMLNetwork xnetwork = new XMLNetwork();
+                xnetwork.address = entry.getValue().getAddress().getHostAddress();
+                xnetwork.mask = entry.getValue().getMask();
+                xnetwork.name = entry.getValue().getName();
+
+                networkList.networks.add(xnetwork);
+            }
+
+            return networkList;
+        }
     }
 }

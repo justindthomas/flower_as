@@ -35,13 +35,13 @@ public class Administration {
 
     @WebMethod(operationName = "addNetwork")
     public Boolean addNetwork(
-            @WebParam(name = "authUser") String authUser,
-            @WebParam(name = "authPassword") String authPassword,
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password,
             @WebParam(name = "name") String name,
             @WebParam(name = "address") String address) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(authUser, authPassword);
+        AuthenticationToken token = userAction.authenticate(user, password);
         if (token.authenticated && token.authorized && token.administrator) {
             if (!configurationManager.getManagedNetworks().containsKey(address)) {
                 configurationManager.getManagedNetworks().put(address, name);
@@ -56,14 +56,14 @@ public class Administration {
 
     @WebMethod(operationName = "addGroup")
     public Boolean addGroup(
-            @WebParam(name = "username") String username,
+            @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "domain") String domain,
             @WebParam(name = "group") String group,
             @WebParam(name = "privileged") String privileged) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(username, password);
+        AuthenticationToken token = userAction.authenticate(user, password);
         if(token.authenticated && token.authorized && token.administrator) {
             if(!configurationManager.getDirectoryDomains().containsKey(domain)) {
                 HashMap<String, Boolean> groups = new HashMap();
@@ -84,12 +84,12 @@ public class Administration {
 
     @WebMethod(operationName = "removeNetwork")
     public Boolean removeNetwork(
-            @WebParam(name = "authUser") String authUser,
-            @WebParam(name = "authPassword") String authPassword,
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password,
             @WebParam(name = "address") String address) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(authUser, authPassword);
+        AuthenticationToken token = userAction.authenticate(user, password);
         if (token.authenticated && token.authorized && token.administrator) {
             if (configurationManager.getManagedNetworks().containsKey(address)) {
                 configurationManager.getManagedNetworks().remove(address);
@@ -104,13 +104,13 @@ public class Administration {
 
     @WebMethod(operationName = "removeGroup")
     public Boolean removeGroup(
-            @WebParam(name = "username") String username,
+            @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "domain") String domain,
             @WebParam(name = "group") String group) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(username, password);
+        AuthenticationToken token = userAction.authenticate(user, password);
         if (token.authenticated && token.authorized && token.administrator) {
             if (configurationManager.getDirectoryDomains().containsKey(domain)) {
                 if(configurationManager.getDirectoryDomains().get(domain).containsKey(group)) {
@@ -135,15 +135,15 @@ public class Administration {
      */
     @WebMethod(operationName = "addUser")
     public Boolean addUser(
-            @WebParam(name = "authUser") String authUser,
-            @WebParam(name = "authPassword") String authPassword,
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password,
             @WebParam(name = "updatedUser") String updatedUser,
             @WebParam(name = "updatedPassword") String updatedPassword,
             @WebParam(name = "fullName") String fullName,
             @WebParam(name = "administrator") Boolean administrator) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(authUser, authPassword);
+        AuthenticationToken token = userAction.authenticate(user, password);
         if (token.authenticated && token.authorized && token.administrator) {
             if (userManager.getUser(updatedUser) == null) {
                 if (!userManager.updateUser(updatedUser, updatedPassword, fullName, administrator)) {
@@ -159,15 +159,15 @@ public class Administration {
 
     @WebMethod(operationName = "privilegedUpdateUser")
     public Boolean privilegedUpdateUser(
-            @WebParam(name = "authUser") String authUser,
-            @WebParam(name = "authPassword") String authPassword,
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password,
             @WebParam(name = "updatedUser") String updatedUser,
             @WebParam(name = "updatedPassword") String updatedPassword,
             @WebParam(name = "fullName") String fullName,
             @WebParam(name = "administrator") Boolean administrator) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(authUser, authPassword);
+        AuthenticationToken token = userAction.authenticate(user, password);
         if (token.authenticated && token.authorized && token.administrator && (userManager.getUser(updatedUser) != null)) {
             if (!userManager.updateUser(updatedUser, updatedPassword, fullName, administrator)) {
                 return false;
@@ -182,12 +182,12 @@ public class Administration {
 
     @WebMethod(operationName = "deleteUser")
     public Boolean deleteUser(
-            @WebParam(name = "authUser") String authUser,
-            @WebParam(name = "authPassword") String authPassword,
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password,
             @WebParam(name = "deletedUser") String deletedUser) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(authUser, authPassword);
+        AuthenticationToken token = userAction.authenticate(user, password);
         if (token.authenticated && token.authorized && token.administrator) {
             return userManager.deleteUser(deletedUser);
         }
@@ -197,15 +197,15 @@ public class Administration {
 
     @WebMethod(operationName = "getUserList")
     public List<XMLUser> getUserList(
-            @WebParam(name = "authUser") String authUser,
-            @WebParam(name = "authPassword") String authPassword) {
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password) {
 
         List<XMLUser> xusers = new ArrayList<XMLUser>();
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(authUser, authPassword);
+        AuthenticationToken token = userAction.authenticate(user, password);
         if (token.authenticated && token.authorized && token.administrator) {
-            for (PersistentUser user : userManager.getUsers()) {
-                xusers.add(user.toXmlUser(false));
+            for (PersistentUser puser : userManager.getUsers()) {
+                xusers.add(puser.toXmlUser(false));
             }
         }
 
@@ -214,12 +214,12 @@ public class Administration {
 
     @WebMethod(operationName = "getDirectoryGroups")
     public List<XMLDirectoryDomain> getDirectoryGroups(
-            @WebParam(name = "username") String username,
+            @WebParam(name = "user") String user,
             @WebParam(name = "password") String password) {
 
         List<XMLDirectoryDomain> xdomains = new ArrayList();
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(username, password);
+        AuthenticationToken token = userAction.authenticate(user, password);
         if(token.authenticated && token.authorized && token.administrator) {
             for (Entry<String, HashMap<String, Boolean>> entry : configurationManager.getDirectoryDomains().entrySet()) {
                 XMLDirectoryDomain xdomain = new XMLDirectoryDomain();
@@ -238,13 +238,13 @@ public class Administration {
 
     @WebMethod(operationName = "getNetworkList")
     public List<XMLNetwork> getNetworkList(
-            @WebParam(name = "authUser") String authUser,
-            @WebParam(name = "authPassword") String authPassword) {
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password) {
 
         List<XMLNetwork> xnetworks = new ArrayList<XMLNetwork>();
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(authUser, authPassword);
+        AuthenticationToken token = userAction.authenticate(user, password);
         if (token.authenticated && token.authorized && token.administrator) {
             for (Entry<String, String> entry : configurationManager.getManagedNetworks().entrySet()) {
                 XMLNetwork xnetwork = new XMLNetwork();
