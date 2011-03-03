@@ -6,10 +6,13 @@ package name.justinthomas.flower.collector;
 
 import java.io.IOException;
 import java.net.BindException;
+import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,6 +25,10 @@ public class Listener {
 
     private ExecutorService executor = Executors.newFixedThreadPool(8);
     protected static Map<String, Template> templates = Collections.synchronizedMap(new HashMap<String, Template>());
+    protected static List<DatagramPacket> queue = Collections.synchronizedList(new LinkedList<DatagramPacket>());
+    
+    // This is just for debugging
+    protected static int tracker = 0;
 
     public void listen() {
         try {
