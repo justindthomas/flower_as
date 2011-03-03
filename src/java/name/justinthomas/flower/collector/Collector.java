@@ -13,12 +13,12 @@ import javax.ejb.Startup;
  *
  * @author justin
  */
-@Singleton
-@Startup
+//@Singleton
+//@Startup
 public class Collector {
     private static Listener listener;
 
-    @PostConstruct
+    //@PostConstruct
     public void init() {
         listener = new Listener();
         listener.listen();

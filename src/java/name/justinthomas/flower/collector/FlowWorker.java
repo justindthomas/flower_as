@@ -15,6 +15,7 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Calendar;
+import java.util.LinkedList;
 import java.util.Map.Entry;
 import javax.xml.datatype.DatatypeConfigurationException;
 import name.justinthomas.flower.analysis.element.Flow;
@@ -43,6 +44,33 @@ public class FlowWorker implements Runnable {
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 socket.receive(packet);
 
+                Listener.queue.add(packet);
+                processQueue();
+
+            } catch (SocketException se) {
+                se.printStackTrace();
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
+            }
+        }
+    }
+
+    private void processQueue() throws IOException {
+        if (Listener.tracker++ % 50 == 0) {
+            System.out.println("Flow Queue Size: " + Listener.queue.size());
+        }
+
+        while (!Listener.queue.isEmpty()) {
+            DatagramPacket packet = null;
+
+            try {
+                packet = Listener.queue.remove(0);
+            } catch (IndexOutOfBoundsException e) {
+                System.err.println("Tried to process a packet that has already been processed.");
+                continue;
+            }
+
+            if (packet != null) {
                 InetAddress sender = packet.getAddress();
 
                 ByteArrayInputStream bais = new ByteArrayInputStream(packet.getData());
@@ -58,20 +86,17 @@ public class FlowWorker implements Runnable {
                 input.readFully(remaining);
 
                 if (version == 9) {
-                    v9(sender, remaining, count, uptime, secs);
+                    if (!v9(sender, remaining, count, uptime, secs)) {
+                        Listener.queue.add(packet);
+                    }
                 } else if (version == 5) {
                     v5(remaining, count);
                 }
-
-            } catch (SocketException se) {
-                se.printStackTrace();
-            } catch (IOException ioe) {
-                ioe.printStackTrace();
             }
         }
     }
 
-    private void v9(InetAddress sender, byte[] remaining, Integer count, Integer sysUpTime, long epoch) {
+    private Boolean v9(InetAddress sender, byte[] remaining, Integer count, Integer sysUpTime, long epoch) {
         ByteArrayInputStream bais = new ByteArrayInputStream(remaining);
         DataInput input = new DataInputStream(bais);
 
@@ -109,17 +134,19 @@ public class FlowWorker implements Runnable {
                         input.readFully(dataBytes);
 
                         n += parseData(dataBytes, Listener.templates.get(streamId.toString() + ":" + flowSetId), sysUpTime, epoch);
+                        return true;
                     } else {
                         //System.out.println("Template for " + streamId.toString() + ":" + flowSetId + " not yet received, discarding flow set");
                         input.skipBytes(length);
                         n = count; // Stop iterating
+                        return false;
                     }
                 }
             }
-
         } catch (IOException ioe) {
             ioe.printStackTrace();
         }
+        return false;
     }
 
     private void v5(byte[] remaining, Integer count) {
@@ -377,7 +404,7 @@ public class FlowWorker implements Runnable {
             }
 
             Flow flow = new Flow(xnetflow);
-            
+
             FlowReceiver flowReceiver = new FlowReceiver();
             Long flowID = flowReceiver.addFlow(flow);
 

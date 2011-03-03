@@ -2,6 +2,7 @@ package name.justinthomas.flower.analysis.services;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
