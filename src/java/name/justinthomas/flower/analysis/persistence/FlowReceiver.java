@@ -83,18 +83,6 @@ public class FlowReceiver {
             entityStore = new EntityStore(environment, "Flow", storeConfig);
             try {
                 FlowAccessor dataAccessor = new FlowAccessor(entityStore);
-                //Long second = flow.startTimeStamp.getTime() / 1000;
-
-                //PersistentSecond persistentSecond = null;
-                //if(dataAccessor.flowsBySecond.contains(second)) {
-                //    persistentSecond = dataAccessor.flowsBySecond.get(second);
-                //} else {
-                //    persistentSecond = new PersistentSecond(second);
-                // }
-                //persistentSecond.flows.add(flow.toHashTableFlow());
-
-                //dataAccessor.flowsBySecond.put(persistentSecond);
-
                 dataAccessor.flowById.put(pflow);
             } catch (DatabaseException e) {
                 System.err.println("addVolume Failed: " + e.getMessage());
