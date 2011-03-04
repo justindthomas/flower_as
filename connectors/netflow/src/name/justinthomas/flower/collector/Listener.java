@@ -25,7 +25,6 @@ public class Listener {
 
     private ExecutorService executor = Executors.newFixedThreadPool(8);
     protected static Map<String, Template> templates = Collections.synchronizedMap(new HashMap<String, Template>());
-    protected static List<DatagramPacket> queue = Collections.synchronizedList(new LinkedList<DatagramPacket>());
     
     // This is just for debugging
     //protected static int tracker = 0;
