@@ -113,7 +113,7 @@ public class StatisticsManager {
         for (Entry<IntervalKey, Boolean> key : keys.entrySet()) {
             if (key.getValue()) {
                 for (Long flowID : dataAccessor.intervalByKey.get(key.getKey()).flowIDs) {
-                    if(flowID != null) {
+                    if (flowID != null) {
                         flowIDs.add(flowID);
                     } else {
                         nullIDs++;
@@ -150,44 +150,53 @@ public class StatisticsManager {
         return normalized;
     }
 
-    public void addStatisticalSeconds(Flow flow, Long flowID) {
+    public void storeStatisticalIntervals(ArrayList<StatisticalInterval> intervals) {
+        System.out.println("Persisting " + intervals.size() + " to long-term storage.");
         EntityStore entityStore = null;
-        EntityStore entityStoreRO = null;
+        //EntityStore entityStoreRO = null;
         Environment environment = null;
 
         try {
             environment = setupEnvironment();
 
             entityStore = new EntityStore(environment, "Statistics", this.getStoreConfig(false));
-            entityStoreRO = new EntityStore(environment, "Statistics", this.getStoreConfig(true));
+            //entityStoreRO = new EntityStore(environment, "Statistics", this.getStoreConfig(true));
 
             try {
                 StatisticsAccessor dataAccessor = new StatisticsAccessor(entityStore);
-                StatisticsAccessor dataAccessorRO = new StatisticsAccessor(entityStoreRO);
+                //StatisticsAccessor dataAccessorRO = new StatisticsAccessor(entityStoreRO);
 
-                for (Long interval : configurationManager.getResolution().keySet()) {
-                    HashMap<IntervalKey, StatisticalInterval> normalized = flowToInterval(flow, interval, flowID);
-
-                    for (Entry<IntervalKey, StatisticalInterval> entry : normalized.entrySet()) {
-                        if (dataAccessorRO.intervalByKey.get(entry.getKey()) != null) {
-                            StatisticalInterval stored = dataAccessorRO.intervalByKey.get(entry.getKey());
-                            stored = stored.addInterval(normalized.get(entry.getKey()));
-                            dataAccessor.intervalByKey.put(stored);
-                        } else {
-                            dataAccessor.intervalByKey.put(normalized.get(entry.getKey()));
-                        }
+                for (StatisticalInterval interval : intervals) {
+                    //dataAccessor.intervalByKey.put(interval);
+                    if (dataAccessor.intervalByKey.get(interval.key) != null) {
+                        StatisticalInterval stored = dataAccessor.intervalByKey.get(interval.key);
+                        stored = stored.addInterval(interval);
+                        dataAccessor.intervalByKey.put(stored);
+                    } else {
+                        dataAccessor.intervalByKey.put(interval);
                     }
                 }
+
             } catch (DatabaseException e) {
-                System.err.println("addStatisticalSeconds Failed: " + e.getMessage());
+                System.err.println("storeStatisticalInterval Failed: " + e.getMessage());
             } finally {
-                closeStore(entityStoreRO);
+                //closeStore(entityStoreRO);
                 closeStore(entityStore);
             }
         } catch (DatabaseException e) {
             System.err.println("Database Error: " + e.getMessage());
         } finally {
             closeEnvironment(environment);
+        }
+    }
+
+    public void addStatisticalSeconds(Flow flow, Long flowID) {
+        for (Long interval : configurationManager.getResolution().keySet()) {
+            HashMap<IntervalKey, StatisticalInterval> normalized = flowToInterval(flow, interval, flowID);
+
+            for (Entry<IntervalKey, StatisticalInterval> entry : normalized.entrySet()) {
+                CachedStatistics.put(entry.getKey(), entry.getValue());
+            }
         }
     }
 
@@ -343,9 +352,9 @@ public class StatisticsManager {
                                             break;
                                         case 17:
                                             udpVolume += volume.getValue();
-                                            if(volume.getKey().getSource() == 4500 || volume.getKey().getDestination() == 4500) {
+                                            if (volume.getKey().getSource() == 4500 || volume.getKey().getDestination() == 4500) {
                                                 ipsecVolume += volume.getValue();
-                                            } else if(volume.getKey().getSource() == 500 || volume.getKey().getDestination() == 500) {
+                                            } else if (volume.getKey().getSource() == 500 || volume.getKey().getDestination() == 500) {
                                                 ipsecVolume += volume.getValue();
                                             }
                                             break;
@@ -362,7 +371,7 @@ public class StatisticsManager {
                                             icmpv6Volume += volume.getValue();
                                     }
 
-                                    if(volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV4)) {
+                                    if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV4)) {
                                         ipv4Volume += volume.getValue();
                                     } else if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV6)) {
                                         ipv6Volume += volume.getValue();
