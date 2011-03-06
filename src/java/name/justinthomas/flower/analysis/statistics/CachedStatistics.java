@@ -44,7 +44,7 @@ public class CachedStatistics {
 
         instance = new CachedStatistics();
         executor = new ScheduledThreadPoolExecutor(1);
-        executor.scheduleWithFixedDelay(new Persist(), 30, 30, TimeUnit.SECONDS);
+        executor.scheduleAtFixedRate(new Persist(), 60, 60, TimeUnit.SECONDS);
     }
 
     public static StatisticalInterval get(IntervalKey key) {

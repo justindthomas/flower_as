@@ -153,21 +153,17 @@ public class StatisticsManager {
     public void storeStatisticalIntervals(ArrayList<StatisticalInterval> intervals) {
         System.out.println("Persisting " + intervals.size() + " to long-term storage.");
         EntityStore entityStore = null;
-        //EntityStore entityStoreRO = null;
         Environment environment = null;
 
         try {
             environment = setupEnvironment();
 
             entityStore = new EntityStore(environment, "Statistics", this.getStoreConfig(false));
-            //entityStoreRO = new EntityStore(environment, "Statistics", this.getStoreConfig(true));
 
             try {
                 StatisticsAccessor dataAccessor = new StatisticsAccessor(entityStore);
-                //StatisticsAccessor dataAccessorRO = new StatisticsAccessor(entityStoreRO);
 
                 for (StatisticalInterval interval : intervals) {
-                    //dataAccessor.intervalByKey.put(interval);
                     if (dataAccessor.intervalByKey.get(interval.key) != null) {
                         StatisticalInterval stored = dataAccessor.intervalByKey.get(interval.key);
                         stored = stored.addInterval(interval);
@@ -180,7 +176,6 @@ public class StatisticsManager {
             } catch (DatabaseException e) {
                 System.err.println("storeStatisticalInterval Failed: " + e.getMessage());
             } finally {
-                //closeStore(entityStoreRO);
                 closeStore(entityStore);
             }
         } catch (DatabaseException e) {
