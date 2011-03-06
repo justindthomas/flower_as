@@ -26,4 +26,32 @@ public class IntervalKey {
         this.interval = interval;
         this.resolution = resolution;
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final IntervalKey other = (IntervalKey) obj;
+        if (this.interval != other.interval && (this.interval == null || !this.interval.equals(other.interval))) {
+            return false;
+        }
+        if (this.resolution != other.resolution && (this.resolution == null || !this.resolution.equals(other.resolution))) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 43 * hash + (this.interval != null ? this.interval.hashCode() : 0);
+        hash = 43 * hash + (this.resolution != null ? this.resolution.hashCode() : 0);
+        return hash;
+    }
+
+    
 }

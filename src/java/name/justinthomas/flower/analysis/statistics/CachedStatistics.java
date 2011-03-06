@@ -40,25 +40,30 @@ public class CachedStatistics {
 
     @PostConstruct
     protected void setup() {
-        System.out.println("Setting CachedStatistics Persist to run every 30 seconds.");
+        System.out.println("Setting CachedStatistics Persist to run every 60 seconds.");
 
         instance = new CachedStatistics();
-        executor = new ScheduledThreadPoolExecutor(1);
-        executor.scheduleAtFixedRate(new Persist(), 60, 60, TimeUnit.SECONDS);
-    }
-
-    public static StatisticalInterval get(IntervalKey key) {
-        if(cache.containsKey(key)) return cache.get(key);
-        return null;
+        executor = new ScheduledThreadPoolExecutor(3);
+        executor.scheduleAtFixedRate(new Task(), 60, 60, TimeUnit.SECONDS);
     }
 
     public static void put(IntervalKey key, StatisticalInterval interval) {
+        //System.out.println("Putting: " + key.interval + ", " + key.resolution);
         lastUpdated.put(key, new Date());
 
         if(cache.containsKey(key)) {
+            //System.out.println("Adding: " + interval.flows.size() + " flows to: " + key.interval + ", " + key.resolution);
             cache.put(key, cache.get(key).addInterval(interval));
         } else {
             cache.put(key, interval);
+        }
+    }
+
+    class Task implements Runnable {
+        @Override
+        public void run() {
+            Thread thread = new Thread(new Persist());
+            thread.start();
         }
     }
 

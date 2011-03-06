@@ -151,7 +151,7 @@ public class StatisticsManager {
     }
 
     public void storeStatisticalIntervals(ArrayList<StatisticalInterval> intervals) {
-        System.out.println("Persisting " + intervals.size() + " to long-term storage.");
+        System.out.println("Persisting " + intervals.size() + " intervals to long-term storage.");
         EntityStore entityStore = null;
         Environment environment = null;
 
@@ -186,12 +186,13 @@ public class StatisticsManager {
     }
 
     public void addStatisticalSeconds(Flow flow, Long flowID) {
-        for (Long interval : configurationManager.getResolution().keySet()) {
-            HashMap<IntervalKey, StatisticalInterval> normalized = flowToInterval(flow, interval, flowID);
+        for (Long resolution : configurationManager.getResolution().keySet()) {
+            HashMap<IntervalKey, StatisticalInterval> normalized = flowToInterval(flow, resolution, flowID);
 
             for (Entry<IntervalKey, StatisticalInterval> entry : normalized.entrySet()) {
                 CachedStatistics.put(entry.getKey(), entry.getValue());
             }
+            //System.out.println("Adding " + normalized.size() + " intervals to resolution " + resolution);
         }
     }
 
