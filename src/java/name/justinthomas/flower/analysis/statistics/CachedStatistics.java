@@ -70,7 +70,7 @@ public class CachedStatistics {
     class Persist implements Runnable {
         @Override
         public void run() {
-            System.out.println("Statistics cache includes " + cache.size() + " entries before Persist.");
+            //System.out.println("Statistics cache includes " + cache.size() + " entries before Persist.");
             ArrayList<IntervalKey> keys = new ArrayList();
             for(IntervalKey key : lastUpdated.keySet()) {
                 if(new Date().getTime() - lastUpdated.get(key).getTime() > MAX_WAIT) {
@@ -80,7 +80,7 @@ public class CachedStatistics {
 
             ArrayList<StatisticalInterval> intervals = new ArrayList();
 
-            System.out.println("Removing intervals from cache.");
+            //System.out.println("Removing intervals from cache.");
             for(IntervalKey key : keys) {
                 intervals.add(cache.get(key));
                 cache.remove(key);
@@ -90,7 +90,7 @@ public class CachedStatistics {
             StatisticsManager manager = new StatisticsManager();
             manager.storeStatisticalIntervals(intervals);
 
-            System.out.println("Statistics cache includes " + cache.size() + " entries after Persist.");
+            //System.out.println("Statistics cache includes " + cache.size() + " entries after Persist.");
         }
     }
 }

@@ -151,7 +151,7 @@ public class StatisticsManager {
     }
 
     public void storeStatisticalIntervals(ArrayList<StatisticalInterval> intervals) {
-        System.out.println("Persisting " + intervals.size() + " intervals to long-term storage.");
+        //System.out.println("Persisting " + intervals.size() + " intervals to long-term storage.");
         EntityStore entityStore = null;
         Environment environment = null;
 
