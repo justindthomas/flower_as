@@ -26,7 +26,11 @@ public class XMLDataVolume {
     @XmlElement
     public Long icmp = null;
     @XmlElement
+    public Long icmpv6 = null;
+    @XmlElement
     public Long ipsec = null;
+    @XmlElement
+    public Long sixinfour = null;
     @XmlElement
     public Long ipv4 = null;
     @XmlElement

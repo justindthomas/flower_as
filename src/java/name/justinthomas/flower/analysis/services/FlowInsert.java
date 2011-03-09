@@ -39,7 +39,7 @@ public class FlowInsert {
         MessageContext messageContext = context.getMessageContext();
         HttpServletRequest request = (HttpServletRequest) messageContext.get(MessageContext.SERVLET_REQUEST);
 
-        System.out.println("Analysis server received: " + flowSet.flows.size() + " flow records");
+        //System.out.println("Analysis server received: " + flowSet.flows.size() + " flow records");
 
         ArrayList<XMLFlowSet> chunks = new ArrayList();
 
@@ -72,7 +72,7 @@ public class FlowInsert {
 
         @Override
         public void run() {
-            System.out.println("Beginning to store " + flowSet.flows.size() + " flows...");
+            //System.out.println("Beginning to store " + flowSet.flows.size() + " flows...");
             for (XMLFlow xflow : flowSet.flows) {
                 try {
                     if (xflow.bytesSent.longValue() < 0) {
@@ -94,14 +94,14 @@ public class FlowInsert {
                 }
             }
 
-            System.out.println("Completed storing and beginning to process statistics for " + flows.size() + " flows.");
+            //System.out.println("Completed storing and beginning to process statistics for " + flows.size() + " flows.");
 
             for (Entry<Long, Flow> flow : flows.entrySet()) {
                 StatisticsManager statisticsManager = new StatisticsManager();
                 statisticsManager.addStatisticalSeconds(flow.getValue(), flow.getKey());
             }
 
-            System.out.println("Completed processing statistics for " + flows.size() + " flows.");
+            //System.out.println("Completed processing statistics for " + flows.size() + " flows.");
         }
     }
 }

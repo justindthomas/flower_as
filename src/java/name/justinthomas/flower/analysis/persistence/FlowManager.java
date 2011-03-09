@@ -206,24 +206,61 @@ public class FlowManager {
         StatisticsManager statisticsManager = new StatisticsManager();
 
         try {
-            LinkedHashMap<Date, HashMap<String, Long>> bins = statisticsManager.getVolumeByTime(new Constraints(constraints), nmb_bins);
+            LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> bins = statisticsManager.getVolumeByTime(new Constraints(constraints), nmb_bins);
 
             for (Date date : bins.keySet()) {
                 XMLDataVolume volume = new XMLDataVolume();
 
                 volume.date = date;
-                volume.total = bins.get(date).get("total");
-                if (DEBUG > 0) {
-                    if (bins.get(date).get("total") < 0) {
-                        System.err.println("Total: " + bins.get(date).get("total"));
-                    }
+                volume.total = 0l;
+                volume.tcp = 0l;
+                volume.udp = 0l;
+                volume.icmp = 0l;
+                volume.icmpv6 = 0l;
+                volume.ipv4 = 0l;
+                volume.ipv6 = 0l;
+                volume.ipsec = 0l;
+                volume.sixinfour = 0l;
+
+                for(Integer version : bins.get(date).get("versions").keySet()) {
+                    volume.total += bins.get(date).get("versions").get(version);
                 }
-                volume.tcp = bins.get(date).get("tcp");
-                volume.udp = bins.get(date).get("udp");
-                volume.icmp = bins.get(date).get("icmp");
-                volume.ipsec = bins.get(date).get("ipsec");
-                volume.ipv4 = bins.get(date).get("ipv4");
-                volume.ipv6 = bins.get(date).get("ipv6");
+
+                if(bins.get(date).get("types").containsKey(6)) {
+                    volume.tcp = bins.get(date).get("types").get(6);
+                }
+
+                if(bins.get(date).get("types").containsKey(17)) {
+                    volume.udp = bins.get(date).get("types").get(17);
+                }
+
+                if(bins.get(date).get("types").containsKey(1)) {
+                    volume.icmp = bins.get(date).get("types").get(1);
+                }
+
+                if(bins.get(date).get("types").containsKey(58)) {
+                    volume.icmpv6 = bins.get(date).get("types").get(58);
+                }
+
+                if(bins.get(date).get("types").containsKey(41)) {
+                    volume.sixinfour = bins.get(date).get("types").get(41);
+                }
+
+                if(bins.get(date).get("types").containsKey(50)) {
+                    volume.ipsec += bins.get(date).get("types").get(50);
+                }
+
+                if(bins.get(date).get("types").containsKey(51)) {
+                    volume.ipsec += bins.get(date).get("types").get(51);
+                }
+
+                if(bins.get(date).get("versions").containsKey(4)) {
+                    volume.ipv4 += bins.get(date).get("versions").get(4);
+                }
+
+                if(bins.get(date).get("versions").containsKey(6)) {
+                    volume.ipv6 += bins.get(date).get("versions").get(6);
+                }
 
                 volumeList.bins.add(volume);
 

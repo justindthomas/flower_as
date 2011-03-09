@@ -259,10 +259,10 @@ public class StatisticsManager {
         return intervals;
     }
 
-    public LinkedHashMap<Date, HashMap<String, Long>> getVolumeByTime(Constraints constraints, Integer bins)
+    public LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> getVolumeByTime(Constraints constraints, Integer bins)
             throws ClassNotFoundException {
 
-        LinkedHashMap<Date, HashMap<String, Long>> consolidated = new LinkedHashMap<Date, HashMap<String, Long>>();
+        LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> consolidated = new LinkedHashMap();
 
         if ((constraints.startTime == null) || (constraints.endTime == null) || (bins == null) || (constraints.startTime.getTime() >= constraints.endTime.getTime())) {
             return consolidated;
@@ -284,16 +284,11 @@ public class StatisticsManager {
         // Populate consolidated with an entry for each minute that we want to graph
         int j;
         for (j = 0; j < bins;) {
-            HashMap<String, Long> interim = new HashMap<String, Long>();
-            interim.put("total", 0l);
-            interim.put("tcp", 0l);
-            interim.put("udp", 0l);
-            interim.put("icmp", 0l);
-            interim.put("icmpv6", 0l);
-            interim.put("ipsec", 0l);
-            interim.put("ipv4", 0l);
-            interim.put("ipv6", 0l);
-            interim.put("sixinfour", 0l);
+            HashMap<String, HashMap<Integer, Long>> interim = new HashMap();
+            interim.put("versions", new HashMap<Integer, Long>());
+            interim.put("types", new HashMap<Integer, Long>());
+            interim.put("tcp", new HashMap<Integer, Long>());
+            interim.put("udp", new HashMap<Integer, Long>());
 
             consolidated.put(new Date(constraints.startTime.getTime() + (j++ * interval)), interim);
         }
@@ -324,55 +319,57 @@ public class StatisticsManager {
             try {
                 try {
                     for (StatisticalInterval second : cursor) {
-                        Long totalVolume = 0l;
-                        Long tcpVolume = 0l;
-                        Long udpVolume = 0l;
-                        Long ipv4Volume = 0l;
-                        Long ipv6Volume = 0l;
-                        Long icmpVolume = 0l;
-                        Long icmpv6Volume = 0l;
-                        Long ipsecVolume = 0l;
-                        Long sixinfourVolume = 0l;
+                        HashMap<Integer, Long> versions = new HashMap();
+                        HashMap<Integer, Long> types = new HashMap();
+                        HashMap<Integer, Long> tcp = new HashMap();
+                        HashMap<Integer, Long> udp = new HashMap();
 
                         for (StatisticalFlow entry : second.flows.values()) {
-                            for (Entry<StatisticalFlowDetail, Long> volume : entry.getCount().entrySet()) {
-                                if (volume.getKey().getType().equals(StatisticalFlowDetail.Count.BYTE)) {
-                                    totalVolume += volume.getValue();
+                            try {
+                                for (Entry<StatisticalFlowDetail, Long> volume : entry.getCount().entrySet()) {
+                                    if (volume.getKey().getType().equals(StatisticalFlowDetail.Count.BYTE)) {
 
-                                    switch (volume.getKey().getProtocol()) {
-                                        case 1:
-                                            icmpVolume += volume.getValue();
-                                            break;
-                                        case 6:
-                                            tcpVolume += volume.getValue();
-                                            break;
-                                        case 17:
-                                            udpVolume += volume.getValue();
-                                            if (volume.getKey().getSource() == 4500 || volume.getKey().getDestination() == 4500) {
-                                                ipsecVolume += volume.getValue();
-                                            } else if (volume.getKey().getSource() == 500 || volume.getKey().getDestination() == 500) {
-                                                ipsecVolume += volume.getValue();
+                                        if (types.containsKey(volume.getKey().getProtocol())) {
+                                            types.put(volume.getKey().getProtocol(), types.get(volume.getKey().getProtocol()) + volume.getValue());
+                                        } else {
+                                            types.put(volume.getKey().getProtocol(), volume.getValue());
+                                        }
+
+                                        if (volume.getKey().getProtocol() == 6) {
+                                            if (tcp.containsKey(volume.getKey().getDestination())) {
+                                                tcp.put(volume.getKey().getDestination(), tcp.get(volume.getKey().getDestination()) + volume.getValue());
+                                            } else {
+                                                tcp.put(volume.getKey().getDestination(), volume.getValue());
                                             }
-                                            break;
-                                        case 41:
-                                            sixinfourVolume += volume.getValue();
-                                            break;
-                                        case 50:
-                                            ipsecVolume += volume.getValue();
-                                            break;
-                                        case 51:
-                                            ipsecVolume += volume.getValue();
-                                            break;
-                                        case 58:
-                                            icmpv6Volume += volume.getValue();
+                                        }
+
+                                        if (volume.getKey().getProtocol() == 17) {
+                                            if (udp.containsKey(volume.getKey().getDestination())) {
+                                                udp.put(volume.getKey().getDestination(), udp.get(volume.getKey().getDestination()) + volume.getValue());
+                                            } else {
+                                                udp.put(volume.getKey().getDestination(), volume.getValue());
+                                            }
+                                        }
+
+                                        if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV4)) {
+                                            if (versions.containsKey(4)) {
+                                                versions.put(4, versions.get(4) + volume.getValue());
+                                            } else {
+                                                versions.put(4, volume.getValue());
+                                            }
+                                        } else if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV6)) {
+                                            if (versions.containsKey(6)) {
+                                                versions.put(6, versions.get(6) + volume.getValue());
+                                            } else {
+                                                versions.put(6, volume.getValue());
+                                            }
+                                        }
                                     }
 
-                                    if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV4)) {
-                                        ipv4Volume += volume.getValue();
-                                    } else if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV6)) {
-                                        ipv6Volume += volume.getValue();
-                                    }
                                 }
+                            } catch (NullPointerException e) {
+                                System.err.println("Unexpected NULL field encountered.  This is probably a result of bad data in the database (perhaps an interrupted insert?)");
+                                continue;
                             }
                         }
 
@@ -383,15 +380,45 @@ public class StatisticsManager {
                             }
 
                             if (new Date(second.getSecond().interval * resolution).after(new Date(bin.getTime())) && new Date(second.getSecond().interval * resolution).before(new Date(bin.getTime() + interval))) {
-                                consolidated.get(bin).put("total", consolidated.get(bin).get("total") + totalVolume);
-                                consolidated.get(bin).put("tcp", consolidated.get(bin).get("tcp") + tcpVolume);
-                                consolidated.get(bin).put("udp", consolidated.get(bin).get("udp") + udpVolume);
-                                consolidated.get(bin).put("icmp", consolidated.get(bin).get("icmp") + icmpVolume);
-                                consolidated.get(bin).put("icmpv6", consolidated.get(bin).get("icmpv6") + icmpv6Volume);
-                                consolidated.get(bin).put("ipv4", consolidated.get(bin).get("ipv4") + ipv4Volume);
-                                consolidated.get(bin).put("ipv6", consolidated.get(bin).get("ipv6") + ipv6Volume);
-                                consolidated.get(bin).put("ipsec", consolidated.get(bin).get("ipsec") + ipsecVolume);
-                                consolidated.get(bin).put("sixinfour", consolidated.get(bin).get("sixinfour") + sixinfourVolume);
+                                if(!types.isEmpty()) {
+                                    for(Integer type : types.keySet()) {
+                                        if(consolidated.get(bin).get("types").containsKey(type)) {
+                                            consolidated.get(bin).get("types").put(type, consolidated.get(bin).get("types").get(type) + types.get(type));
+                                        } else {
+                                            consolidated.get(bin).get("types").put(type, types.get(type));
+                                        }
+                                    }
+                                }
+
+                                if(!tcp.isEmpty()) {
+                                    for(Integer destination : tcp.keySet()) {
+                                        if(consolidated.get(bin).get("tcp").containsKey(destination)) {
+                                            consolidated.get(bin).get("tcp").put(destination, consolidated.get(bin).get("tcp").get(destination) + tcp.get(destination));
+                                        } else {
+                                            consolidated.get(bin).get("tcp").put(destination, tcp.get(destination));
+                                        }
+                                    }
+                                }
+
+                                if(!udp.isEmpty()) {
+                                    for(Integer destination : udp.keySet()) {
+                                        if(consolidated.get(bin).get("udp").containsKey(destination)) {
+                                            consolidated.get(bin).get("udp").put(destination, consolidated.get(bin).get("udp").get(destination) + udp.get(destination));
+                                        } else {
+                                            consolidated.get(bin).get("udp").put(destination, udp.get(destination));
+                                        }
+                                    }
+                                }
+
+                                if(!versions.isEmpty()) {
+                                    for(Integer version : versions.keySet()) {
+                                        if(consolidated.get(bin).get("versions").containsKey(version)) {
+                                            consolidated.get(bin).get("versions").put(version, consolidated.get(bin).get("versions").get(version) + versions.get(version));
+                                        } else {
+                                            consolidated.get(bin).get("versions").put(version, versions.get(version));
+                                        }
+                                    }
+                                }
                             }
                         }
 
