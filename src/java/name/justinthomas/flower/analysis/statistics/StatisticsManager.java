@@ -173,8 +173,10 @@ public class StatisticsManager {
                     }
                 }
 
-            } catch (DatabaseException e) {
-                System.err.println("storeStatisticalInterval Failed: " + e.getMessage());
+            } catch (DatabaseException e1) {
+                System.err.println("storeStatisticalInterval Failed: " + e1.getMessage());
+            } catch (ArrayIndexOutOfBoundsException e2) {
+                System.err.println("storeStatisticalInterval Failed: " + e2.getMessage());
             } finally {
                 closeStore(entityStore);
             }

@@ -20,7 +20,4 @@ public class XMLDataVolumeList {
     public List<XMLDataVolume> bins = new ArrayList<XMLDataVolume>();
     @XmlElement
     public Boolean ready = false;
-    @XmlElement
-    public Integer packetsProcessed = 0;
-
 }

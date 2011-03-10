@@ -16,23 +16,25 @@ import javax.xml.bind.annotation.XmlType;
 @XmlType
 public class XMLDataVolume {
     @XmlElement
-    public Date date = null;
+    public Date date;
     @XmlElement
-    public Long total = null;
+    public Long duration;
     @XmlElement
-    public Long tcp = null;
+    public Long total;
     @XmlElement
-    public Long udp = null;
+    public Long tcp;
     @XmlElement
-    public Long icmp = null;
+    public Long udp;
     @XmlElement
-    public Long icmpv6 = null;
+    public Long icmp;
     @XmlElement
-    public Long ipsec = null;
+    public Long icmpv6;
     @XmlElement
-    public Long sixinfour = null;
+    public Long ipsec;
     @XmlElement
-    public Long ipv4 = null;
+    public Long sixinfour;
     @XmlElement
-    public Long ipv6 = null;
+    public Long ipv4;
+    @XmlElement
+    public Long ipv6;
 }

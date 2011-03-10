@@ -170,10 +170,11 @@ public class ChartData {
      */
     @WebMethod(operationName = "getDataVolume")
     public XMLDataVolumeList getDataVolume(
-            @WebParam(name = "constraints") String constraints,
-            @WebParam(name = "nmb_bins") Integer nmb_bins,
             @WebParam(name = "user") String user,
-            @WebParam(name = "password") String password) {
+            @WebParam(name = "password") String password,
+            @WebParam(name = "constraints") String constraints,
+            @WebParam(name = "bins") Integer bins,
+            @WebParam(name = "wait") Boolean wait) {
 
         UserAction userAction = new UserAction();
 
@@ -194,22 +195,30 @@ public class ChartData {
         XMLDataVolumeList volumes = SessionManager.getVolumes(session);
 
         if (volumes == null) {
+            volumes = new XMLDataVolumeList();
             if (!SessionManager.isHistogramBuilding(session)) {
                 SessionManager.isHistogramBuilding(session, true);
-                System.out.println("Starting volume build thread: " + constraints + ", " + nmb_bins);
-                BuildDataVolumeList task = new BuildDataVolumeList(session, constraints, nmb_bins);
-                threadManager.start(user, new TimedThread(task));
+                System.out.println("Starting volume build thread: " + constraints + ", " + bins);
+                BuildDataVolumeList task = new BuildDataVolumeList(session, constraints, bins);
+                TimedThread thread = new TimedThread(task);
+                threadManager.start(user, thread);
+                if (wait) {
+                    try {
+                        thread.join();
+                        volumes = SessionManager.getVolumes(session);
+                        SessionManager.setVolumes(session, null);
+                        SessionManager.packetsProcessed(session, null);
+                    } catch (InterruptedException e) {
+                        System.err.println("Thread: " + thread.getName() + " was interrupted.");
+                    }
+                }
             }
         } else {
             SessionManager.setVolumes(session, null);
             SessionManager.packetsProcessed(session, null);
-            return volumes;
         }
 
-        XMLDataVolumeList xmlDataVolumeList = new XMLDataVolumeList();
-        xmlDataVolumeList.packetsProcessed = SessionManager.packetsProcessed(session);
-
-        return (xmlDataVolumeList);  // The "ready" Boolean in XMLDVL is false by default
+        return (volumes);  // The "ready" Boolean in XMLDVL is false by default
     }
 
     private class BuildPacketList implements Runnable {

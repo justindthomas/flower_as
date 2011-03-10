@@ -42,12 +42,12 @@ public class UserAction {
             @WebParam(name = "username") String username,
             @WebParam(name = "password") String password) {
 
-        AuthenticationToken token = external(username, password);
+        AuthenticationToken token = internal(username, password);
         if (token.authorized) {
             return token;
         }
 
-        return internal(username, password);
+        return external(username, password);
     }
 
     private AuthenticationToken external(String username, String password) {

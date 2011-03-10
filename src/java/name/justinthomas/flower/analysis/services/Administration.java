@@ -9,15 +9,19 @@ import javax.ejb.EJB;
 import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebService;
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlType;
 import javax.xml.ws.WebServiceContext;
 import name.justinthomas.flower.analysis.authentication.AuthenticationToken;
 import name.justinthomas.flower.analysis.persistence.ConfigurationManager;
+import name.justinthomas.flower.analysis.persistence.FrequencyManager;
 import name.justinthomas.flower.analysis.persistence.UserManager;
 import name.justinthomas.flower.analysis.persistence.PersistentUser;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryDomain;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryGroup;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetwork;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLUser;
+import name.justinthomas.flower.analysis.statistics.CachedStatistics;
 
 /**
  *
@@ -64,8 +68,8 @@ public class Administration {
 
         UserAction userAction = new UserAction();
         AuthenticationToken token = userAction.authenticate(user, password);
-        if(token.authenticated && token.authorized && token.administrator) {
-            if(!configurationManager.getDirectoryDomains().containsKey(domain)) {
+        if (token.authenticated && token.authorized && token.administrator) {
+            if (!configurationManager.getDirectoryDomains().containsKey(domain)) {
                 HashMap<String, Boolean> groups = new HashMap();
                 groups.put(group, Boolean.parseBoolean(privileged));
                 configurationManager.getDirectoryDomains().put(domain, groups);
@@ -113,11 +117,11 @@ public class Administration {
         AuthenticationToken token = userAction.authenticate(user, password);
         if (token.authenticated && token.authorized && token.administrator) {
             if (configurationManager.getDirectoryDomains().containsKey(domain)) {
-                if(configurationManager.getDirectoryDomains().get(domain).containsKey(group)) {
+                if (configurationManager.getDirectoryDomains().get(domain).containsKey(group)) {
                     configurationManager.getDirectoryDomains().get(domain).remove(group);
                 }
 
-                if(configurationManager.getDirectoryDomains().get(domain).isEmpty()) {
+                if (configurationManager.getDirectoryDomains().get(domain).isEmpty()) {
                     configurationManager.getDirectoryDomains().remove(domain);
                 }
 
@@ -220,11 +224,11 @@ public class Administration {
         List<XMLDirectoryDomain> xdomains = new ArrayList();
         UserAction userAction = new UserAction();
         AuthenticationToken token = userAction.authenticate(user, password);
-        if(token.authenticated && token.authorized && token.administrator) {
+        if (token.authenticated && token.authorized && token.administrator) {
             for (Entry<String, HashMap<String, Boolean>> entry : configurationManager.getDirectoryDomains().entrySet()) {
                 XMLDirectoryDomain xdomain = new XMLDirectoryDomain();
                 xdomain.domain = entry.getKey();
-                for(Entry<String, Boolean> group : entry.getValue().entrySet()) {
+                for (Entry<String, Boolean> group : entry.getValue().entrySet()) {
                     XMLDirectoryGroup xgroup = new XMLDirectoryGroup();
                     xgroup.name = group.getKey();
                     xgroup.privileged = group.getValue();
@@ -258,5 +262,34 @@ public class Administration {
             }
         }
         return xnetworks;
+    }
+
+    @WebMethod(operationName = "getOperatingStatistics")
+    public OperatingStatistics getStatistics(
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password) {
+
+        OperatingStatistics stats = new OperatingStatistics();
+
+        UserAction userAction = new UserAction();
+        AuthenticationToken token = userAction.authenticate(user, password);
+        if (token.authenticated && token.authorized && token.administrator) {
+            stats.insertionCacheSize = CachedStatistics.getCacheSize();
+            stats.frequencyMapSize = FrequencyManager.getFrequencyManager().getMapSize();
+            stats.largestFrequency = FrequencyManager.getFrequencyManager().getLargestFrequency();
+        }
+
+        return stats;
+
+    }
+
+    @XmlType
+    public static class OperatingStatistics {
+        @XmlElement
+        public Integer insertionCacheSize;
+        @XmlElement
+        public Integer frequencyMapSize;
+        @XmlElement
+        public Integer largestFrequency;
     }
 }

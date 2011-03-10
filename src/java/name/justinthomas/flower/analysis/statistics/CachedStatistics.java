@@ -59,6 +59,10 @@ public class CachedStatistics {
         }
     }
 
+    public static Integer getCacheSize() {
+        return cache.size();
+    }
+
     class Task implements Runnable {
         @Override
         public void run() {

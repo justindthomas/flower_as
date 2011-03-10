@@ -199,19 +199,23 @@ public class FlowManager {
     }
 
     @Lock(LockType.READ)
-    public XMLDataVolumeList getXMLDataVolumes(HttpSession session, String constraints, Integer nmb_bins) {
+    public XMLDataVolumeList getXMLDataVolumes(HttpSession session, String constr, Integer nmb_bins) {
         XMLDataVolumeList volumeList = new XMLDataVolumeList();
 
         Boolean cancelVolume = false;
         StatisticsManager statisticsManager = new StatisticsManager();
 
+        Constraints constraints = new Constraints(constr);
+        Long intervalDuration = (constraints.endTime.getTime() - constraints.startTime.getTime())/nmb_bins;
+
         try {
-            LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> bins = statisticsManager.getVolumeByTime(new Constraints(constraints), nmb_bins);
+            LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> bins = statisticsManager.getVolumeByTime(constraints, nmb_bins);
 
             for (Date date : bins.keySet()) {
                 XMLDataVolume volume = new XMLDataVolume();
 
                 volume.date = date;
+                volume.duration = intervalDuration;
                 volume.total = 0l;
                 volume.tcp = 0l;
                 volume.udp = 0l;

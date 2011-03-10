@@ -46,12 +46,12 @@ public class FrequencyManager {
         loadMap();
 
         if (DEBUG >= 1) {
-            System.out.println("Setting UpdateDatabase to run in 1 minute and every hour.");
+            System.out.println("Setting UpdateDatabase to run in 60 minutes and every hour.");
         }
 
         ScheduledThreadPoolExecutor stpe = new ScheduledThreadPoolExecutor(3);
         UpdateDatabase ud = new UpdateDatabase(environmentHome);
-        stpe.scheduleAtFixedRate(ud, 1, 60, TimeUnit.MINUTES);
+        stpe.scheduleAtFixedRate(ud, 15, 15, TimeUnit.MINUTES);
     }
 
     private void setConfiguration() {
@@ -93,7 +93,7 @@ public class FrequencyManager {
 
         FrequencyAccessor dataAccessor = new FrequencyAccessor(entityStore);
         int i = 0;
-        for(Entry<String, PersistentFrequency> entry : dataAccessor.frequencyByPort.map().entrySet()) {
+        for (Entry<String, PersistentFrequency> entry : dataAccessor.frequencyByPort.map().entrySet()) {
             i++;
             map.put(entry.getKey(), entry.getValue().frequency);
         }
@@ -200,21 +200,21 @@ public class FrequencyManager {
             }
 
             int recordCount = 0;
-            synchronized (map) {
+            //synchronized (map) {
 
-                if (DEBUG >= 1) {
-                    System.out.println("Entering save loop.");
-                }
-                for(Entry<String, Integer> entry : entries) {
-                    if (DEBUG >= 2) {
-                        System.out.println("Record: " + recordCount++);
-                    } else if (DEBUG >= 1 && (++recordCount % 10000 == 0)) {
-                        System.out.println("Record: " + recordCount);
-                    }
-                    PersistentFrequency htf = new PersistentFrequency(entry.getKey(), entry.getValue());
-                    dataAccessor.frequencyByPort.put(htf);
-                }
+            if (DEBUG >= 1) {
+                System.out.println("Entering save loop.");
             }
+            for (Entry<String, Integer> entry : entries) {
+                if (DEBUG >= 2) {
+                    System.out.println("Record: " + recordCount++);
+                } else if (DEBUG >= 1 && (++recordCount % 10000 == 0)) {
+                    System.out.println("Record: " + recordCount);
+                }
+                PersistentFrequency htf = new PersistentFrequency(entry.getKey(), entry.getValue());
+                dataAccessor.frequencyByPort.put(htf);
+            }
+            //}
 
             if (DEBUG >= 1) {
                 System.out.println("Records saved: " + recordCount);
@@ -235,7 +235,33 @@ public class FrequencyManager {
 
         @Override
         public void run() {
+            if(FrequencyManager.getFrequencyManager().getLargestFrequency() > (0.75 * Integer.MAX_VALUE)) {
+                pruneMap();
+            }
+
             saveMap();
         }
+    }
+
+    public void pruneMap() {
+        int i = 0;
+        for(Entry<String, Integer> frequency : map.entrySet()) {
+            //if(++i % 1000 == 0) System.out.println("Reducing: " + frequency.getValue() + " to: " + new Double(0.1 * frequency.getValue()).intValue());
+            map.put(frequency.getKey(), new Double(0.1 * frequency.getValue()).intValue());
+        }
+    }
+
+    public Integer getMapSize() {
+        return map.size();
+    }
+
+    public Integer getLargestFrequency() {
+        Integer i = 0;
+        for (Integer frequency : map.values()) {
+            if (frequency > i) {
+                i = frequency;
+            }
+        }
+        return i;
     }
 }
