@@ -1,8 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package name.justinthomas.flower.analysis.statistics;
 
 import java.util.ArrayList;
@@ -13,6 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.ejb.Singleton;
 import javax.ejb.Startup;
 
@@ -30,7 +26,7 @@ public class CachedStatistics {
     private static Map<IntervalKey, Date> lastUpdated = Collections.synchronizedMap(new HashMap());
     public static final long MAX_WAIT = 300000;
 
-    public CachedStatistics getInstance() {
+    public static CachedStatistics getInstance() {
         if(instance == null) {
             instance = new CachedStatistics();
         }
@@ -66,18 +62,24 @@ public class CachedStatistics {
     class Task implements Runnable {
         @Override
         public void run() {
-            Thread thread = new Thread(new Persist());
+            Thread thread = new Thread(new Persist(false));
             thread.start();
         }
     }
 
     class Persist implements Runnable {
+        private Boolean flush;
+
+        public Persist(Boolean flush) {
+            this.flush = flush;
+        }
+
         @Override
         public void run() {
             //System.out.println("Statistics cache includes " + cache.size() + " entries before Persist.");
             ArrayList<IntervalKey> keys = new ArrayList();
             for(IntervalKey key : lastUpdated.keySet()) {
-                if(new Date().getTime() - lastUpdated.get(key).getTime() > MAX_WAIT) {
+                if((new Date().getTime() - lastUpdated.get(key).getTime() > MAX_WAIT) || flush) {
                     keys.add(key);
                 }
             }
@@ -96,5 +98,11 @@ public class CachedStatistics {
 
             //System.out.println("Statistics cache includes " + cache.size() + " entries after Persist.");
         }
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        Persist persist = new Persist(true);
+        persist.run();
     }
 }

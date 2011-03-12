@@ -1,14 +1,9 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package name.justinthomas.flower.analysis.services;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Security;
-import javax.ejb.EJB;
 import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebService;
@@ -25,14 +20,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 @WebService()
 public class UserAction {
 
-    @EJB
-    UserManager userManager;
-
-    public UserAction() {
-        if (userManager == null) {
-            userManager = new UserManager();
-        }
-    }
+    UserManager userManager = new UserManager();
 
     /**
      * Web service operation

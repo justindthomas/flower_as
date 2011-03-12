@@ -22,60 +22,15 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.PostConstruct;
-import javax.ejb.DependsOn;
-import javax.ejb.Lock;
-import javax.ejb.LockType;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
-import javax.naming.Context;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import javax.servlet.http.HttpSession;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolume;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
 import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
 
-@Singleton
-@Startup
-@DependsOn("ConfigurationManager")
 public class FlowManager {
-
     private static final Integer DEBUG = 2;
-    private ConfigurationManager configurationManager;
-
-    public static FlowManager getFlowManager() {
-        FlowManager flowManager = null;
-        try {
-            Context context = new InitialContext();
-            flowManager = (FlowManager) context.lookup("java:global/Analysis/FlowManager");
-        } catch (NamingException ne) {
-            System.err.println("Could not locate FlowManager using JNDI: " + ne.getExplanation());
-        }
-        return flowManager;
-    }
-
-    @PostConstruct
-    public void init() {
-        if (FlowManager.DEBUG >= 1) {
-            System.out.println("Initializing FlowManager()");
-        }
-
-        configurationManager = ConfigurationManager.getConfigurationManager();
-
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/" + configurationManager.getFlowDirectory());
-
-        try {
-            if (!environmentHome.exists()) {
-                if (!environmentHome.mkdirs()) {
-                    throw new Exception("Could not open or create base flow directory.");
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
-        }
-    }
+    private ConfigurationManager configurationManager = ConfigurationManager.getConfigurationManager();
 
     private Environment setupEnvironment() {
         File environmentHome = new File(configurationManager.getBaseDirectory() + "/" + configurationManager.getFlowDirectory());
@@ -133,7 +88,6 @@ public class FlowManager {
         }
     }
 
-    @Lock(LockType.READ)
     public void getFlows(HttpSession session, String constraintsString) {
 
         System.out.println("getFlows called.");
@@ -141,7 +95,7 @@ public class FlowManager {
         SessionManager.getPackets(session).clear();
 
         StatisticsManager statisticsManager = new StatisticsManager();
-        LinkedList<StatisticalInterval> intervals = statisticsManager.getStatisticalIntervals(session, constraints);
+        LinkedList<StatisticalInterval> intervals = statisticsManager.getStatisticalIntervals(session, constraints, null);
 
         LinkedHashMap<Long, Long> flowIDs = new LinkedHashMap();
 
@@ -198,7 +152,6 @@ public class FlowManager {
         }
     }
 
-    @Lock(LockType.READ)
     public XMLDataVolumeList getXMLDataVolumes(HttpSession session, String constr, Integer nmb_bins) {
         XMLDataVolumeList volumeList = new XMLDataVolumeList();
 
@@ -287,7 +240,6 @@ public class FlowManager {
         return volumeList;
     }
 
-    @Lock(LockType.READ)
     public XMLNetworkList getXMLNetworks(HttpSession session, String constraints) {
         XMLNetworkList networkList = new XMLNetworkList();
         StatisticsManager statisticsManager = new StatisticsManager();

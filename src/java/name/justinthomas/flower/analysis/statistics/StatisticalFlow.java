@@ -5,6 +5,7 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.util.HashMap;
 import java.util.Map.Entry;
+import javax.xml.bind.annotation.XmlType;
 import name.justinthomas.flower.analysis.element.Flow;
 
 /**
@@ -12,6 +13,7 @@ import name.justinthomas.flower.analysis.element.Flow;
  * @author justin
  */
 @Persistent(version = 022211)
+@XmlType
 public class StatisticalFlow {
 
     String source;

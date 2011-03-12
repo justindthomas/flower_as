@@ -1,17 +1,22 @@
 package name.justinthomas.flower.analysis.statistics;
 
 import com.sleepycat.persist.model.Persistent;
+import javax.xml.bind.annotation.XmlEnum;
+import javax.xml.bind.annotation.XmlType;
 
 /**
  *
  * @author justin
  */
 @Persistent
+@XmlType
 public class StatisticalFlowDetail {
+    @XmlEnum
     public static enum Count {
         PACKET, BYTE;
     }
 
+    @XmlEnum
     public static enum Version {
         IPV6, IPV4;
     }

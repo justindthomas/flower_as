@@ -1,12 +1,6 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package name.justinthomas.flower.analysis.services;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map.Entry;
 import javax.annotation.Resource;
 import javax.jws.WebMethod;
@@ -27,8 +21,6 @@ import name.justinthomas.flower.analysis.statistics.StatisticsManager;
  */
 @WebService()
 public class FlowInsert {
-    private static final int MAX_FLOWSET_SIZE = 75;
-
     @Resource
     WebServiceContext context;
 
@@ -39,24 +31,8 @@ public class FlowInsert {
         MessageContext messageContext = context.getMessageContext();
         HttpServletRequest request = (HttpServletRequest) messageContext.get(MessageContext.SERVLET_REQUEST);
 
-        //System.out.println("Analysis server received: " + flowSet.flows.size() + " flow records");
-
-        ArrayList<XMLFlowSet> chunks = new ArrayList();
-
-        Iterator<XMLFlow> iterator = flowSet.flows.iterator();
-
-        while (iterator.hasNext()) {
-            XMLFlowSet chunkedFlowSet = new XMLFlowSet();
-            for (int i = 0; (iterator.hasNext() && (i < MAX_FLOWSET_SIZE)); i++) {
-                chunkedFlowSet.flows.add(iterator.next());
-            }
-            chunks.add(chunkedFlowSet);
-        }
-
-        for (XMLFlowSet chunkedFlowSet : chunks) {
-            Thread thread = new Thread(new InsertThread(chunkedFlowSet));
-            thread.start();
-        }
+        Thread thread = new Thread(new InsertThread(flowSet));
+        thread.start();
 
         return 0;
     }
@@ -78,10 +54,6 @@ public class FlowInsert {
                     if (xflow.bytesSent.longValue() < 0) {
                         throw new Exception("Negative bytesSent value (" + xflow.bytesSent.longValue() + ") in XMLFlow received.");
                     }
-
-                    //if (xflow.bytesReceived.longValue() < 0) {
-                    //    throw new Exception("Negative bytesReceived value (" + xflow.bytesSent.longValue() + ") in XMLFlow received from: " + request.getRemoteAddr());
-                    //}
 
                     Flow flow = new Flow(xflow);
 

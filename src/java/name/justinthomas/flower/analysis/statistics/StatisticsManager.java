@@ -234,19 +234,19 @@ public class StatisticsManager {
         return returnValue;
     }
 
-    public LinkedList<StatisticalInterval> getStatisticalIntervals(HttpSession session, Constraints constraints) {
+    public LinkedList<StatisticalInterval> getStatisticalIntervals(HttpSession session, Constraints constraints, Integer resolution) {
         LinkedList<StatisticalInterval> intervals = new LinkedList();
 
         Long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
         Environment environment;
-        Long resolution = getResolution(duration, null);
+        Long r = (resolution != null) ? resolution : getResolution(duration, null);
 
         EntityStore store = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
         StatisticsAccessor accessor = new StatisticsAccessor(store);
-        Long start = constraints.startTime.getTime() / resolution;
-        IntervalKey startKey = new IntervalKey(start, resolution);
-        Long end = constraints.endTime.getTime() / resolution;
-        IntervalKey endKey = new IntervalKey(end, resolution);
+        Long start = constraints.startTime.getTime() / r;
+        IntervalKey startKey = new IntervalKey(start, r);
+        Long end = constraints.endTime.getTime() / r;
+        IntervalKey endKey = new IntervalKey(end, r);
 
         EntityCursor<StatisticalInterval> cursor = accessor.intervalByKey.entities(startKey, true, endKey, true);
 

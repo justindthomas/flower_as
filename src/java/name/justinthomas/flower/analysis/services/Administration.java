@@ -34,8 +34,8 @@ public class Administration {
     private WebServiceContext serviceContext;
     @EJB
     ConfigurationManager configurationManager;
-    @EJB
-    UserManager userManager;
+    //@EJB
+    UserManager userManager = new UserManager();
 
     @WebMethod(operationName = "addNetwork")
     public Boolean addNetwork(

@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package name.justinthomas.flower.analysis.persistence;
 
 import java.util.ArrayList;
@@ -45,7 +41,7 @@ public class Cleaner implements Runnable {
         ArrayList<Long> flowIDs = statisticsManager.cleanStatisticalIntervals();
 
         System.out.println("Cleaning flows...");
-        FlowManager flowManager = FlowManager.getFlowManager();
+        FlowManager flowManager = new FlowManager();
         flowManager.cleanFlows(flowIDs);
 
         if (DEBUG >= 1) {

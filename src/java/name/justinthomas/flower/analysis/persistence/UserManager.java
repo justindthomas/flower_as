@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package name.justinthomas.flower.analysis.persistence;
 
 import com.sleepycat.je.DatabaseException;
@@ -16,17 +12,12 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Security;
 import java.util.ArrayList;
-import javax.ejb.DependsOn;
-import javax.ejb.EJB;
-import javax.ejb.Stateless;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 /**
  *
  * @author justin
  */
-@Stateless
-@DependsOn("ConfigurationManager")
 public class UserManager {
 
     private static Integer DEBUG = 1;

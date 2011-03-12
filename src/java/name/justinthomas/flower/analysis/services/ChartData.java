@@ -2,9 +2,9 @@ package name.justinthomas.flower.analysis.services;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map.Entry;
 import javax.annotation.Resource;
 import javax.ejb.EJB;
@@ -23,12 +23,15 @@ import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetwork;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
 import name.justinthomas.flower.analysis.element.ManagedNetworks;
 import name.justinthomas.flower.analysis.persistence.ConfigurationManager;
+import name.justinthomas.flower.analysis.persistence.Constraints;
 import name.justinthomas.flower.analysis.persistence.SessionManager;
 import name.justinthomas.flower.analysis.persistence.ThreadManager;
 import name.justinthomas.flower.analysis.persistence.TimedThread;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLFlowSet;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNode;
+import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
+import name.justinthomas.flower.analysis.statistics.StatisticsManager;
 
 /**
  *
@@ -39,8 +42,8 @@ public class ChartData {
 
     @EJB
     ThreadManager threadManager;
-    @EJB
-    FlowManager flowManager;
+    //@EJB
+    //FlowManager flowManager;
     @EJB
     ConfigurationManager configurationManager;
     @Resource
@@ -58,10 +61,7 @@ public class ChartData {
         UserAction userAction = new UserAction();
 
         if (!userAction.authenticate(user, password).authorized) {
-            XMLNetworkList xmlNetworkList = new XMLNetworkList();
-            xmlNetworkList.ready = true;
-
-            return (xmlNetworkList);
+            return (null);
         }
 
         MessageContext messageContext = serviceContext.getMessageContext();
@@ -122,10 +122,7 @@ public class ChartData {
         UserAction userAction = new UserAction();
 
         if (!userAction.authenticate(user, password).authorized) {
-            XMLFlowSet xmlFlowList = new XMLFlowSet();
-            xmlFlowList.finished = true;
-
-            return (xmlFlowList);
+            return (null);
         }
 
         MessageContext messageContext = serviceContext.getMessageContext();
@@ -165,6 +162,23 @@ public class ChartData {
         return xmlPacketList;
     }
 
+    @WebMethod(operationName = "getIntervals")
+        public List<StatisticalInterval> getIntervals(
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password,
+            @WebParam(name = "constraints") String constraints,
+            @WebParam(name = "resolution") Integer resolution) {
+
+        UserAction userAction = new UserAction();
+
+        if (!userAction.authenticate(user, password).authorized) {
+            return (null);
+        }
+
+        StatisticsManager statisticsManager = new StatisticsManager();
+        return statisticsManager.getStatisticalIntervals(null, new Constraints(constraints), resolution);
+    }
+
     /**
      * Web service operation
      */
@@ -179,10 +193,7 @@ public class ChartData {
         UserAction userAction = new UserAction();
 
         if (!userAction.authenticate(user, password).authorized) {
-            XMLDataVolumeList xmlDataVolumeList = new XMLDataVolumeList();
-            xmlDataVolumeList.ready = true;
-
-            return (xmlDataVolumeList);
+            return (null);
         }
 
         MessageContext messageContext = serviceContext.getMessageContext();
@@ -233,6 +244,7 @@ public class ChartData {
 
         @Override
         public void run() {
+            FlowManager flowManager = new FlowManager();
             flowManager.getFlows(session, constraints);
 
             //System.out.println("FlowManager getPackets() appears to have completed...");
@@ -252,6 +264,7 @@ public class ChartData {
 
         @Override
         public void run() {
+            FlowManager flowManager = new FlowManager();
             flowManager.getXMLNetworks(session, constraints);
         }
     }
@@ -270,6 +283,7 @@ public class ChartData {
 
         @Override
         public void run() {
+            FlowManager flowManager = new FlowManager();
             flowManager.getXMLDataVolumes(session, constraints, bins);
         }
     }
