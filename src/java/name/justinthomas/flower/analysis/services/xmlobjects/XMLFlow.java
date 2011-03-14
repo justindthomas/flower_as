@@ -19,9 +19,9 @@ public class XMLFlow {
     @XmlElement
     public Integer      id = null;
     @XmlElement
-    public Calendar     startTimeStamp = null;
+    public Long     startTimeStamp = null;
     @XmlElement
-    public Calendar     lastTimeStamp = null;
+    public Long     lastTimeStamp = null;
     @XmlElement
     public String       ethernetType = null;
     @XmlElement
@@ -43,7 +43,7 @@ public class XMLFlow {
     @XmlElement
     public Integer      packetsReceived = null;
     @XmlElement
-    public BigDecimal   bytesSent = new BigDecimal(0);
+    public Long         bytesSent = 0l;
     @XmlElement
-    public BigDecimal   bytesReceived = new BigDecimal(0);
+    public Long         bytesReceived = 0l;
 }

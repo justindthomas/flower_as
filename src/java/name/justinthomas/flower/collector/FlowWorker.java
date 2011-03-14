@@ -295,13 +295,13 @@ public class FlowWorker implements Runnable {
         return 0;
     }
 
-    private Calendar parseDate(DataInput input, Integer sysUpTime, long epoch) throws IOException, DatatypeConfigurationException {
+    private Long parseDate(DataInput input, Integer sysUpTime, long epoch) throws IOException, DatatypeConfigurationException {
         long ms = input.readInt();
         long time = ((epoch * 1000) - sysUpTime + ms);
         Calendar cal = Calendar.getInstance();
         cal.setTimeInMillis(time);
 
-        return cal;
+        return time;
     }
 
     private int parseData(byte[] dataBytes, Template template, Integer sysUpTime, long epoch) throws IOException {
@@ -393,12 +393,12 @@ public class FlowWorker implements Runnable {
                     dte.printStackTrace();
                 }
             }
-            xnetflow.bytesSent = new BigDecimal(size);
+            xnetflow.bytesSent = size;
             xnetflow.packetsSent = packets.intValue();
 
             // softflowd 0.9.8 mixes up the time stamps
-            if (xnetflow.startTimeStamp.after(xnetflow.lastTimeStamp)) {
-                Calendar temp = xnetflow.startTimeStamp;
+            if (xnetflow.startTimeStamp > xnetflow.lastTimeStamp) {
+                Long temp = xnetflow.startTimeStamp;
                 xnetflow.startTimeStamp = xnetflow.lastTimeStamp;
                 xnetflow.lastTimeStamp = temp;
             }

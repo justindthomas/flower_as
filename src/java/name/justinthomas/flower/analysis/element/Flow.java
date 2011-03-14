@@ -97,8 +97,8 @@ public class Flow implements Serializable {
     public Flow(XMLFlow xflow) throws UnknownHostException {
         this();
 
-        this.bytesSent = xflow.bytesSent;
-        this.bytesReceived = xflow.bytesReceived;
+        this.bytesSent = new BigDecimal(xflow.bytesSent);
+        this.bytesReceived = new BigDecimal(xflow.bytesReceived);
         this.addresses[0] = InetAddress.getByName(xflow.sourceAddress);
         this.addresses[1] = InetAddress.getByName(xflow.destinationAddress);
         this.ports[0] = xflow.sourcePort;
@@ -106,8 +106,8 @@ public class Flow implements Serializable {
 
         this.ethernetType = xflow.ethernetType;
 
-        this.startTimeStamp = xflow.startTimeStamp.getTime();
-        this.lastTimeStamp = xflow.lastTimeStamp.getTime();
+        this.startTimeStamp = new Date(xflow.startTimeStamp);
+        this.lastTimeStamp = new Date(xflow.lastTimeStamp);
         this.packetsSent = xflow.packetsSent;
         this.packetsReceived = xflow.packetsReceived;
         this.protocol = xflow.protocol;
@@ -152,14 +152,12 @@ public class Flow implements Serializable {
     public XMLFlow toXMLFlow() {
         XMLFlow xflow = new XMLFlow();
 
-        xflow.startTimeStamp = Calendar.getInstance();
         if (startTimeStamp != null) {
-            xflow.startTimeStamp.setTime(startTimeStamp);
+            xflow.startTimeStamp = startTimeStamp.getTime();
         }
 
-        xflow.lastTimeStamp = Calendar.getInstance();
         if (lastTimeStamp != null) {
-            xflow.lastTimeStamp.setTime(lastTimeStamp);
+            xflow.lastTimeStamp = lastTimeStamp.getTime();
         }
 
         xflow.ethernetType = ethernetType;
@@ -178,11 +176,11 @@ public class Flow implements Serializable {
         }
 
         if (bytesSent != null) {
-            xflow.bytesSent = bytesSent;
+            xflow.bytesSent = bytesSent.longValue();
         }
 
         if (bytesReceived != null) {
-            xflow.bytesReceived = bytesReceived;
+            xflow.bytesReceived = bytesReceived.longValue();
         }
 
         if (packetsSent != null) {
