@@ -5,6 +5,7 @@ import time
 import optparse
 import logging
 import logging.handlers
+import sys
 from daemon import Daemon
 
 from Queue import Queue
@@ -255,19 +256,31 @@ class Collector(Daemon):
     def run(self):
         startup()
 
+def stop_nicely():
+    logger.info("Instructing normalizer and transfer threads to stop...")
+    normalizer.stop()
+    transfer.stop()
+
+    try:
+        normalizer.join()
+        transfer.join()
+    except RuntimeError:
+        logger.debug("RuntimeError encountered when joining threads.")
+
+    logger.info("Netflow collector shutdown completed")
+
 def startup():
+    normalizer.start()
+    transfer.start()
+
     HOST, PORT = "::", 9995
     server = IPv6Server((HOST, PORT), NetflowCollector)
     try:
         server.serve_forever()
-    except KeyboardInterrupt, RuntimeError:
-        logger.info("Instructing normalizer and transfer threads to stop...")
-        normalizer.stop()
-        transfer.stop()
+    except KeyboardInterrupt:
+        pass
 
-    normalizer.join()
-    transfer.join()
-    logger.info("Netflow collector shutdown completed")
+    stop_nicely()
 
 if __name__ == "__main__":
     parser = optparse.OptionParser(description="Netflow to Flower connector", usage="usage: %prog [options] server")
@@ -275,16 +288,15 @@ if __name__ == "__main__":
     parser.add_option("-p", "--port", dest="port", default="8080")
     parser.add_option("--debug", action="store_true", dest="debug", default=False)
     parser.add_option("-i", action="store_true", dest="interactive", default=False)
-
+    parser.add_option("--stop", action="store_true", dest="stop", default=False)
 
     (options, args) = parser.parse_args()
 
-    if len(args) != 1:
-        parser.error("Please specify the name or address of a Flower Analysis Server")
+    daemon = Collector('/tmp/netflowd.pid')
 
     LOG_FILENAME = "/var/log/netflow"
     logger = logging.getLogger('netflowd')
-    
+
     if(not options.debug):
         logger.setLevel(logging.INFO)
     else:
@@ -296,22 +308,30 @@ if __name__ == "__main__":
 
     logger.addHandler(handler)
 
-    if(options.debug):
-        logger.debug("Debugging enabled")
-
-    logger.info("Starting Netflow collector...")
-    logger.info("Flower Analysis Server: " + args[0] + ":" + options.port)
-    if(not options.ssl):
-        logger.info("SSL Disabled")
-    
     netflows = Queue()
     normalized = Queue()
 
     normalizer = NetflowQueueProcessor()
-    normalizer.start()
-
     transfer = TransferThread()
-    transfer.start()
 
-    if(options.interactive):
-        startup()
+    if(options.stop):
+        stop_nicely()
+        daemon.stop()
+    else:
+        if len(args) != 1:
+            parser.error("Please specify the name or address of a Flower Analysis Server")
+
+        if(options.debug):
+            logger.debug("Debugging enabled")
+
+        logger.info("Starting Netflow collector...")
+        logger.info("Flower Analysis Server: " + args[0] + ":" + options.port)
+        if(not options.ssl):
+            logger.info("SSL Disabled")
+
+        if(options.interactive):
+            startup()
+        else:
+            daemon = Collector('/tmp/netflowd.pid')
+            daemon.start()
+            sys.exit(0)
