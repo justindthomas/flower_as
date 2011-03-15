@@ -302,13 +302,11 @@ public class QueueManager implements Runnable {
         return 0;
     }
 
-    private XMLGregorianCalendar parseDate(DataInput input, Integer sysUpTime, long epoch) throws IOException, DatatypeConfigurationException {
+    private Long parseDate(DataInput input, Integer sysUpTime, long epoch) throws IOException, DatatypeConfigurationException {
         long ms = input.readInt();
         long time = ((epoch * 1000) - sysUpTime + ms);
-        GregorianCalendar cal = new GregorianCalendar();
-        cal.setTimeInMillis(time);
 
-        return DatatypeFactory.newInstance().newXMLGregorianCalendar(cal);
+        return time;
     }
 
     private int parseData(byte[] dataBytes, Template template, Integer sysUpTime, long epoch) throws IOException {
@@ -400,12 +398,12 @@ public class QueueManager implements Runnable {
                     dte.printStackTrace();
                 }
             }
-            xnetflow.setBytesSent(new BigDecimal(size));
+            xnetflow.setBytesSent(size);
             xnetflow.setPacketsSent(packets.intValue());
 
             // softflowd 0.9.8 mixes up the time stamps
-            if (xnetflow.getStartTimeStamp().toGregorianCalendar().after(xnetflow.getLastTimeStamp().toGregorianCalendar())) {
-                XMLGregorianCalendar temp = xnetflow.getStartTimeStamp();
+            if (xnetflow.getStartTimeStamp() > xnetflow.getLastTimeStamp()) {
+                Long temp = xnetflow.getStartTimeStamp();
                 xnetflow.setStartTimeStamp(xnetflow.getLastTimeStamp());
                 xnetflow.setLastTimeStamp(temp);
             }

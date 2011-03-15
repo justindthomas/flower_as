@@ -1,15 +1,20 @@
 #!/usr/bin/env python
 
-from struct import unpack
+import SocketServer
 import time
+import optparse
+import logging
+import logging.handlers
+from daemon import Daemon
 
 from Queue import Queue
-import SocketServer
+from struct import unpack
 from sched import scheduler
 from socket import inet_ntop, AF_INET, AF_INET6
 from threading import Thread
 from suds.client import Client
 from suds import WebFault
+from urllib2 import URLError
 
 class TransferThread(Thread):
     tasks = scheduler(time.time, time.sleep)
@@ -20,32 +25,42 @@ class TransferThread(Thread):
         self.tasks.run()
 
     def process(self, name):
-        print "Processing transfer queue..."
-        client = Client("http://dev:8080/flower/analysis/FlowInsertService?wsdl")
+        logger.debug("Processing transfer queue...")
 
-        xflowset = client.factory.create("xmlFlowSet")
-        while(not normalized.empty()):
-            flow = normalized.get_nowait()
-            xflow = client.factory.create("xmlFlow")
-            xflow.sourceAddress = flow["source"]
-            xflow.destinationAddress = flow["destination"]
-            xflow.sourcePort = flow["sport"]
-            xflow.destinationPort = flow["dport"]
-            xflow.flags = flow["tcp_flags"]
-            xflow.bytesSent = flow["in_bytes"] + flow["out_bytes"]
-            xflow.packetsSent = flow["in_pkts"] + flow["out_pkts"]
-            xflow.protocol = flow["protocol"]
-            xflow.startTimeStamp = flow["first_switched"]
-            xflow.lastTimeStamp = flow["last_switched"]
-            xflowset.flows.append(xflow)
-            #print xflow
+        try:
+            protocol = "http://"
 
-        if(len(xflowset.flows) > 0):
-            try:
-                result = client.service.addFlows(xflowset)
-                #print result
-            except WebFault as detail:
-                print detail
+            if(options.ssl):
+                protocol = "https://"
+
+            logger.debug("Connecting to: " + protocol + args[0] + ":" + options.port + "/flower/analysis/FlowInsertService?wsdl")
+            client = Client(protocol + args[0] + ":" + options.port + "/flower/analysis/FlowInsertService?wsdl")
+
+            xflowset = client.factory.create("xmlFlowSet")
+            while(not normalized.empty()):
+                flow = normalized.get_nowait()
+                xflow = client.factory.create("xmlFlow")
+                xflow.sourceAddress = flow["source"]
+                xflow.destinationAddress = flow["destination"]
+                xflow.sourcePort = flow["sport"]
+                xflow.destinationPort = flow["dport"]
+                xflow.flags = flow["tcp_flags"]
+                xflow.bytesSent = flow["in_bytes"] + flow["out_bytes"]
+                xflow.packetsSent = flow["in_pkts"] + flow["out_pkts"]
+                xflow.protocol = flow["protocol"]
+                xflow.startTimeStamp = flow["first_switched"]
+                xflow.lastTimeStamp = flow["last_switched"]
+                xflowset.flows.append(xflow)
+                #print xflow
+
+            if(len(xflowset.flows) > 0):
+                if(client.service.addFlows(xflowset) != 0):
+                    logger.error("Unexpected response from Analysis Server while attempting to add new flows")
+
+        except URLError:
+            logger.error("Unable to connect to Analysis Server")
+        except WebFault:
+            logger.error("Unable to complete data transfer to Analysis Server")
             
         if(not self.stop_flag):
             self.tasks.enter(15, 1, self.process, ('process', ))
@@ -53,7 +68,7 @@ class TransferThread(Thread):
     def stop(self):
         self.stop_flag = True
 
-class QueueProcessor(Thread):
+class NetflowQueueProcessor(Thread):
     tasks = scheduler(time.time, time.sleep)
     stop_flag = False
     templates = {}
@@ -76,11 +91,11 @@ class QueueProcessor(Thread):
         self.tasks.run()
 		
     def process(self, name):
-        print "Processing NetFlow queue..."
+        logger.debug("Processing NetFlow queue...")
 
         retry = []
-        while(not queue.empty()):
-            sender, data = queue.get_nowait()
+        while(not netflows.empty()):
+            sender, data = netflows.get_nowait()
             version = self.parse_number(data[:2])
             count = self.parse_number(data[2:4])
             uptime = self.parse_number(data[4:8])
@@ -94,7 +109,7 @@ class QueueProcessor(Thread):
                     retry.append(result)
 
         for netflow in retry:
-            queue.put((sender, netflow))
+            netflows.put((sender, netflow))
 				
         if(not self.stop_flag):
             self.tasks.enter(15, 1, self.process, ('process', ))
@@ -165,6 +180,7 @@ class QueueProcessor(Thread):
                     normalized.put(flow)
                     netflows = netflows[flow_size:]
                 #print normalized
+                logger.debug("Normalized queue contains: " + str(normalized.qsize()) + " entries")
             else:
                 counter = count
                 return data
@@ -215,7 +231,7 @@ class QueueProcessor(Thread):
 
             self.templates[sender][id] = fields
 
-        #print "Templates: " + str(self.templates)
+        logging.debug("Templates Parsed: " + str(self.templates))
         return template_count
 		
     def stop(self):
@@ -225,28 +241,77 @@ class NetflowCollector(SocketServer.DatagramRequestHandler):
     def handle(self):
         data = self.rfile.read(4096)
         client = self.client_address[0]
-        queue.put((client, data))
-        #print("Queue Size: " + str(queue.qsize()) + " " + client)
+        netflows.put((client, data))
+        #print("Queue Size: " + str(netflows.qsize()) + " " + client)
+        logger.debug("Netflow queue contains: " + str(netflows.qsize()) + " entries")
 
     def finish(self):
         pass
 
 class IPv6Server(SocketServer.UDPServer):
     address_family = AF_INET6
-	
-if __name__ == "__main__":
-    queue = Queue()
-    normalized = Queue()
-    queue_thread = QueueProcessor()
-    queue_thread.start()
-    transfer_thread = TransferThread()
-    transfer_thread.start()
 
+class Collector(Daemon):
+    def run(self):
+        startup()
+
+def startup():
     HOST, PORT = "::", 9995
     server = IPv6Server((HOST, PORT), NetflowCollector)
     try:
         server.serve_forever()
-    except KeyboardInterrupt:
-        print "\nInstructing threads to shutdown..."
-        queue_thread.stop()
-        transfer_thread.stop()
+    except KeyboardInterrupt, RuntimeError:
+        logger.info("Instructing normalizer and transfer threads to stop...")
+        normalizer.stop()
+        transfer.stop()
+
+    normalizer.join()
+    transfer.join()
+    logger.info("Netflow collector shutdown completed")
+
+if __name__ == "__main__":
+    parser = optparse.OptionParser(description="Netflow to Flower connector", usage="usage: %prog [options] server")
+    parser.add_option("-n", "--no-ssl", action="store_false", dest="ssl", default=True)
+    parser.add_option("-p", "--port", dest="port", default="8080")
+    parser.add_option("--debug", action="store_true", dest="debug", default=False)
+    parser.add_option("-i", action="store_true", dest="interactive", default=False)
+
+
+    (options, args) = parser.parse_args()
+
+    if len(args) != 1:
+        parser.error("Please specify the name or address of a Flower Analysis Server")
+
+    LOG_FILENAME = "/var/log/netflow"
+    logger = logging.getLogger('netflowd')
+    
+    if(not options.debug):
+        logger.setLevel(logging.INFO)
+    else:
+        logger.setLevel(logging.DEBUG)
+
+    handler = logging.handlers.RotatingFileHandler(LOG_FILENAME, maxBytes=16384, backupCount=5)
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+
+    logger.addHandler(handler)
+
+    if(options.debug):
+        logger.debug("Debugging enabled")
+
+    logger.info("Starting Netflow collector...")
+    logger.info("Flower Analysis Server: " + args[0] + ":" + options.port)
+    if(not options.ssl):
+        logger.info("SSL Disabled")
+    
+    netflows = Queue()
+    normalized = Queue()
+
+    normalizer = NetflowQueueProcessor()
+    normalizer.start()
+
+    transfer = TransferThread()
+    transfer.start()
+
+    if(options.interactive):
+        startup()
