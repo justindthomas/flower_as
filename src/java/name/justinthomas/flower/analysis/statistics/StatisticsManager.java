@@ -187,7 +187,17 @@ public class StatisticsManager {
         }
     }
 
-    public void addStatisticalSeconds(Flow flow, Long flowID) {
+    public void addStatisticalSeconds(Flow flow, Long flowID, InetAddress collector) {
+        try {
+            if (CachedStatistics.hasOtherRepresentation(flow.getSourceAddress(), flow.getDestinationAddress(), collector)) {
+                System.out.println("Ignoring duplicate flow from: " + collector.getHostAddress() +
+                        ", already represented by: " + CachedStatistics.getRepresentation(flow.getSourceAddress(), flow.getDestinationAddress()).getHostAddress());
+                return;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         for (Long resolution : configurationManager.getResolution().keySet()) {
             HashMap<IntervalKey, StatisticalInterval> normalized = flowToInterval(flow, resolution, flowID);
 
@@ -382,9 +392,9 @@ public class StatisticsManager {
                             }
 
                             if (new Date(second.getSecond().interval * resolution).after(new Date(bin.getTime())) && new Date(second.getSecond().interval * resolution).before(new Date(bin.getTime() + interval))) {
-                                if(!types.isEmpty()) {
-                                    for(Integer type : types.keySet()) {
-                                        if(consolidated.get(bin).get("types").containsKey(type)) {
+                                if (!types.isEmpty()) {
+                                    for (Integer type : types.keySet()) {
+                                        if (consolidated.get(bin).get("types").containsKey(type)) {
                                             consolidated.get(bin).get("types").put(type, consolidated.get(bin).get("types").get(type) + types.get(type));
                                         } else {
                                             consolidated.get(bin).get("types").put(type, types.get(type));
@@ -392,9 +402,9 @@ public class StatisticsManager {
                                     }
                                 }
 
-                                if(!tcp.isEmpty()) {
-                                    for(Integer destination : tcp.keySet()) {
-                                        if(consolidated.get(bin).get("tcp").containsKey(destination)) {
+                                if (!tcp.isEmpty()) {
+                                    for (Integer destination : tcp.keySet()) {
+                                        if (consolidated.get(bin).get("tcp").containsKey(destination)) {
                                             consolidated.get(bin).get("tcp").put(destination, consolidated.get(bin).get("tcp").get(destination) + tcp.get(destination));
                                         } else {
                                             consolidated.get(bin).get("tcp").put(destination, tcp.get(destination));
@@ -402,9 +412,9 @@ public class StatisticsManager {
                                     }
                                 }
 
-                                if(!udp.isEmpty()) {
-                                    for(Integer destination : udp.keySet()) {
-                                        if(consolidated.get(bin).get("udp").containsKey(destination)) {
+                                if (!udp.isEmpty()) {
+                                    for (Integer destination : udp.keySet()) {
+                                        if (consolidated.get(bin).get("udp").containsKey(destination)) {
                                             consolidated.get(bin).get("udp").put(destination, consolidated.get(bin).get("udp").get(destination) + udp.get(destination));
                                         } else {
                                             consolidated.get(bin).get("udp").put(destination, udp.get(destination));
@@ -412,9 +422,9 @@ public class StatisticsManager {
                                     }
                                 }
 
-                                if(!versions.isEmpty()) {
-                                    for(Integer version : versions.keySet()) {
-                                        if(consolidated.get(bin).get("versions").containsKey(version)) {
+                                if (!versions.isEmpty()) {
+                                    for (Integer version : versions.keySet()) {
+                                        if (consolidated.get(bin).get("versions").containsKey(version)) {
                                             consolidated.get(bin).get("versions").put(version, consolidated.get(bin).get("versions").get(version) + versions.get(version));
                                         } else {
                                             consolidated.get(bin).get("versions").put(version, versions.get(version));

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# To freeze on Debian stable, use:  python /usr/share/doc/python2.6/examples/Tools/freeze/freeze.py netflow.py -m encodings.ascii encodings.utf_8 encodings.idna
+
 import SocketServer
 import time
 import optparse

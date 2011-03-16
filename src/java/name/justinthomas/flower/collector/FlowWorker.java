@@ -409,7 +409,8 @@ public class FlowWorker implements Runnable {
             Long flowID = flowReceiver.addFlow(flow);
 
             StatisticsManager statisticsManager = new StatisticsManager();
-            statisticsManager.addStatisticalSeconds(flow, flowID);
+            // Commented out because I'm too lazy to fix this (requires determining source IP address of sender)
+            //statisticsManager.addStatisticalSeconds(flow, flowID);
         }
 
         return flows;

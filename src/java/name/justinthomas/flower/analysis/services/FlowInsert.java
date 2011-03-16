@@ -1,5 +1,7 @@
 package name.justinthomas.flower.analysis.services;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import javax.annotation.Resource;
@@ -21,6 +23,7 @@ import name.justinthomas.flower.analysis.statistics.StatisticsManager;
  */
 @WebService()
 public class FlowInsert {
+
     @Resource
     WebServiceContext context;
 
@@ -31,19 +34,26 @@ public class FlowInsert {
         MessageContext messageContext = context.getMessageContext();
         HttpServletRequest request = (HttpServletRequest) messageContext.get(MessageContext.SERVLET_REQUEST);
 
-        Thread thread = new Thread(new InsertThread(flowSet));
-        thread.start();
+        try {
+            InetAddress collector = InetAddress.getByName(request.getRemoteAddr());
+            Thread thread = new Thread(new InsertThread(flowSet, collector));
+            thread.start();
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
 
         return 0;
     }
 
     class InsertThread implements Runnable {
 
+        InetAddress collector;
         XMLFlowSet flowSet;
         HashMap<Long, Flow> flows = new HashMap();
 
-        public InsertThread(XMLFlowSet flowSet) {
+        public InsertThread(XMLFlowSet flowSet, InetAddress collector) {
             this.flowSet = flowSet;
+            this.collector = collector;
         }
 
         @Override
@@ -70,7 +80,7 @@ public class FlowInsert {
 
             for (Entry<Long, Flow> flow : flows.entrySet()) {
                 StatisticsManager statisticsManager = new StatisticsManager();
-                statisticsManager.addStatisticalSeconds(flow.getValue(), flow.getKey());
+                statisticsManager.addStatisticalSeconds(flow.getValue(), flow.getKey(), collector);
             }
 
             //System.out.println("Completed processing statistics for " + flows.size() + " flows.");

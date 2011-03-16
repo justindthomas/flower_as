@@ -277,6 +277,7 @@ public class Administration {
             stats.insertionCacheSize = CachedStatistics.getCacheSize();
             stats.frequencyMapSize = FrequencyManager.getFrequencyManager().getMapSize();
             stats.largestFrequency = FrequencyManager.getFrequencyManager().getLargestFrequency();
+            stats.representationMap = CachedStatistics.getRepresentationMapSize();
         }
 
         return stats;
@@ -291,5 +292,7 @@ public class Administration {
         public Integer frequencyMapSize;
         @XmlElement
         public Integer largestFrequency;
+        @XmlElement
+        public Integer representationMap;
     }
 }
