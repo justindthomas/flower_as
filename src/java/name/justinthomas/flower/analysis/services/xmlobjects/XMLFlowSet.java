@@ -19,5 +19,7 @@ public class XMLFlowSet {
     @XmlElement
     public List<XMLFlow> flows = new ArrayList<XMLFlow>();
     @XmlElement
+    public String tracker;
+    @XmlElement
     public Boolean finished = false;
 }

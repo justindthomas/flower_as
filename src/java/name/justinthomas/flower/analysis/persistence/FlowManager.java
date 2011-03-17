@@ -88,11 +88,11 @@ public class FlowManager {
         }
     }
 
-    public void getFlows(HttpSession session, String constraintsString) {
+    public void getFlows(HttpSession session, String constraintsString, String tracker) {
 
         System.out.println("getFlows called.");
         Constraints constraints = new Constraints(constraintsString);
-        SessionManager.getPackets(session).clear();
+        SessionManager.getFlows(session, tracker).clear();
 
         StatisticsManager statisticsManager = new StatisticsManager();
         LinkedList<StatisticalInterval> intervals = statisticsManager.getStatisticalIntervals(session, constraints, null);
@@ -127,7 +127,7 @@ public class FlowManager {
                     }
 
                     if (select) {
-                        SessionManager.getPackets(session).add(new Flow(pflow));
+                        SessionManager.getFlows(session, tracker).add(new Flow(pflow));
                     }
 
                     if (DEBUG > 0) {

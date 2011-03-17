@@ -2,10 +2,14 @@ package name.justinthomas.flower.analysis.services;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Random;
 import javax.annotation.Resource;
 import javax.ejb.EJB;
 import javax.jws.WebMethod;
@@ -32,6 +36,7 @@ import name.justinthomas.flower.analysis.services.xmlobjects.XMLFlowSet;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNode;
 import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
+import org.bouncycastle.util.encoders.Base64;
 
 /**
  *
@@ -54,9 +59,10 @@ public class ChartData {
      */
     @WebMethod(operationName = "getNetworkMap")
     public XMLNetworkList getNetworkMap(
-            @WebParam(name = "constraints") String constraints,
             @WebParam(name = "user") String user,
-            @WebParam(name = "password") String password) {
+            @WebParam(name = "password") String password,
+            @WebParam(name = "constraints") String constraints,
+            @WebParam(name = "wait") Boolean wait) {
 
         UserAction userAction = new UserAction();
 
@@ -79,19 +85,29 @@ public class ChartData {
 
                 //System.out.println("Starting map build thread.");
                 BuildNetworkList task = new BuildNetworkList(session, constraints);
-                threadManager.start(user, new TimedThread(task));
+                TimedThread thread = new TimedThread(task);
+                threadManager.start(user, thread);
+
+                if (wait) {
+                    try {
+                        thread.join();
+                        networks = SessionManager.getNetworks(session);
+                        SessionManager.setNetworks(session, null);
+                        SessionManager.flowsProcessed(session, null);
+                    } catch (InterruptedException e) {
+                        System.err.println("Thread: " + thread.getName() + " was interrupted.");
+                    }
+                } else {
+                    networks = new XMLNetworkList();
+                }
             }
         } else {
+            networks = SessionManager.getNetworks(session);
             SessionManager.setNetworks(session, null);
             SessionManager.flowsProcessed(session, null);
-            createTraceFile(networks);
-            return networks;
         }
 
-        XMLNetworkList xmlNetworkList = new XMLNetworkList();
-        xmlNetworkList.flowsProcessed = SessionManager.flowsProcessed(session);
-
-        return (xmlNetworkList);  // The "ready" Boolean in XMLNL is false by default
+        return (networks);  // The "ready" Boolean in XMLNL is false by default
     }
 
     private void createTraceFile(XMLNetworkList xmlNetworkList) {
@@ -113,11 +129,12 @@ public class ChartData {
     /**
      * Web service operation
      */
-    @WebMethod(operationName = "getPackets")
-    public XMLFlowSet getPackets(
-            @WebParam(name = "constraints") String constraints,
+    @WebMethod(operationName = "getFlows")
+    public XMLFlowSet getFlows(
             @WebParam(name = "user") String user,
-            @WebParam(name = "password") String password) {
+            @WebParam(name = "password") String password,
+            @WebParam(name = "constraints") String constraints,
+            @WebParam(name = "tracker") String tracker) {
 
         UserAction userAction = new UserAction();
 
@@ -132,38 +149,66 @@ public class ChartData {
             throw new WebServiceException("No session in WebServiceContext");
         }
 
-        if (!SessionManager.isProcessingPacketsComplete(session)) {
-            //System.out.println("It appears that processing is not complete...");
-            if (!SessionManager.isProcessingPackets(session)) {
-                //System.out.println("It appears that processing has not begun...");
-                SessionManager.isProcessingPackets(session, true);
+        if (constraints != null && (tracker == null || tracker.isEmpty())) {
+            //This is a new request
+            //System.out.println("It appears that processing has not begun...");
+            SessionManager.isProcessingPackets(session, true);
 
-                //System.out.println("Starting packet processing thread.");
-                BuildPacketList task = new BuildPacketList(session, constraints);
-                threadManager.start(user, new TimedThread(task));
+            Integer r = new Random().nextInt();
+            byte[] b = new byte[1];
+            b[0] = r.byteValue();
+
+            try {
+                MessageDigest md = MessageDigest.getInstance("MD5");
+                md.update(b);
+                tracker = new String(Base64.encode(md.digest()));
+                System.out.println("New Tracker: " + tracker);
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
             }
+            
+            BuildFlowList task = new BuildFlowList(session, constraints, tracker);
+            threadManager.start(user, new TimedThread(task));
         }
+
+        //if (!SessionManager.isProcessingPacketsComplete(session, constraints)) {
+        //    //System.out.println("It appears that processing is not complete...");
+        //    if (!SessionManager.isProcessingPackets(session)) {
+        //        //System.out.println("It appears that processing has not begun...");
+        //        SessionManager.isProcessingPackets(session, true);
+        //
+        //        //System.out.println("Starting packet processing thread.");
+        //        BuildFlowList task = new BuildFlowList(session, constraints);
+        //        threadManager.start(user, new TimedThread(task));
+        //    }
+        //}
+
 
         XMLFlowSet xmlPacketList = new XMLFlowSet();
 
         Integer resultCount = 0;
-        final Integer MAX_REQUEST_RESULTS = 100;
-        while (!SessionManager.getPackets(session).isEmpty() && (resultCount++ < MAX_REQUEST_RESULTS)) {
-            xmlPacketList.flows.add(SessionManager.getPackets(session).remove(0).toXMLFlow());
+        final Integer MAX_REQUEST_RESULTS = 1000;
+        try {
+            while (!SessionManager.getFlows(session, tracker).isEmpty() && (resultCount++ < MAX_REQUEST_RESULTS)) {
+                xmlPacketList.flows.add(SessionManager.getFlows(session, tracker).remove(0).toXMLFlow());
+            }
+
+            if (SessionManager.getFlows(session, tracker).isEmpty() && SessionManager.isProcessingPacketsComplete(session, tracker)) {
+                xmlPacketList.finished = true;
+                SessionManager.isProcessingPackets(session, null);
+                SessionManager.isProcessingPacketsComplete(session, tracker, null);
+                SessionManager.getFlows(session, tracker).clear();
+            }
+        } catch (NullPointerException e) {
+            System.err.println("Could not access flows; this is probably due to a non-existent tracker reference.");
         }
 
-        if (SessionManager.getPackets(session).isEmpty() && SessionManager.isProcessingPacketsComplete(session)) {
-            xmlPacketList.finished = true;
-            SessionManager.isProcessingPackets(session, null);
-            SessionManager.isProcessingPacketsComplete(session, null);
-            SessionManager.getPackets(session).clear();
-        }
-
+        xmlPacketList.tracker = tracker;
         return xmlPacketList;
     }
 
     @WebMethod(operationName = "getIntervals")
-        public List<StatisticalInterval> getIntervals(
+    public List<StatisticalInterval> getIntervals(
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "constraints") String constraints,
@@ -232,23 +277,25 @@ public class ChartData {
         return (volumes);  // The "ready" Boolean in XMLDVL is false by default
     }
 
-    private class BuildPacketList implements Runnable {
+    private class BuildFlowList implements Runnable {
 
         private HttpSession session;
         private String constraints;
+        private String tracker;
 
-        private BuildPacketList(HttpSession session, String constraints) {
+        private BuildFlowList(HttpSession session, String constraints, String tracker) {
             this.session = session;
             this.constraints = constraints;
+            this.tracker = tracker;
         }
 
         @Override
         public void run() {
             FlowManager flowManager = new FlowManager();
-            flowManager.getFlows(session, constraints);
+            flowManager.getFlows(session, constraints, tracker);
 
             //System.out.println("FlowManager getPackets() appears to have completed...");
-            SessionManager.isProcessingPacketsComplete(session, true);
+            SessionManager.isProcessingPacketsComplete(session, tracker, true);
         }
     }
 
