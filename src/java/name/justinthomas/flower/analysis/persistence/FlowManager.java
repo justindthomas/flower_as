@@ -256,6 +256,7 @@ public class FlowManager {
         }
 
         if (!cancelNetworks) {
+            System.out.println("Completed XMLNetworkList creation and writing to session...");
             networkList.ready = true;
             SessionManager.setNetworks(session, networkList);
             SessionManager.isMapBuilding(session, null);
@@ -263,6 +264,7 @@ public class FlowManager {
             System.out.println("Canceled map build");
         }
 
+        System.out.println("Returning XMLNetworkList to caller...");
         return networkList;
     }
 

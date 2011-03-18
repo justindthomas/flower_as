@@ -80,10 +80,11 @@ public class ChartData {
         XMLNetworkList networks = SessionManager.getNetworks(session);
 
         if (networks == null) {
+            System.out.println("networks session variable is null.");
             if (!SessionManager.isMapBuilding(session)) {
                 SessionManager.isMapBuilding(session, true);
 
-                //System.out.println("Starting map build thread.");
+                System.out.println("Starting map build thread.");
                 BuildNetworkList task = new BuildNetworkList(session, constraints);
                 TimedThread thread = new TimedThread(task);
                 threadManager.start(user, thread);
@@ -93,20 +94,23 @@ public class ChartData {
                         thread.join();
                         networks = SessionManager.getNetworks(session);
                         SessionManager.setNetworks(session, null);
-                        SessionManager.flowsProcessed(session, null);
                     } catch (InterruptedException e) {
                         System.err.println("Thread: " + thread.getName() + " was interrupted.");
                     }
-                } else {
-                    networks = new XMLNetworkList();
                 }
             }
         } else {
             networks = SessionManager.getNetworks(session);
             SessionManager.setNetworks(session, null);
-            SessionManager.flowsProcessed(session, null);
         }
 
+        if (networks == null) {
+            // networks will be null at this point if wait is false
+            // and the map has not been built yet, or if there is an error
+            networks = new XMLNetworkList();
+        }
+
+        System.out.println("ready flag set to: " + networks.ready);
         return (networks);  // The "ready" Boolean in XMLNL is false by default
     }
 
@@ -149,7 +153,8 @@ public class ChartData {
             throw new WebServiceException("No session in WebServiceContext");
         }
 
-        if (constraints != null && (tracker == null || tracker.isEmpty())) {
+        System.out.println("constraints: " + constraints + ", tracker: " + tracker);
+        if (tracker == null || tracker.isEmpty()) {
             //This is a new request
             //System.out.println("It appears that processing has not begun...");
             SessionManager.isProcessingPackets(session, true);
@@ -166,7 +171,7 @@ public class ChartData {
             } catch (NoSuchAlgorithmException e) {
                 e.printStackTrace();
             }
-            
+
             BuildFlowList task = new BuildFlowList(session, constraints, tracker);
             threadManager.start(user, new TimedThread(task));
         }
@@ -263,7 +268,6 @@ public class ChartData {
                         thread.join();
                         volumes = SessionManager.getVolumes(session);
                         SessionManager.setVolumes(session, null);
-                        SessionManager.packetsProcessed(session, null);
                     } catch (InterruptedException e) {
                         System.err.println("Thread: " + thread.getName() + " was interrupted.");
                     }
@@ -271,7 +275,6 @@ public class ChartData {
             }
         } else {
             SessionManager.setVolumes(session, null);
-            SessionManager.packetsProcessed(session, null);
         }
 
         return (volumes);  // The "ready" Boolean in XMLDVL is false by default
@@ -313,6 +316,7 @@ public class ChartData {
         public void run() {
             FlowManager flowManager = new FlowManager();
             flowManager.getXMLNetworks(session, constraints);
+            System.out.println("Completed BuildNetworkList thread.");
         }
     }
 
