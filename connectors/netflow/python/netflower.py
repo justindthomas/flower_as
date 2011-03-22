@@ -36,8 +36,8 @@ class TransferThread(Thread):
             if(options.ssl):
                 protocol = "https://"
 
-            logger.debug("Connecting to: " + protocol + args[0] + ":" + options.port + "/flower/analysis/FlowInsertService?wsdl")
-            client = Client(protocol + args[0] + ":" + options.port + "/flower/analysis/FlowInsertService?wsdl")
+            logger.debug("Connecting to: " + protocol + args[0] + ":" + options.remote + "/flower/analysis/FlowInsertService?wsdl")
+            client = Client(protocol + args[0] + ":" + options.remote + "/flower/analysis/FlowInsertService?wsdl")
 
             xflowset = client.factory.create("xmlFlowSet")
             while(not normalized.empty()):
@@ -64,6 +64,9 @@ class TransferThread(Thread):
             logger.error("Unable to connect to Analysis Server")
         except WebFault:
             logger.error("Unable to complete data transfer to Analysis Server")
+        except Exception as exception:
+            code, detail = exception
+            logger.error("Server generated a " + str(code) + " error: " + detail)
             
         if(not self.stop_flag):
             self.tasks.enter(15, 1, self.process, ('process', ))
@@ -275,8 +278,8 @@ def startup():
     normalizer.start()
     transfer.start()
 
-    HOST, PORT = "::", 9995
-    server = IPv6Server((HOST, PORT), NetflowCollector)
+    HOST = "::"
+    server = IPv6Server((HOST, options.local), NetflowCollector)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -286,18 +289,19 @@ def startup():
 
 if __name__ == "__main__":
     parser = optparse.OptionParser(description="Netflow to Flower connector", usage="usage: %prog [options] server")
-    parser.add_option("-n", "--no-ssl", action="store_false", dest="ssl", default=True)
-    parser.add_option("-p", "--port", dest="port", default="8080")
-    parser.add_option("--debug", action="store_true", dest="debug", default=False)
-    parser.add_option("-i", action="store_true", dest="interactive", default=False)
-    parser.add_option("--stop", action="store_true", dest="stop", default=False)
+    parser.add_option("-n", "--no-ssl", help="don't use HTTPS to connect to the server", action="store_false", dest="ssl", default=True)
+    parser.add_option("-r", "--remote", help="specify the remote TCP server port (default: 8080)", dest="remote", default="8080")
+    parser.add_option("-l", "--local", help="specify the local UDP listen port to receive netflows (default: 9995)", dest="local", default="9995")
+    parser.add_option("-d", "--debug", help="enable more verbose logging", action="store_true", dest="debug", default=False)
+    parser.add_option("-i", "--interactive", help="don't disconnect console (useful for debugging)", action="store_true", dest="interactive", default=False)
+    parser.add_option("-s", "--stop", help="end a non-interactive process", action="store_true", dest="stop", default=False)
 
     (options, args) = parser.parse_args()
 
-    daemon = Collector('/tmp/netflowd.pid')
+    daemon = Collector('/tmp/netflower.pid')
 
-    LOG_FILENAME = "/var/log/netflow"
-    logger = logging.getLogger('netflowd')
+    LOG_FILENAME = "/var/log/netflower"
+    logger = logging.getLogger('netflower')
 
     if(not options.debug):
         logger.setLevel(logging.INFO)
@@ -327,13 +331,14 @@ if __name__ == "__main__":
             logger.debug("Debugging enabled")
 
         logger.info("Starting Netflow collector...")
-        logger.info("Flower Analysis Server: " + args[0] + ":" + options.port)
+        logger.info("Flower Analysis Server: " + args[0] + ":" + options.remote)
+        logger.info("Listening on UDP port: " + options.local)
         if(not options.ssl):
             logger.info("SSL Disabled")
 
         if(options.interactive):
             startup()
         else:
-            daemon = Collector('/tmp/netflowd.pid')
+            daemon = Collector('/tmp/netflower.pid')
             daemon.start()
             sys.exit(0)
