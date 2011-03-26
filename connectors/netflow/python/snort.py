@@ -21,8 +21,7 @@ class SnortProcessor(Thread):
 		except OSError:
 			pass
 		
-		handler = SnortAlertHandler(self.logger, self.args, self.options)
-		self.server = SnortAlertServer(self.logger, "/var/log/snort/snort_alert", handler)
+		self.server = SnortAlertServer(self.logger, "/var/log/snort/snort_alert", SnortAlertHandler)
 		self.server.serve_forever()
 	
 	def stop(self):
@@ -34,11 +33,6 @@ class SnortAlertServer(SocketServer.UnixDatagramServer):
 		self.logger = logger
 
 class SnortAlertHandler(SocketServer.DatagramRequestHandler):
-	def __init__(self, logger, args, options):
-		self.logger = logger
-		self.args = args
-		self.options = options
-	
 	def handle(self):
 		try:
 			ALERTMSG_LENGTH=256
@@ -55,7 +49,7 @@ class SnortAlertHandler(SocketServer.DatagramRequestHandler):
 			ethernet = Ethernet(pkt)
 			ip = ethernet.data
 			
-			client = Client(self.options.server + ':8080/flower/analysis/AlertsService?wsdl')
+			client = Client('http://localhost:8080/flower/analysis/AlertsService?wsdl')
 			
 			alert = msg.rstrip("\0")
 			
