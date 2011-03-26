@@ -11,12 +11,14 @@ from suds import WebFault
 from urllib2 import URLError
 from Queue import Queue
 
+netflow_queue = Queue()
+normalized_queue = Queue()
+
 class TransferThread(Thread):
 	
-	def __init__(self, logger, normalized, args, options):
+	def __init__(self, logger, args, options):
 		Thread.__init__(self)
 		self.logger = logger
-		self.normalized = normalized
 		self.args = args
 		self.options = options
 		self.tasks = scheduler(time.time, time.sleep)
@@ -39,8 +41,8 @@ class TransferThread(Thread):
 			client = Client(protocol + self.args[0] + ":" + self.options.remote + "/flower/analysis/FlowInsertService?wsdl")
 			
 			xflowset = client.factory.create("xmlFlowSet")
-			while(not self.normalized.empty()):
-				flow = self.normalized.get_nowait()
+			while(not normalized_queue.empty()):
+				flow = normalized_queue.get_nowait()
 				xflow = client.factory.create("xmlFlow")
 				xflow.sourceAddress = flow["source"]
 				xflow.destinationAddress = flow["destination"]
@@ -72,11 +74,9 @@ class TransferThread(Thread):
 
 class NetflowQueueProcessor(Thread):
 	
-	def __init__(self, logger, netflow_queue, normalized):
+	def __init__(self, logger):
 		Thread.__init__(self)
 		self.logger = logger
-		self.netflow_queue = netflow_queue
-		self.normalized = normalized
 		self.tasks = scheduler(time.time, time.sleep)
 		self.stop_flag = False
 		self.templates = {}
@@ -102,8 +102,8 @@ class NetflowQueueProcessor(Thread):
 		self.logger.debug("Processing NetFlow queue...")
 		
 		retry = []
-		while(not self.netflow_queue.empty()):
-			sender, data = self.netflow_queue.get_nowait()
+		while(not netflow_queue.empty()):
+			sender, data = netflow_queue.get_nowait()
 			version = self.parse_number(data[:2])
 			count = self.parse_number(data[2:4])
 			uptime = self.parse_number(data[4:8])
@@ -117,7 +117,7 @@ class NetflowQueueProcessor(Thread):
 					retry.append(result)
 					
 		for netflow in retry:
-			self.netflow_queue.put((sender, netflow))
+			netflow_queue.put((sender, netflow))
 				
 		if(not self.stop_flag):
 			self.tasks.enter(15, 1, self.process, ('process', ))
@@ -185,10 +185,10 @@ class NetflowQueueProcessor(Thread):
 							
 						flow_size += size
 						
-					self.normalized.put(flow)
+					normalized_queue.put(flow)
 					netflows = netflows[flow_size:]
 				#print normalized
-				self.logger.debug("Normalized queue contains: " + str(self.normalized.qsize()) + " entries")
+				self.logger.debug("Normalized queue contains: " + str(normalized_queue.qsize()) + " entries")
 			else:
 				counter = count
 				return data
@@ -246,18 +246,12 @@ class NetflowQueueProcessor(Thread):
 		self.stop_flag = True
 
 class NetflowCollector(SocketServer.DatagramRequestHandler):
-	
-	def __init__(self, logger, netflow_queue, normalized_queue):
-		self.logger = logger
-		self.netflow_queue = netflow_queue
-		self.normalized_queue = normalized_queue
-		
 	def handle(self):
 		data = self.rfile.read(4096)
 		client = self.client_address[0]
 		netflow_queue.put((client, data))
 		#print("Queue Size: " + str(netflows.qsize()) + " " + client)
-		self.logger.debug("Netflow queue contains: " + str(self.netflow_queue.qsize()) + " entries")
+		self.logger.debug("Netflow queue contains: " + str(netflow_queue.qsize()) + " entries")
 		
 	def finish(self):
 		pass
@@ -272,16 +266,13 @@ class NetflowProcessor(Thread):
 		self.args = args
 		self.options = options
 		self.stop_flag = False
-		self.netflow_queue = Queue()
-		self.normalized_queue = Queue()
 
-		self.normalizer = NetflowQueueProcessor(self.logger, self.netflow_queue, self.normalized_queue)
-		self.transfer = TransferThread(self.logger, self.normalized_queue, self.args, self.options)
+		self.normalizer = NetflowQueueProcessor(self.logger)
+		self.transfer = TransferThread(self.logger, self.args, self.options)
 		
 	def run(self):
 		HOST = "::"
-		handler = NetflowCollector(self.logger, self.netflow_queue, self.normalized_queue)
-		self.server = IPv6Server((HOST, int(self.options.local)), handler)
+		self.server = IPv6Server((HOST, int(self.options.local)), NetflowCollector)
 		self.server.serve_forever()
 			
 	def stop(self):
