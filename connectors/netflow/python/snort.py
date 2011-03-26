@@ -64,3 +64,6 @@ class SnortAlertHandler(SocketServer.DatagramRequestHandler):
 			
 		except struct.error, e:
 			print "bad message? (msglen=%d): %s" % (len(datain), e.message)
+	
+	def finish(self):
+		pass
