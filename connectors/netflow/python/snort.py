@@ -29,7 +29,7 @@ class SnortProcessor(Thread):
 
 class SnortAlertServer(SocketServer.UnixDatagramServer):
 	def __init__(self, logger, socket, handler):
-		SocketServer.UnixDatagramServer.__init__(self, socket, logger)
+		SocketServer.UnixDatagramServer.__init__(self, socket)
 		self.logger = logger
 
 class SnortAlertHandler(SocketServer.DatagramRequestHandler):
