@@ -251,7 +251,7 @@ class NetflowCollector(SocketServer.DatagramRequestHandler):
 		client = self.client_address[0]
 		netflow_queue.put((client, data))
 		#print("Queue Size: " + str(netflows.qsize()) + " " + client)
-		self.logger.debug("Netflow queue contains: " + str(netflow_queue.qsize()) + " entries")
+		#self.logger.debug("Netflow queue contains: " + str(netflow_queue.qsize()) + " entries")
 		
 	def finish(self):
 		pass
