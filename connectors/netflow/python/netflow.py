@@ -271,6 +271,9 @@ class NetflowProcessor(Thread):
 		self.transfer = TransferThread(self.logger, self.args, self.options)
 		
 	def run(self):
+		self.normalizer.start
+		self.transfer.start
+		
 		HOST = "::"
 		self.server = IPv6Server((HOST, int(self.options.local)), NetflowCollector)
 		self.server.serve_forever()
