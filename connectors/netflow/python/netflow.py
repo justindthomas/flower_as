@@ -271,6 +271,7 @@ class NetflowProcessor(Thread):
 		self.transfer = TransferThread(self.logger, self.args, self.options)
 		
 	def run(self):
+		self.logger.info("Starting normalizer and transfer threads")
 		self.normalizer.start
 		self.transfer.start
 		
