@@ -239,7 +239,7 @@ class NetflowQueueProcessor(Thread):
 				
 			self.templates[sender][id] = fields
 			
-		self.logging.debug("Templates Parsed: " + str(self.templates))
+		self.logger.debug("Templates Parsed: " + str(self.templates))
 		return template_count
 		
 	def stop(self):
