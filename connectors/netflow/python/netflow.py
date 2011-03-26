@@ -9,6 +9,7 @@ from threading import Thread
 from suds.client import Client
 from suds import WebFault
 from urllib2 import URLError
+from Queue import Queue
 
 class TransferThread(Thread):
 	
@@ -20,23 +21,23 @@ class TransferThread(Thread):
 		self.options = options
 		self.tasks = scheduler(time.time, time.sleep)
 		self.stop_flag = False
-
+		
 	def run(self):
 		self.tasks.enter(5, 1, self.process, ('process', ))
 		self.tasks.run()
-
+		
 	def process(self, name):
 		self.logger.debug("Processing transfer queue...")
-
+		
 		try:
 			protocol = "http://"
-
+			
 			if(self.options.ssl):
 				protocol = "https://"
-
+				
 			self.logger.debug("Connecting to: " + protocol + self.args[0] + ":" + self.options.remote + "/flower/analysis/FlowInsertService?wsdl")
 			client = Client(protocol + self.args[0] + ":" + self.options.remote + "/flower/analysis/FlowInsertService?wsdl")
-
+			
 			xflowset = client.factory.create("xmlFlowSet")
 			while(not self.normalized.empty()):
 				flow = self.normalized.get_nowait()
@@ -53,11 +54,11 @@ class TransferThread(Thread):
 				xflow.lastTimeStamp = flow["last_switched"]
 				xflowset.flows.append(xflow)
 				#print xflow
-
+				
 			if(len(xflowset.flows) > 0):
 				if(client.service.addFlows(xflowset) != 0):
 					self.logger.error("Unexpected response from Analysis Server while attempting to add new flows")
-
+					
 		except URLError:
 			self.logger.error("Unable to connect to Analysis Server")
 		except WebFault:
@@ -65,21 +66,21 @@ class TransferThread(Thread):
 			
 		if(not self.stop_flag):
 			self.tasks.enter(15, 1, self.process, ('process', ))
-
+			
 	def stop(self):
 		self.stop_flag = True
 
 class NetflowQueueProcessor(Thread):
 	
-	def __init__(self, logger, netflows, normalized):
+	def __init__(self, logger, netflow_queue, normalized):
 		Thread.__init__(self)
 		self.logger = logger
-		self.netflows = netflows
+		self.netflow_queue = netflow_queue
 		self.normalized = normalized
 		self.tasks = scheduler(time.time, time.sleep)
 		self.stop_flag = False
 		self.templates = {}
-
+		
 	fields = {"IN_BYTES":1, "IN_PKTS":2, "FLOWS":3, "PROTOCOL":4, "TOS":5, "TCP_FLAGS":6, "L4_SRC_PORT":7,
 		"IPV4_SRC_ADDR":8, "SRC_MASK":9, "INPUT_SNMP":10, "L4_DST_PORT":11, "IPV4_DST_ADDR":12, "DST_MASK":13,
 		"OUTPUT_SNMP":14, "IPV4_NEXT_HOP":15, "SRC_AS":16, "DST_AS":17, "BGP_IPV4_NEXT_HOP":18, "MUL_DST_PKTS":19,
@@ -92,17 +93,17 @@ class NetflowQueueProcessor(Thread):
 		"SRC_VLAN":58, "DST_VLAN":59, "IP_PROTOCOL_VERSION":60, "DIRECTION":61, "IPV6_NEXT_HOP":62, "BGP_IPV6_NEXT_HOP":63,
 		"IPV6_OPTION_HEADERS":64, "MPLS_LABEL_1":70, "MPLS_LABEL_2":71, "MPLS_LABEL_3":72, "MPLS_LABEL_4":73,
 		"MPLS_LABEL_5":74, "MPLS_LABEL_6":75, "MPLS_LABEL_7":76, "MPLS_LABEL_8":77, "MPLS_LABEL_9":78, "MPLS_LABEL_10":79}
-	
+		
 	def run(self):
 		self.tasks.enter(5, 1, self.process, ('process', ))
 		self.tasks.run()
 		
 	def process(self, name):
 		self.logger.debug("Processing NetFlow queue...")
-
+		
 		retry = []
-		while(not self.netflows.empty()):
-			sender, data = self.netflows.get_nowait()
+		while(not self.netflow_queue.empty()):
+			sender, data = self.netflow_queue.get_nowait()
 			version = self.parse_number(data[:2])
 			count = self.parse_number(data[2:4])
 			uptime = self.parse_number(data[4:8])
@@ -114,30 +115,30 @@ class NetflowQueueProcessor(Thread):
 				result = self.v9(sender, count, epoch, uptime, data)
 				if(result != None):
 					retry.append(result)
-
+					
 		for netflow in retry:
-			self.netflows.put((sender, netflow))
+			self.netflow_queue.put((sender, netflow))
 				
 		if(not self.stop_flag):
 			self.tasks.enter(15, 1, self.process, ('process', ))
-
+			
 	def v9(self, sender, count, epoch, uptime, data):
 		sequence = self.parse_number(data[12:16])
 		source = self.parse_number(data[16:20])
 		#print (sequence, source)
 		flowsets = data[20:]
-
+		
 		counter = 0
 		while(counter < count):
 			id = self.parse_number(flowsets[:2])
 			length = self.parse_number(flowsets[2:4])
 			#print (id, length)
-
+			
 			flowset = flowsets[:length]
 			flowsets = flowsets[length:]
-
+			
 			netflows = flowset[4:]
-
+			
 			if(id == 0):
 				counter += self.parse_templates(sender, netflows)
 			elif((sender in self.templates.keys()) and (id in self.templates[sender].keys())):
@@ -181,9 +182,9 @@ class NetflowQueueProcessor(Thread):
 							flow["tcp_flags"] = self.parse_number(netflows[location:location + size])
 						if(type == self.fields["IP_PROTOCOL_VERSION"]):
 							flow["version"] = self.parse_number(netflows[location:location + size])
-
+							
 						flow_size += size
-
+						
 					self.normalized.put(flow)
 					netflows = netflows[flow_size:]
 				#print normalized
@@ -191,9 +192,9 @@ class NetflowQueueProcessor(Thread):
 			else:
 				counter = count
 				return data
-
+				
 		return None
-
+		
 	def parse_address(self, data):
 		if(len(data) == 16):
 			return str(inet_ntop(AF_INET6, data))
@@ -201,7 +202,7 @@ class NetflowQueueProcessor(Thread):
 			return str(inet_ntop(AF_INET, data))
 		else:
 			return ""
-
+			
 	def parse_number(self, data):
 		if(len(data) == 1):
 			return unpack("!B", data)[0]
@@ -209,20 +210,20 @@ class NetflowQueueProcessor(Thread):
 			return unpack("!H", data)[0]
 		elif(len(data) == 4):
 			return unpack("!I", data)[0]
-
+			
 	def parse_templates(self, sender, data):
 		#print "Data: " + str(len(data))
 		template_count = 0
-
+		
 		while(len(data) > 0):
 			template_count += 1
 			id = self.parse_number(data[:2])
 			field_count = self.parse_number(data[2:4])
 			#print "Template: " + str((sender, id, field_count))
-
+			
 			fields = []
 			data = data[4:]
-
+			
 			count = 0
 			location = 0
 			while(count < field_count):
@@ -232,35 +233,63 @@ class NetflowQueueProcessor(Thread):
 				fields.append((type, location, length))
 				location += length
 				data = data[4:]
-
+				
 			if(not sender in self.templates.keys()):
 				self.templates[sender] = {}
-
+				
 			self.templates[sender][id] = fields
-
+			
 		self.logging.debug("Templates Parsed: " + str(self.templates))
 		return template_count
 		
 	def stop(self):
 		self.stop_flag = True
-		
+
 class NetflowCollector(SocketServer.DatagramRequestHandler):
 	
-	def __init__(self, logger):
-		SocketServer.DatagramRequestHandler.__init__(self)
+	def __init__(self, logger, netflow_queue, normalized_queue):
 		self.logger = logger
+		self.netflow_queue = netflow_queue
+		self.normalized_queue = normalized_queue
 		
 	def handle(self):
 		data = self.rfile.read(4096)
 		client = self.client_address[0]
-		netflows.put((client, data))
+		netflow_queue.put((client, data))
 		#print("Queue Size: " + str(netflows.qsize()) + " " + client)
-		self.logger.debug("Netflow queue contains: " + str(netflows.qsize()) + " entries")
-
+		self.logger.debug("Netflow queue contains: " + str(netflow_queue.qsize()) + " entries")
+		
 	def finish(self):
 		pass
 
 class IPv6Server(SocketServer.UDPServer):
 	address_family = AF_INET6
 
+class NetflowProcessor(Thread):
+	def __init__(self, logger, args, options):
+		Thread.__init__(self)
+		self.logger = logger
+		self.args = args
+		self.options = options
+		self.stop_flag = False
+		self.netflow_queue = Queue()
+		self.normalized_queue = Queue()
+
+		self.normalizer = NetflowQueueProcessor(self.logger, self.netflow_queue, self.normalized_queue)
+		self.transfer = TransferThread(self.logger, self.normalized_queue, self.args, self.options)
+		self.stop_serving = False
+		
+	def run(self):
+		HOST = "::"
+		handler = NetflowCollector(self.logger, self.netflow_queue, self.normalized_queue)
+		server = IPv6Server((HOST, int(self.options.local)), handler)
+		
+		while(not self.stop_serving):
+			server.handle_request()
+			
+	def stop(self):
+		self.logger.info("Stopping netflow processor...")
+		self.stop_serving = True
+		self.normalizer.stop()
+		self.transfer.stop()
 

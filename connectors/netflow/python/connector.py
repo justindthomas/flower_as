@@ -7,7 +7,6 @@ import logging
 import logging.handlers
 import netflow
 import snort
-from Queue import Queue
 from daemon import Daemon
 
 class Collector(Daemon):
@@ -15,30 +14,25 @@ class Collector(Daemon):
 		startup()
 
 def stop_nicely():
-	logger.info("Instructing normalizer and transfer threads to stop...")
-	normalizer.stop()
-	transfer.stop()
+	logger.info("Instructing threads to stop...")
+	snort.stop()
+	netflow_processor.stop()
 
 	try:
-		normalizer.join()
-		transfer.join()
+		logger.info("Joining snort thread...")
+		snort.join()
+		logger.info("Joining netflow thread...")
+		netflow_processor.join()
 	except RuntimeError:
 		logger.debug("RuntimeError encountered when joining threads.")
 
 	logger.info("Netflow collector shutdown completed")
 
 def startup():
-	normalizer.start()
-	transfer.start()
 	snort.start()
-
-	HOST = "::"
-	server = netflow.IPv6Server((HOST, int(options.local)), netflow.NetflowCollector)
-	try:
-		server.serve_forever()
-	except KeyboardInterrupt:
-		pass
-
+	netflow_processor.start()
+	
+	raw_input("press enter to end")
 	stop_nicely()
 
 if __name__ == "__main__":
@@ -68,12 +62,8 @@ if __name__ == "__main__":
 
 	logger.addHandler(handler)
 
-	netflows = Queue()
-	normalized = Queue()
-
-	normalizer = netflow.NetflowQueueProcessor(logger, netflows, normalized)
-	transfer = netflow.TransferThread(logger, normalized, args, options)
 	snort = snort.SnortProcessor(logger, args, options)
+	netflow_processor = netflow.NetflowProcessor(logger, args, options)
 
 	if(options.stop):
 		stop_nicely()
