@@ -48,8 +48,8 @@ if __name__ == "__main__":
 
 	daemon = Collector('/tmp/flower.pid')
 
-	LOG_FILENAME = "/var/log/netflower"
-	logger = logging.getLogger('netflower')
+	LOG_FILENAME = "/var/log/netflow"
+	logger = logging.getLogger('flower')
 
 	if(not options.debug):
 		logger.setLevel(logging.INFO)
