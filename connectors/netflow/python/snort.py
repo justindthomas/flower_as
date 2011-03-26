@@ -11,7 +11,6 @@ class SnortProcessor(Thread):
 		self.logger = logger
 		self.args = args
 		self.options = options
-		self.stop_serving = False
 		
 	def run(self):
 		self.logger.info("Starting Snort handler...")
@@ -23,13 +22,11 @@ class SnortProcessor(Thread):
 			pass
 		
 		handler = SnortAlertHandler(self.logger, self.args, self.options)
-		server = SnortAlertServer(self.logger, "/var/log/snort/snort_alert", handler)
-		
-		while(not self.stop_serving):
-			server.handle_request()
+		self.server = SnortAlertServer(self.logger, "/var/log/snort/snort_alert", handler)
+		self.server.serve_forever()
 	
 	def stop(self):
-		self.stop_serving = True
+		self.server.shutdown()
 
 class SnortAlertServer(SocketServer.UnixDatagramServer):
 	def __init__(self, logger, socket, handler):

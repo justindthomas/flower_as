@@ -277,19 +277,16 @@ class NetflowProcessor(Thread):
 
 		self.normalizer = NetflowQueueProcessor(self.logger, self.netflow_queue, self.normalized_queue)
 		self.transfer = TransferThread(self.logger, self.normalized_queue, self.args, self.options)
-		self.stop_serving = False
 		
 	def run(self):
 		HOST = "::"
 		handler = NetflowCollector(self.logger, self.netflow_queue, self.normalized_queue)
-		server = IPv6Server((HOST, int(self.options.local)), handler)
-		
-		while(not self.stop_serving):
-			server.handle_request()
+		self.server = IPv6Server((HOST, int(self.options.local)), handler)
+		self.server.serve_forever()
 			
 	def stop(self):
 		self.logger.info("Stopping netflow processor...")
-		self.stop_serving = True
+		self.server.shutdown()
 		self.normalizer.stop()
 		self.transfer.stop()
 
