@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
 	daemon = Collector('/tmp/flower.pid')
 
-	LOG_FILENAME = "/var/log/netflow"
+	LOG_FILENAME = "/var/log/flower/connector.log"
 	logger = logging.getLogger('flower')
 
 	if(not options.debug):
