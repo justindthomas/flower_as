@@ -104,7 +104,7 @@ class SnortQueueProcessor(Thread):
 			palert.alert = alert
 			palert.packet = packet
 			
-			palerts.add(palert)
+			palerts.append(palert)
 			
 		#response = client.service.addAlert(ts_sec, ts_usec, ntoa(ip.src), ntoa(ip.dst), sport, dport, alert, packet)
 		response = client.service.addAlerts(palerts)
