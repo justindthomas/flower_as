@@ -25,6 +25,14 @@ public class Alerts {
     @EJB
     ConfigurationManager configurationManager;
 
+    @WebMethod(operationName = "addAlerts")
+    public Integer addAlerts(
+            @WebParam(name = "alerts") List<PersistentAlert> alerts) {
+        
+        System.out.println("Received " + alerts.size() + " alerts.");
+        return 0;
+    }
+    
     @WebMethod(operationName = "addAlert")
     public Boolean addAlert(
             @WebParam(name = "date") Long date,
