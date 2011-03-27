@@ -30,28 +30,13 @@ public class Alerts {
             @WebParam(name = "alerts") List<PersistentAlert> alerts) {
         
         System.out.println("Received " + alerts.size() + " alerts.");
-        return 0;
-    }
-    
-    @WebMethod(operationName = "addAlert")
-    public Boolean addAlert(
-            @WebParam(name = "date") Long date,
-            @WebParam(name = "usec") Long usec,
-            @WebParam(name = "sourceAddress") String sourceAddress,
-            @WebParam(name = "destinationAddress") String destinationAddress,
-            @WebParam(name = "sourcePort") Integer sourcePort,
-            @WebParam(name = "destinationPort") Integer destinationPort,
-            @WebParam(name = "alert") String alert,
-            @WebParam(name = "packet") String packet) {
-
-
-        AlertManager alertManager = new AlertManager();
-        PersistentAlert palert = new PersistentAlert(date, usec, sourceAddress, destinationAddress, sourcePort, destinationPort, alert, packet);
-        alertManager.addAlert(palert);
-
-        System.out.println(palert);
         
-        return true;
+        AlertManager alertManager = new AlertManager();
+        for(PersistentAlert alert : alerts) {
+            alertManager.addAlert(alert);
+        }
+        
+        return alerts.size();
     }
 
     @WebMethod(operationName = "deleteAlert")

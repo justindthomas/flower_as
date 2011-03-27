@@ -24,6 +24,7 @@ class SnortProcessor(Thread):
 		self.args = args
 		self.options = options
 		self.queue_processor = SnortQueueProcessor(self.logger)
+		self.server = SnortAlertServer(self.logger, "/var/log/snort/snort_alert", SnortAlertHandler)
 		
 	def run(self):
 		self.logger.info("Starting Snort handler...")
@@ -35,8 +36,6 @@ class SnortProcessor(Thread):
 			pass
 		
 		self.queue_processor.start()
-		
-		self.server = SnortAlertServer(self.logger, "/var/log/snort/snort_alert", SnortAlertHandler)
 		self.server.serve_forever()
 	
 	def stop(self):
