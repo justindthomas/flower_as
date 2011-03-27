@@ -4,3 +4,6 @@
 /build.xml
 /dist/
 /build/
+/connectors/connector/python/daemon.pyc
+/connectors/connector/python/netflow.pyc
+/connectors/connector/python/snort.pyc
