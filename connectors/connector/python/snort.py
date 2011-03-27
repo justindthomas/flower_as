@@ -97,8 +97,8 @@ class SnortQueueProcessor(Thread):
 			palert.type = sourceType.SNORT
 			palert.date = ts_sec
 			palert.usec = ts_usec
-			palert.sourceAddress = parse_address(ip.src)
-			palert.destinationAddress = parse_address(ip.dst)
+			palert.sourceAddress = self.parse_address(ip.src)
+			palert.destinationAddress = self.parse_address(ip.dst)
 			palert.sourcePort = sport
 			palert.destinationPort = dport
 			palert.alert = alert
