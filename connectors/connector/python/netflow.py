@@ -108,10 +108,8 @@ class NetflowQueueProcessor(Thread):
 			count = self.parse_number(data[2:4])
 			uptime = self.parse_number(data[4:8])
 			epoch = self.parse_number(data[8:12])
-			#print (version, count, uptime, epoch)
 			
 			if(version == 9):
-				#print("Data size: " + str(len(data)))
 				result = self.v9(sender, count, epoch, uptime, data)
 				if(result != None):
 					retry.append(result)
@@ -125,14 +123,12 @@ class NetflowQueueProcessor(Thread):
 	def v9(self, sender, count, epoch, uptime, data):
 		sequence = self.parse_number(data[12:16])
 		source = self.parse_number(data[16:20])
-		#print (sequence, source)
 		flowsets = data[20:]
 		
 		counter = 0
 		while(counter < count):
 			id = self.parse_number(flowsets[:2])
 			length = self.parse_number(flowsets[2:4])
-			#print (id, length)
 			
 			flowset = flowsets[:length]
 			flowsets = flowsets[length:]
@@ -144,8 +140,6 @@ class NetflowQueueProcessor(Thread):
 			elif((sender in self.templates.keys()) and (id in self.templates[sender].keys())):
 				while(counter < count and len(netflows) > 3):
 					flow_size = 0
-					#print "Flow bytes remaining: " + str(len(netflows))
-					#print "Counter: " + str(counter) + ", count: " + str(count)
 					counter += 1
 					flow = { "source":None, "destination":None, "protocol":None, "sport":None,
 						"dport":None, "flows":None, "in_bytes":0, "out_bytes":0, "in_pkts":0,
@@ -154,40 +148,40 @@ class NetflowQueueProcessor(Thread):
 					for type, location, size in self.templates[sender][id]:
 						if(type == self.fields["IPV4_SRC_ADDR"] or type == self.fields["IPV6_SRC_ADDR"]):
 							flow["source"] = self.parse_address(netflows[location:location + size])
-						if(type == self.fields["IPV4_DST_ADDR"] or type == self.fields["IPV6_DST_ADDR"]):
+						elif(type == self.fields["IPV4_DST_ADDR"] or type == self.fields["IPV6_DST_ADDR"]):
 							flow["destination"] = self.parse_address(netflows[location:location + size])
-						if(type == self.fields["PROTOCOL"]):
+						elif(type == self.fields["PROTOCOL"]):
 							flow["protocol"] = self.parse_number(netflows[location:location + size])
-						if(type == self.fields["L4_SRC_PORT"]):
+						elif(type == self.fields["L4_SRC_PORT"]):
 							flow["sport"] = self.parse_number(netflows[location:location + size])
-						if(type == self.fields["L4_DST_PORT"]):
+						elif(type == self.fields["L4_DST_PORT"]):
 							flow["dport"] = self.parse_number(netflows[location:location + size])
-						if(type == self.fields["FLOWS"]):
+						elif(type == self.fields["FLOWS"]):
 							flow["flows"] = self.parse_number(netflows[location:location + size])
-						if(type == self.fields["IN_BYTES"]):
+						elif(type == self.fields["IN_BYTES"]):
 							flow["in_bytes"] = self.parse_number(netflows[location:location + size])
-						if(type == self.fields["IN_PKTS"]):
+						elif(type == self.fields["IN_PKTS"]):
 							flow["in_pkts"] = self.parse_number(netflows[location:location + size])
-						if(type == self.fields["OUT_BYTES"]):
+						elif(type == self.fields["OUT_BYTES"]):
 							flow["out_bytes"] = self.parse_number(netflows[location:location + size])
-						if(type == self.fields["OUT_PKTS"]):
+						elif(type == self.fields["OUT_PKTS"]):
 							flow["out_pkts"] = self.parse_number(netflows[location:location + size])
-						if(type == self.fields["LAST_SWITCHED"]):
+						elif(type == self.fields["LAST_SWITCHED"]):
 							end = ((epoch * 1000) - uptime + self.parse_number(netflows[location:location + size]))
 							flow["last_switched"] = end
-						if(type == self.fields["FIRST_SWITCHED"]):
+						elif(type == self.fields["FIRST_SWITCHED"]):
 							start = ((epoch * 1000) - uptime + self.parse_number(netflows[location:location + size]))
 							flow["first_switched"] = start
-						if(type == self.fields["TCP_FLAGS"]):
+						elif(type == self.fields["TCP_FLAGS"]):
 							flow["tcp_flags"] = self.parse_number(netflows[location:location + size])
-						if(type == self.fields["IP_PROTOCOL_VERSION"]):
+						elif(type == self.fields["IP_PROTOCOL_VERSION"]):
 							flow["version"] = self.parse_number(netflows[location:location + size])
 							
 						flow_size += size
 						
 					normalized_queue.put(flow)
 					netflows = netflows[flow_size:]
-				#print normalized
+
 				self.logger.debug("Normalized queue contains: " + str(normalized_queue.qsize()) + " entries")
 			else:
 				counter = count
@@ -212,14 +206,12 @@ class NetflowQueueProcessor(Thread):
 			return unpack("!I", data)[0]
 			
 	def parse_templates(self, sender, data):
-		#print "Data: " + str(len(data))
 		template_count = 0
 		
 		while(len(data) > 0):
 			template_count += 1
 			id = self.parse_number(data[:2])
 			field_count = self.parse_number(data[2:4])
-			#print "Template: " + str((sender, id, field_count))
 			
 			fields = []
 			data = data[4:]
@@ -250,8 +242,6 @@ class NetflowCollector(SocketServer.DatagramRequestHandler):
 		data = self.rfile.read(4096)
 		client = self.client_address[0]
 		netflow_queue.put((client, data))
-		#print("Queue Size: " + str(netflows.qsize()) + " " + client)
-		#self.logger.debug("Netflow queue contains: " + str(netflow_queue.qsize()) + " entries")
 		
 	def finish(self):
 		pass
