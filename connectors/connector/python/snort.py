@@ -9,6 +9,7 @@ from suds.client import Client
 from sched import scheduler
 from threading import Thread
 from Queue import Queue
+from urllib2 import URLError
 
 alert_queue = Queue()
 ALERTMSG_LENGTH=256
@@ -23,23 +24,33 @@ class SnortProcessor(Thread):
 		self.logger = logger
 		self.args = args
 		self.options = options
-		self.queue_processor = SnortQueueProcessor(self.logger)
+		self.server = None
+		self.queue_processor = SnortQueueProcessor(self.logger, self.args, self.options)
 	
 	def run(self):
-		self.logger.info("Starting Snort handler...")
-		os.setuid(105)
+		self.logger.info("Starting Snort alert processor main thread...")
 		
 		try:
-			os.remove("/var/log/snort/snort_alert")
+			os.setuid(int(self.options.uid))
+		except OSError:
+			self.logger.error("Could not change user for Snort alert processor")
+			return
+		
+		try:
+			os.remove(self.options.unsock)
 		except OSError:
 			pass
 		
 		self.queue_processor.start()
-		self.server = SnortAlertServer(self.logger, "/var/log/snort/snort_alert", SnortAlertHandler)
+		
+		self.logger.debug("Binding UNIX socket for Snort alerts at " + self.options.unsock)
+		self.server = SnortAlertServer(self.logger, self.options.unsock, SnortAlertHandler)
 		self.server.serve_forever()
 	
 	def stop(self):
-		self.server.shutdown()
+		if(self.server != None):
+			self.server.shutdown()
+			
 		self.queue_processor.stop()
 
 class SnortAlertServer(SocketServer.UnixDatagramServer):
@@ -59,54 +70,62 @@ class SnortAlertHandler(SocketServer.DatagramRequestHandler):
 		pass
 
 class SnortQueueProcessor(Thread):
-	def __init__(self, logger):
+	def __init__(self, logger, args, options):
 		Thread.__init__(self)
 		self.logger = logger
+		self.args = args
+		self.options = options
 		self.tasks = scheduler(time.time, time.sleep)
 		self.stop_flag = False
 		
 	def run(self):
-		self.logger.info("Starting alert queue processor...")
+		self.logger.info("Starting Snort alert queue processor...")
 		self.tasks.enter(5, 1, self.process, ('process', ))
 		self.tasks.run()
 		
 	def process(self, name):
 		palerts = []
 		
-		client = Client('http://dev:8080/flower/analysis/AlertsService?wsdl')
+		ws = 'http://' + self.args[0] + ':' + self.options.remote + '/flower/analysis/AlertsService?wsdl'
+		self.logger.debug('Connecting to web service: ' + ws)
 		
-		while(not alert_queue.empty()):	
-			(msg, ts_sec, ts_usec, caplen, pktlen, dlthdr, nethdr, transhdr, data, val, pkt) = struct.unpack(fmt, alert_queue.get_nowait())
-			ethernet = Ethernet(pkt)
-			ip = ethernet.data
+		try:
+			client = Client(ws)
+		
+			while(not alert_queue.empty()):	
+				(msg, ts_sec, ts_usec, caplen, pktlen, dlthdr, nethdr, transhdr, data, val, pkt) = struct.unpack(fmt, alert_queue.get_nowait())
+				ethernet = Ethernet(pkt)
+				ip = ethernet.data
 			
-			alert = msg.rstrip("\0")
+				alert = msg.rstrip("\0")
 			
-			sport = None
-			dport = None
-			if(ip.p == 6 or ip.p == 17):
-				sport = ip.data.sport
-				dport = ip.data.dport
+				sport = None
+				dport = None
+				if(ip.p == 6 or ip.p == 17):
+					sport = ip.data.sport
+					dport = ip.data.dport
 			
-			packet = base64.b64encode(pkt)
+				packet = base64.b64encode(pkt)
 			
-			sourceType = client.factory.create("sourceType")
+				sourceType = client.factory.create("sourceType")
 			
-			palert = client.factory.create("persistentAlert")
-			palert.type = sourceType.SNORT
-			palert.date = ts_sec
-			palert.usec = ts_usec
-			palert.sourceAddress = self.parse_address(ip.src)
-			palert.destinationAddress = self.parse_address(ip.dst)
-			palert.sourcePort = sport
-			palert.destinationPort = dport
-			palert.alert = alert
-			palert.packet = packet
+				palert = client.factory.create("persistentAlert")
+				palert.type = sourceType.SNORT
+				palert.date = ts_sec
+				palert.usec = ts_usec
+				palert.sourceAddress = self.parse_address(ip.src)
+				palert.destinationAddress = self.parse_address(ip.dst)
+				palert.sourcePort = sport
+				palert.destinationPort = dport
+				palert.alert = alert
+				palert.packet = packet
 			
-			palerts.append(palert)
+				palerts.append(palert)
 			
-		#response = client.service.addAlert(ts_sec, ts_usec, ntoa(ip.src), ntoa(ip.dst), sport, dport, alert, packet)
-		response = client.service.addAlerts(palerts)
+			response = client.service.addAlerts(palerts)
+		
+		except URLError:
+			self.logger.error('Failed to connect to Snort alert web service')
 		
 		if(not self.stop_flag):
 			self.tasks.enter(15, 1, self.process, ('process', ))

@@ -15,12 +15,15 @@ class Collector(Daemon):
 
 def stop_nicely():
 	logger.info("Instructing threads to stop...")
-	snort.stop()
+	if (not options.nosnort):
+		snort.stop()
 	netflow_processor.stop()
 
 	try:
-		logger.info("Joining snort thread...")
-		snort.join()
+		if (not options.nosnort):
+			logger.info("Joining snort thread...")
+			snort.join()
+			
 		logger.info("Joining netflow thread...")
 		netflow_processor.join()
 	except RuntimeError:
@@ -29,7 +32,9 @@ def stop_nicely():
 	logger.info("Netflow collector shutdown completed")
 
 def startup():
-	snort.start()
+	if (not options.nosnort):
+		snort.start()
+		
 	netflow_processor.start()
 	
 	raw_input("press enter to end")
@@ -43,7 +48,11 @@ if __name__ == "__main__":
 	parser.add_option("-d", "--debug", help="enable more verbose logging", action="store_true", dest="debug", default=False)
 	parser.add_option("-i", "--interactive", help="don't disconnect console (useful for debugging)", action="store_true", dest="interactive", default=False)
 	parser.add_option("-s", "--stop", help="end a non-interactive process", action="store_true", dest="stop", default=False)
-
+	
+	parser.add_option("-S", "--disable-snort", help="disable Snort alert collector", action="store_true", dest="nosnort", default=False)
+	parser.add_option("-k", "--socket", help="specify UNIX socket for Snort alerts", dest="unsock", default="/var/log/snort/snort_alert")
+	parser.add_option("-u", "--uid", help="specify the numeric user ID of the Snort alert socket owner", dest="uid", default="105")
+	
 	(options, args) = parser.parse_args()
 
 	daemon = Collector('/tmp/flower.pid')
@@ -62,7 +71,11 @@ if __name__ == "__main__":
 
 	logger.addHandler(handler)
 
-	snort = snort.SnortProcessor(logger, args, options)
+	if (not options.nosnort):
+		snort = snort.SnortProcessor(logger, args, options)
+	else:
+		logger.info("Snort alert processor disabled")
+		
 	netflow_processor = netflow.NetflowProcessor(logger, args, options)
 
 	if(options.stop):
