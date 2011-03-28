@@ -265,6 +265,7 @@ class NetflowProcessor(Thread):
 		self.logger = logger
 		self.args = args
 		self.options = options
+		self.server = None
 		self.stop_flag = False
 
 		self.normalizer = NetflowQueueProcessor(self.logger)
@@ -281,7 +282,8 @@ class NetflowProcessor(Thread):
 			
 	def stop(self):
 		self.logger.info("Stopping netflow processor...")
-		self.server.shutdown()
+		if(self.server != None):
+			self.server.shutdown()
 		self.normalizer.stop()
 		self.transfer.stop()
 
