@@ -65,7 +65,7 @@ if __name__ == "__main__":
 	else:
 		logger.setLevel(logging.DEBUG)
 
-	handler = logging.handlers.RotatingFileHandler(LOG_FILENAME, maxBytes=16384, backupCount=5)
+	handler = logging.handlers.RotatingFileHandler(LOG_FILENAME, maxBytes=2097152, backupCount=10)
 	formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 	handler.setFormatter(formatter)
 
