@@ -40,26 +40,30 @@ class TransferThread(Thread):
 			self.logger.debug("Connecting to: " + protocol + self.args[0] + ":" + self.options.remote + "/flower/analysis/FlowInsertService?wsdl")
 			client = Client(protocol + self.args[0] + ":" + self.options.remote + "/flower/analysis/FlowInsertService?wsdl")
 			
-			xflowset = client.factory.create("xmlFlowSet")
 			while(not normalized_queue.empty()):
-				flow = normalized_queue.get_nowait()
-				xflow = client.factory.create("xmlFlow")
-				xflow.sourceAddress = flow["source"]
-				xflow.destinationAddress = flow["destination"]
-				xflow.sourcePort = flow["sport"]
-				xflow.destinationPort = flow["dport"]
-				xflow.flags = flow["tcp_flags"]
-				xflow.bytesSent = flow["in_bytes"] + flow["out_bytes"]
-				xflow.packetsSent = flow["in_pkts"] + flow["out_pkts"]
-				xflow.protocol = flow["protocol"]
-				xflow.startTimeStamp = flow["first_switched"]
-				xflow.lastTimeStamp = flow["last_switched"]
-				xflowset.flows.append(xflow)
-				#print xflow
+				xflowset = client.factory.create("xmlFlowSet")
+				# 50000 is an arbitrary size to keep HTTP requests reasonable; I dislike arbitrary numbers and will probably change this after further analysis
+				while(len(str(xflowset)) < 50000 and not normalized_queue.empty()):
+					flow = normalized_queue.get_nowait()
+					xflow = client.factory.create("xmlFlow")
+					xflow.sourceAddress = flow["source"]
+					xflow.destinationAddress = flow["destination"]
+					xflow.sourcePort = flow["sport"]
+					xflow.destinationPort = flow["dport"]
+					xflow.flags = flow["tcp_flags"]
+					xflow.bytesSent = flow["in_bytes"] + flow["out_bytes"]
+					xflow.packetsSent = flow["in_pkts"] + flow["out_pkts"]
+					xflow.protocol = flow["protocol"]
+					xflow.startTimeStamp = flow["first_switched"]
+					xflow.lastTimeStamp = flow["last_switched"]
+					xflowset.flows.append(xflow)
 				
-			if(len(xflowset.flows) > 0):
-				if(client.service.addFlows(xflowset) != 0):
-					self.logger.error("Unexpected response from Analysis Server while attempting to add new flows")
+				if(len(xflowset.flows) > 0):
+					self.logger.debug("Preparing to send XMLFlowSet of size: " + str(len(str(xflowset))))
+					if(client.service.addFlows(xflowset) != 0):
+						self.logger.error("Unexpected response from Analysis Server while attempting to add new flows")
+					else:
+						self.logger.debug("Server confirmed successful transmission.")
 					
 		except URLError:
 			self.logger.error("Unable to connect to Analysis Server")
