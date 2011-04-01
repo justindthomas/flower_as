@@ -41,9 +41,9 @@ class TransferThread(Thread):
 			client = Client(protocol + self.args[0] + ":" + self.options.remote + "/flower/analysis/FlowInsertService?wsdl")
 			
 			while(not normalized_queue.empty()):
-				xflowset = client.factory.create("xmlFlowSet")
+				flows = []
 				# 50000 is an arbitrary size to keep HTTP requests reasonable; I dislike arbitrary numbers and will probably change this after further analysis
-				while(len(str(xflowset)) < 50000 and not normalized_queue.empty()):
+				while(len(str(flows)) < 50000 and not normalized_queue.empty()):
 					flow = normalized_queue.get_nowait()
 					xflow = client.factory.create("persistentFlow")
 					xflow.source = flow["source"]
@@ -56,11 +56,11 @@ class TransferThread(Thread):
 					xflow.protocol = flow["protocol"]
 					xflow.startTimeStampMs = flow["first_switched"]
 					xflow.lastTimeStampMs = flow["last_switched"]
-					xflowset.flows.append(xflow)
+					flows.append(xflow)
 				
-				if(len(xflowset.flows) > 0):
-					self.logger.debug("Preparing to send XMLFlowSet of size: " + str(len(str(xflowset))))
-					if(client.service.addFlows(xflowset) != 0):
+				if(len(flows) > 0):
+					self.logger.debug("Preparing to send XMLFlowSet of size: " + str(len(str(flows))))
+					if(client.service.addFlows(flows) != 0):
 						self.logger.error("Unexpected response from Analysis Server while attempting to add new flows")
 					else:
 						self.logger.debug("Server confirmed successful transmission.")

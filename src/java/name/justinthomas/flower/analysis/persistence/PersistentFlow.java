@@ -18,9 +18,8 @@ import name.justinthomas.flower.analysis.element.Flow;
 @Entity(version = 11082010)
 public class PersistentFlow {
 
-    @PrimaryKey(sequence="ID")
+    @PrimaryKey(sequence = "ID")
     Long id;
-    
     private Date startTimeStamp = null;
     private Date lastTimeStamp = null;
     public String ethernetType = null;
@@ -60,7 +59,11 @@ public class PersistentFlow {
     }
 
     public Long getLastTimeStampMs() {
-        return lastTimeStamp.getTime();
+        if (lastTimeStamp != null) {
+            return lastTimeStamp.getTime();
+        }
+
+        return 0l;
     }
 
     public void setLastTimeStampMs(Long lastTimeStamp) {
@@ -68,7 +71,11 @@ public class PersistentFlow {
     }
 
     public Long getStartTimeStampMs() {
-        return startTimeStamp.getTime();
+        if (startTimeStamp != null) {
+            return startTimeStamp.getTime();
+        }
+
+        return 0l;
     }
 
     public void setStartTimeStampMs(Long lastTimeStamp) {

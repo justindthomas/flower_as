@@ -3,6 +3,7 @@ package name.justinthomas.flower.analysis.services;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
 import javax.annotation.Resource;
 import javax.jws.WebMethod;
@@ -14,7 +15,6 @@ import javax.xml.ws.handler.MessageContext;
 import name.justinthomas.flower.analysis.element.Flow;
 import name.justinthomas.flower.analysis.persistence.FlowReceiver;
 import name.justinthomas.flower.analysis.persistence.PersistentFlow;
-import name.justinthomas.flower.analysis.services.xmlobjects.XMLFlowSet;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
 
 /**
@@ -29,7 +29,7 @@ public class FlowInsert {
 
     @WebMethod(operationName = "addFlows")
     public Integer addFlows(
-            @WebParam(name = "flows") XMLFlowSet flowSet) {
+            @WebParam(name = "flows") List<PersistentFlow> flowSet) {
 
         MessageContext messageContext = context.getMessageContext();
         HttpServletRequest request = (HttpServletRequest) messageContext.get(MessageContext.SERVLET_REQUEST);
@@ -48,18 +48,18 @@ public class FlowInsert {
     class InsertThread implements Runnable {
 
         InetAddress collector;
-        XMLFlowSet flowSet;
+        List<PersistentFlow> flowSet;
         HashMap<Long, Flow> flows = new HashMap();
 
-        public InsertThread(XMLFlowSet flowSet, InetAddress collector) {
+        public InsertThread(List<PersistentFlow> flowSet, InetAddress collector) {
             this.flowSet = flowSet;
             this.collector = collector;
         }
 
         @Override
         public void run() {
-            System.out.println("Beginning to store " + flowSet.flows.size() + " flows...");
-            for (PersistentFlow xflow : flowSet.flows) {
+            System.out.println("Beginning to store " + flowSet.size() + " flows...");
+            for (PersistentFlow xflow : flowSet) {
                 try {
                     if (xflow.size.longValue() < 0) {
                         throw new Exception("Negative bytesSent value (" + xflow.size.longValue() + ") in XMLFlow received.");

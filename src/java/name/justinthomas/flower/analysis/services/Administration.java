@@ -20,7 +20,6 @@ import name.justinthomas.flower.analysis.persistence.PersistentUser;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryDomain;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryGroup;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetwork;
-import name.justinthomas.flower.analysis.services.xmlobjects.XMLUser;
 import name.justinthomas.flower.analysis.statistics.CachedStatistics;
 
 /**
@@ -200,16 +199,16 @@ public class Administration {
     }
 
     @WebMethod(operationName = "getUserList")
-    public List<XMLUser> getUserList(
+    public List<PersistentUser> getUserList(
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password) {
 
-        List<XMLUser> xusers = new ArrayList<XMLUser>();
+        List<PersistentUser> xusers = new ArrayList();
         UserAction userAction = new UserAction();
         AuthenticationToken token = userAction.authenticate(user, password);
         if (token.authenticated && token.authorized && token.administrator) {
             for (PersistentUser puser : userManager.getUsers()) {
-                xusers.add(puser.toXmlUser(false));
+                xusers.add(puser.sanitize());
             }
         }
 
@@ -286,6 +285,7 @@ public class Administration {
 
     @XmlType
     public static class OperatingStatistics {
+
         @XmlElement
         public Integer insertionCacheSize;
         @XmlElement

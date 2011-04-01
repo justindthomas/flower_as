@@ -84,7 +84,7 @@ public class FlowReceiver {
             entityStore = new EntityStore(environment, "Flow", storeConfig);
             try {
                 FlowAccessor dataAccessor = new FlowAccessor(entityStore);
-                System.out.println("Putting flow with start date: " + new Date(pflow.getStartTimeStampMs()));
+                //System.out.println("Putting flow with start date: " + new Date(pflow.getStartTimeStampMs()));
                 dataAccessor.flowById.put(pflow);
             } catch (DatabaseException e) {
                 System.err.println("addVolume Failed: " + e.getMessage());

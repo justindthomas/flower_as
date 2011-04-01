@@ -1,6 +1,10 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
 package name.justinthomas.flower.analysis.services.xmlobjects;
 
-import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlType;
 
 /**
@@ -9,8 +13,6 @@ import javax.xml.bind.annotation.XmlType;
  */
 @XmlType
 public class XMLDirectoryGroup {
-    @XmlElement
     public String name;
-    @XmlElement
     public Boolean privileged = false;
 }

@@ -7,13 +7,14 @@ package name.justinthomas.flower.analysis.persistence;
 
 import com.sleepycat.persist.model.Entity;
 import com.sleepycat.persist.model.PrimaryKey;
-import name.justinthomas.flower.analysis.services.xmlobjects.XMLUser;
+import javax.xml.bind.annotation.XmlType;
 
 /**
  *
  * @author justin
  */
 @Entity
+@XmlType
 public class PersistentUser {
 
     @PrimaryKey
@@ -30,15 +31,9 @@ public class PersistentUser {
         this.fullName = fullName;
         this.administrator = administrator;
     }
-
-    public XMLUser toXmlUser(Boolean withPassword) {
-        XMLUser xuser = new XMLUser();
-
-        xuser.user = this.username;
-        if(withPassword) xuser.password = this.hashedPassword;
-        xuser.fullName = fullName;
-        xuser.administrator = administrator;
-        
-        return xuser;
+    
+    public PersistentUser sanitize() {
+        hashedPassword = null;
+        return this;
     }
 }

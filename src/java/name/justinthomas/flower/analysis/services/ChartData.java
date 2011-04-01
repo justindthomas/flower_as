@@ -2,9 +2,9 @@ package name.justinthomas.flower.analysis.services;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +17,8 @@ import javax.jws.WebParam;
 import javax.jws.WebService;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlType;
 
 import javax.xml.ws.WebServiceContext;
 import javax.xml.ws.WebServiceException;
@@ -28,11 +30,11 @@ import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
 import name.justinthomas.flower.analysis.element.ManagedNetworks;
 import name.justinthomas.flower.analysis.persistence.ConfigurationManager;
 import name.justinthomas.flower.analysis.persistence.Constraints;
+import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.persistence.SessionManager;
 import name.justinthomas.flower.analysis.persistence.ThreadManager;
 import name.justinthomas.flower.analysis.persistence.TimedThread;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
-import name.justinthomas.flower.analysis.services.xmlobjects.XMLFlowSet;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNode;
 import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
@@ -134,7 +136,7 @@ public class ChartData {
      * Web service operation
      */
     @WebMethod(operationName = "getFlows")
-    public XMLFlowSet getFlows(
+    public FlowSet getFlows(
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "constraints") String constraints,
@@ -189,7 +191,7 @@ public class ChartData {
         //}
 
 
-        XMLFlowSet xmlPacketList = new XMLFlowSet();
+        FlowSet xmlPacketList = new FlowSet();
 
         Integer resultCount = 0;
         final Integer MAX_REQUEST_RESULTS = 1000;
@@ -371,5 +373,15 @@ public class ChartData {
 
             return networkList;
         }
+    }
+
+    @XmlType
+    public static class FlowSet {
+        @XmlElement
+        public List<PersistentFlow> flows = new ArrayList();
+        @XmlElement
+        public String tracker;
+        @XmlElement
+        public Boolean finished = false;
     }
 }

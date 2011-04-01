@@ -21,3 +21,4 @@ public class XMLDirectoryDomain {
     @XmlElement
     public List<XMLDirectoryGroup> groups = new ArrayList();
 }
+
