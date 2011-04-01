@@ -1,7 +1,9 @@
-import socket,os,struct,sys,time,base64
+import os
+import struct
+import time
+import base64
 import SocketServer
 from dpkt.ethernet import Ethernet
-from socket import inet_ntoa as ntoa
 from socket import inet_ntop as ntop
 from socket import AF_INET, AF_INET6
 from threading import Thread
@@ -107,10 +109,7 @@ class SnortQueueProcessor(Thread):
 			
 				packet = base64.b64encode(pkt)
 			
-				sourceType = client.factory.create("sourceType")
-			
-				palert = client.factory.create("persistentAlert")
-				palert.type = sourceType.SNORT
+				palert = client.factory.create("snortAlert")
 				palert.date = ts_sec
 				palert.usec = ts_usec
 				palert.sourceAddress = self.parse_address(ip.src)
@@ -122,7 +121,8 @@ class SnortQueueProcessor(Thread):
 			
 				palerts.append(palert)
 			
-			response = client.service.addAlerts(palerts)
+			if(client.service.addSnortAlerts(palerts) != len(palerts)):
+                            self.logger.error('Number of alerts reported as received by server does not match number sent!')
 		
 		except URLError:
 			self.logger.error('Failed to connect to Snort alert web service')

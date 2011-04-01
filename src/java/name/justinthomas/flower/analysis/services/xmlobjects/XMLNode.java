@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlType;
+import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 
 /**
  *
@@ -21,7 +22,7 @@ public class XMLNode {
     @XmlElement
     public String resolvedAddress;
     @XmlElement
-    public List<XMLFlow> flowsOriginated = new ArrayList<XMLFlow>();
+    public List<PersistentFlow> flowsOriginated = new ArrayList<PersistentFlow>();
     @XmlElement
-    public List<XMLFlow> flowsReceived = new ArrayList<XMLFlow>();
+    public List<PersistentFlow> flowsReceived = new ArrayList<PersistentFlow>();
 }

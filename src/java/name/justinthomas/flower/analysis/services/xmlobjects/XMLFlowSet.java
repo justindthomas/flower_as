@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlType;
+import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 
 /**
  *
@@ -17,7 +18,7 @@ import javax.xml.bind.annotation.XmlType;
 @XmlType
 public class XMLFlowSet {
     @XmlElement
-    public List<XMLFlow> flows = new ArrayList<XMLFlow>();
+    public List<PersistentFlow> flows = new ArrayList();
     @XmlElement
     public String tracker;
     @XmlElement

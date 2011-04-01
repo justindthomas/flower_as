@@ -12,23 +12,41 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.ejb.Singleton;
 import javax.ejb.Startup;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 
 /**
  *
  * @author justin
  */
-@Singleton
 @Startup
+@Singleton
 public class CachedStatistics {
+
     private static CachedStatistics instance;
     private static ScheduledThreadPoolExecutor executor;
-
-    private static Map<IntervalKey, StatisticalInterval> cache = Collections.synchronizedMap(new HashMap());
-    private static Map<IntervalKey, Date> lastUpdated = Collections.synchronizedMap(new HashMap());
-    private static Map<AddressPair, Representation> sourceMap = Collections.synchronizedMap(new HashMap());
+    private Map<IntervalKey, StatisticalInterval> cache;
+    private Map<IntervalKey, Date> lastUpdated;
+    private Map<AddressPair, Representation> sourceMap;
     public static final long MAX_WAIT = 300000;
 
+    public static CachedStatistics getInstance() {
+        if (instance == null) {
+            System.out.println("Locating CachedStatistics by JNDI");
+            try {
+                Context context = new InitialContext();
+                instance = (CachedStatistics) context.lookup("java:global/Analysis/CachedStatistics");
+            } catch (NamingException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return instance;
+    }
+
     static class Representation {
+
         InetAddress collector;
         Date expiration = new Date();
 
@@ -60,7 +78,7 @@ public class CachedStatistics {
         }
 
         public Boolean isExpired() {
-            if(new Date().after(expiration)) {
+            if (new Date().after(expiration)) {
                 return true;
             }
 
@@ -69,6 +87,7 @@ public class CachedStatistics {
     }
 
     static class AddressPair {
+
         InetAddress source, destination;
 
         public AddressPair(InetAddress source, InetAddress destination) {
@@ -106,44 +125,40 @@ public class CachedStatistics {
         }
     }
 
-    public static CachedStatistics getInstance() {
-        if(instance == null) {
-            instance = new CachedStatistics();
-        }
-
-        return instance;
-    }
-
     @PostConstruct
     protected void setup() {
+        instance = this;
         System.out.println("Setting CachedStatistics Persist to run every 60 seconds.");
-
-        instance = new CachedStatistics();
+        cache = Collections.synchronizedMap(new HashMap());
+        lastUpdated = Collections.synchronizedMap(new HashMap());
+        sourceMap = Collections.synchronizedMap(new HashMap());
         executor = new ScheduledThreadPoolExecutor(3);
+
         executor.scheduleAtFixedRate(new Task(), 60, 60, TimeUnit.SECONDS);
     }
 
     public static void put(IntervalKey key, StatisticalInterval interval) {
         //System.out.println("Putting: " + key.interval + ", " + key.resolution);
-        lastUpdated.put(key, new Date());
+        CachedStatistics.getInstance().lastUpdated.put(key, new Date());
 
-        if(cache.containsKey(key)) {
+        if (CachedStatistics.getInstance().cache.containsKey(key)) {
             //System.out.println("Adding: " + interval.flows.size() + " flows to: " + key.interval + ", " + key.resolution);
-            cache.put(key, cache.get(key).addInterval(interval));
+            CachedStatistics.getInstance().cache.put(key, CachedStatistics.getInstance().cache.get(key).addInterval(interval));
         } else {
-            cache.put(key, interval);
+            CachedStatistics.getInstance().cache.put(key, interval);
         }
     }
 
     public static Integer getCacheSize() {
-        return cache.size();
+        return CachedStatistics.getInstance().cache.size();
     }
 
     public static Integer getRepresentationMapSize() {
-        return sourceMap.size();
+        return CachedStatistics.getInstance().sourceMap.size();
     }
 
     class Task implements Runnable {
+
         @Override
         public void run() {
             Thread thread = new Thread(new Persist(false));
@@ -152,6 +167,7 @@ public class CachedStatistics {
     }
 
     class Persist implements Runnable {
+
         private Boolean flush;
 
         public Persist(Boolean flush) {
@@ -160,18 +176,18 @@ public class CachedStatistics {
 
         @Override
         public void run() {
-            //System.out.println("Statistics cache includes " + cache.size() + " entries before Persist.");
+            System.out.println("Statistics cache includes " + cache.size() + " entries before Persist.");
             ArrayList<IntervalKey> keys = new ArrayList();
-            for(IntervalKey key : lastUpdated.keySet()) {
-                if((new Date().getTime() - lastUpdated.get(key).getTime() > MAX_WAIT) || flush) {
+            for (IntervalKey key : lastUpdated.keySet()) {
+                if ((new Date().getTime() - lastUpdated.get(key).getTime() > MAX_WAIT) || flush) {
                     keys.add(key);
                 }
             }
 
             ArrayList<StatisticalInterval> intervals = new ArrayList();
 
-            //System.out.println("Removing intervals from cache.");
-            for(IntervalKey key : keys) {
+            System.out.println("Removing intervals from cache.");
+            for (IntervalKey key : keys) {
                 intervals.add(cache.get(key));
                 cache.remove(key);
                 lastUpdated.remove(key);
@@ -180,30 +196,30 @@ public class CachedStatistics {
             StatisticsManager manager = new StatisticsManager();
             manager.storeStatisticalIntervals(intervals);
 
-            //System.out.println("Statistics cache includes " + cache.size() + " entries after Persist.");
+            System.out.println("Statistics cache includes " + cache.size() + " entries after Persist.");
         }
     }
 
     public static InetAddress getRepresentation(InetAddress source, InetAddress destination) {
-        return sourceMap.get(new AddressPair(source, destination)).collector;
+        return CachedStatistics.getInstance().sourceMap.get(new AddressPair(source, destination)).collector;
     }
-    
+
     public static Boolean hasOtherRepresentation(InetAddress source, InetAddress destination, InetAddress collector) {
-        if(sourceMap.containsKey(new AddressPair(source, destination))) {
-            if(sourceMap.get(new AddressPair(source, destination)).equals(new Representation(collector))) {
-                sourceMap.put(new AddressPair(source, destination), new Representation(collector));
+        if (CachedStatistics.getInstance().sourceMap.containsKey(new AddressPair(source, destination))) {
+            if (CachedStatistics.getInstance().sourceMap.get(new AddressPair(source, destination)).equals(new Representation(collector))) {
+                CachedStatistics.getInstance().sourceMap.put(new AddressPair(source, destination), new Representation(collector));
                 return false;
             } else {
-                if(sourceMap.get(new AddressPair(source, destination)).isExpired()) {
-                    sourceMap.put(new AddressPair(source, destination), new Representation(collector));
+                if (CachedStatistics.getInstance().sourceMap.get(new AddressPair(source, destination)).isExpired()) {
+                    CachedStatistics.getInstance().sourceMap.put(new AddressPair(source, destination), new Representation(collector));
                     return false;
                 }
             }
         } else {
-            sourceMap.put(new AddressPair(source, destination), new Representation(collector));
+            CachedStatistics.getInstance().sourceMap.put(new AddressPair(source, destination), new Representation(collector));
             return false;
         }
-        
+
         return true;
     }
 

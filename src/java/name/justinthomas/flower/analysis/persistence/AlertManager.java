@@ -18,48 +18,60 @@ public class AlertManager {
     public AlertManager() {
         this.configurationManager = ConfigurationManager.getConfigurationManager();
     }
-
-    public void addAlert(PersistentAlert alert) {
+    
+    public void addAlert(SnortAlert alert) {
         Environment environment;
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(false));
         AlertAccessor accessor = new AlertAccessor(entityStore);
 
-        Long second = alert.date;
-        PersistentAlertSecond psecond;
-        if (accessor.alertsBySecond.contains(second)) {
-            psecond = accessor.alertsBySecond.get(second);
-        } else {
-            psecond = new PersistentAlertSecond();
-            psecond.second = second;
-        }
-
-        accessor.alertById.put(alert);
-
-        System.out.println("Adding: " + alert.id + " to: " + psecond.second);
-        psecond.alerts.add(alert.id);
-        accessor.alertsBySecond.put(psecond);
+        System.out.println("Adding alert: " + alert.toString());
+        accessor.snortAlertById.put(alert);
 
         closeStore(entityStore);
         closeEnvironment(environment);
     }
 
-    public Boolean deleteAlert(Long alert) {
+    public void addAlert(ModSecurityAlert alert) {
         Environment environment;
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(false));
         AlertAccessor accessor = new AlertAccessor(entityStore);
 
-        accessor.alertById.delete(alert);
+        System.out.println("Adding alert: " + alert.toString());
+        accessor.modSecurityAlertById.put(alert);
+
+        closeStore(entityStore);
+        closeEnvironment(environment);
+    }
+
+    public Boolean deleteSnortAlert(Long alert) {
+        Environment environment;
+        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(false));
+        AlertAccessor accessor = new AlertAccessor(entityStore);
+
+        accessor.snortAlertById.delete(alert);
 
         closeStore(entityStore);
         closeEnvironment(environment);
         return true;
     }
 
-    public ArrayList<PersistentAlert> getAlerts(Constraints constraints) {
-        ArrayList<PersistentAlert> alerts = new ArrayList();
+    public Boolean deleteModSecurityAlert(Long alert) {
+        Environment environment;
+        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(false));
+        AlertAccessor accessor = new AlertAccessor(entityStore);
+
+        accessor.modSecurityAlertById.delete(alert);
+
+        closeStore(entityStore);
+        closeEnvironment(environment);
+        return true;
+    }
+
+    public ArrayList<SnortAlert> getSnortAlerts(Constraints constraints) {
+        ArrayList<SnortAlert> alerts = new ArrayList();
 
         System.out.println("Getting alerts from: " + constraints.startTime + " to: " + constraints.endTime);
-        System.out.println("Alert type requested: " + constraints.alertType);
+
         Long start = constraints.startTime.getTime() / 1000;
         Long end = constraints.endTime.getTime() / 1000;
 
@@ -67,17 +79,35 @@ public class AlertManager {
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(false));
         AlertAccessor accessor = new AlertAccessor(entityStore);
 
-        ForwardCursor<PersistentAlertSecond> cursor = accessor.alertsBySecond.entities(start, true, end, true);
+        ForwardCursor<SnortAlert> cursor = accessor.snortAlertsByDate.entities(start, true, end, true);
 
-        for(PersistentAlertSecond psecond : cursor) {
-            System.out.println("Alerts at " + psecond.getSecond() + ":" + psecond.alerts.size());
-            for(Long alertID : psecond.alerts) {
-                PersistentAlert alert = accessor.alertById.get(alertID);
-                System.out.println("Alert type: " + alert.type);
-                if((constraints.alertType == null) || (constraints.alertType == alert.type)) {
-                    alerts.add(accessor.alertById.get(alertID));
-                }
-            }
+        for(SnortAlert alert : cursor) {
+            alerts.add(alert);
+        }
+
+        cursor.close();
+        closeStore(entityStore);
+        closeEnvironment(environment);
+
+        return alerts;
+    }
+
+    public ArrayList<ModSecurityAlert> getModSecurityAlerts(Constraints constraints) {
+        ArrayList<ModSecurityAlert> alerts = new ArrayList();
+
+        System.out.println("Getting alerts from: " + constraints.startTime + " to: " + constraints.endTime);
+        
+        Long start = constraints.startTime.getTime() / 1000;
+        Long end = constraints.endTime.getTime() / 1000;
+
+        Environment environment;
+        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(false));
+        AlertAccessor accessor = new AlertAccessor(entityStore);
+
+        ForwardCursor<ModSecurityAlert> cursor = accessor.modSecurityAlertsByDate.entities(start, true, end, true);
+
+        for(ModSecurityAlert alert : cursor) {
+            alerts.add(alert);
         }
 
         cursor.close();

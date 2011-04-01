@@ -33,11 +33,11 @@ public class Network {
             xnode.resolvedAddress = node.getResolvedAddress();
 
             for (Flow flow : node.getFlowsOriginated()) {
-                xnode.flowsOriginated.add(flow.toXMLFlow());
+                xnode.flowsOriginated.add(flow.toHashTableFlow());
             }
 
             for (Flow flow : node.getFlowsReceived()) {
-                xnode.flowsReceived.add(flow.toXMLFlow());
+                xnode.flowsReceived.add(flow.toHashTableFlow());
             }
 
             xnetwork.nodes.add(xnode);

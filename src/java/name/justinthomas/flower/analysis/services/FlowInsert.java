@@ -13,7 +13,7 @@ import javax.xml.ws.WebServiceContext;
 import javax.xml.ws.handler.MessageContext;
 import name.justinthomas.flower.analysis.element.Flow;
 import name.justinthomas.flower.analysis.persistence.FlowReceiver;
-import name.justinthomas.flower.analysis.services.xmlobjects.XMLFlow;
+import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLFlowSet;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
 
@@ -59,10 +59,10 @@ public class FlowInsert {
         @Override
         public void run() {
             System.out.println("Beginning to store " + flowSet.flows.size() + " flows...");
-            for (XMLFlow xflow : flowSet.flows) {
+            for (PersistentFlow xflow : flowSet.flows) {
                 try {
-                    if (xflow.bytesSent.longValue() < 0) {
-                        throw new Exception("Negative bytesSent value (" + xflow.bytesSent.longValue() + ") in XMLFlow received.");
+                    if (xflow.size.longValue() < 0) {
+                        throw new Exception("Negative bytesSent value (" + xflow.size.longValue() + ") in XMLFlow received.");
                     }
 
                     Flow flow = new Flow(xflow);

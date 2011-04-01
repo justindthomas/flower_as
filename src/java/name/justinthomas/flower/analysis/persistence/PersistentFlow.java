@@ -7,20 +7,22 @@ package name.justinthomas.flower.analysis.persistence;
 import com.sleepycat.persist.model.Entity;
 import com.sleepycat.persist.model.PrimaryKey;
 import java.util.Date;
+import javax.xml.bind.annotation.XmlType;
 import name.justinthomas.flower.analysis.element.Flow;
 
 /**
  *
  * @author justin
  */
+@XmlType
 @Entity(version = 11082010)
 public class PersistentFlow {
 
     @PrimaryKey(sequence="ID")
     Long id;
     
-    public Date startTimeStamp = null;
-    public Date lastTimeStamp = null;
+    private Date startTimeStamp = null;
+    private Date lastTimeStamp = null;
     public String ethernetType = null;
     public String reportedBy = null;
     public String source = null;
@@ -39,7 +41,7 @@ public class PersistentFlow {
             this.sourcePort = flow.getUnfixedSourcePort();
             this.destinationPort = flow.getUnfixedDestinationPort();
         } catch (Exception e) {
-            System.err.println("Error in HashTableFlow(Flow): " + e.getMessage());
+            e.printStackTrace();
         }
 
 
@@ -54,16 +56,22 @@ public class PersistentFlow {
         this.flags = flow.flags;
     }
 
-    public void flip() {
-        String temp = this.source;
-        this.source = this.destination;
-        this.destination = temp;
-
-        Integer tempPort = this.sourcePort;
-        this.sourcePort = this.destinationPort;
-        this.destinationPort = tempPort;
+    public PersistentFlow() {
     }
 
-    private PersistentFlow() {
+    public Long getLastTimeStampMs() {
+        return lastTimeStamp.getTime();
+    }
+
+    public void setLastTimeStampMs(Long lastTimeStamp) {
+        this.lastTimeStamp = new Date(lastTimeStamp);
+    }
+
+    public Long getStartTimeStampMs() {
+        return startTimeStamp.getTime();
+    }
+
+    public void setStartTimeStampMs(Long lastTimeStamp) {
+        this.startTimeStamp = new Date(lastTimeStamp);
     }
 }

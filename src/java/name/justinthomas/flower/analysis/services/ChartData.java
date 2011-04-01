@@ -195,7 +195,7 @@ public class ChartData {
         final Integer MAX_REQUEST_RESULTS = 1000;
         try {
             while (!SessionManager.getFlows(session, tracker).isEmpty() && (resultCount++ < MAX_REQUEST_RESULTS)) {
-                xmlPacketList.flows.add(SessionManager.getFlows(session, tracker).remove(0).toXMLFlow());
+                xmlPacketList.flows.add(SessionManager.getFlows(session, tracker).remove(0).toHashTableFlow());
             }
 
             if (SessionManager.getFlows(session, tracker).isEmpty() && SessionManager.isProcessingPacketsComplete(session, tracker)) {

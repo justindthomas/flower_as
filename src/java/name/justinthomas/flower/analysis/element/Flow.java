@@ -11,7 +11,6 @@ import org.bouncycastle.util.encoders.Base64Encoder;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.Map.Entry;
 import javax.naming.Context;
@@ -22,7 +21,6 @@ import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlowDetail;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlowDetail.Count;
-import name.justinthomas.flower.analysis.services.xmlobjects.XMLFlow;
 
 public class Flow implements Serializable {
 
@@ -93,7 +91,7 @@ public class Flow implements Serializable {
             }
         }
     }
-
+/*
     public Flow(XMLFlow xflow) throws UnknownHostException {
         this();
 
@@ -118,6 +116,8 @@ public class Flow implements Serializable {
 
         this.reportedBy = xflow.reportedBy;
     }
+ *
+ */
 
     public Flow(PersistentFlow sflow) throws UnknownHostException {
         this();
@@ -132,8 +132,8 @@ public class Flow implements Serializable {
 
         this.ethernetType = sflow.ethernetType;
 
-        this.lastTimeStamp = sflow.lastTimeStamp;
-        this.startTimeStamp = sflow.startTimeStamp;
+        this.lastTimeStamp = new Date(sflow.getLastTimeStampMs());
+        this.startTimeStamp = new Date(sflow.getStartTimeStampMs());
 
         this.packetsSent = sflow.packetCount;
         this.protocol = sflow.protocol;
@@ -149,6 +149,7 @@ public class Flow implements Serializable {
         return sflow;
     }
 
+    /*
     public XMLFlow toXMLFlow() {
         XMLFlow xflow = new XMLFlow();
 
@@ -197,6 +198,8 @@ public class Flow implements Serializable {
 
         return xflow;
     }
+     * 
+     */
 
     private Boolean determineDirectionality() {
         if ((protocol != 6) && (protocol != 17)) {

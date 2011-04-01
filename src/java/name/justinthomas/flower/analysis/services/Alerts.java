@@ -11,7 +11,8 @@ import javax.xml.ws.WebServiceContext;
 import name.justinthomas.flower.analysis.persistence.AlertManager;
 import name.justinthomas.flower.analysis.persistence.ConfigurationManager;
 import name.justinthomas.flower.analysis.persistence.Constraints;
-import name.justinthomas.flower.analysis.persistence.PersistentAlert;
+import name.justinthomas.flower.analysis.persistence.ModSecurityAlert;
+import name.justinthomas.flower.analysis.persistence.SnortAlert;
 
 /**
  *
@@ -25,22 +26,36 @@ public class Alerts {
     @EJB
     ConfigurationManager configurationManager;
 
-    @WebMethod(operationName = "addAlerts")
-    public Integer addAlerts(
-            @WebParam(name = "alerts") List<PersistentAlert> alerts) {
+    @WebMethod(operationName = "addSnortAlerts")
+    public Integer addSnortAlerts(
+            @WebParam(name = "alerts") List<SnortAlert> alerts) {
         
         System.out.println("Received " + alerts.size() + " alerts.");
         
         AlertManager alertManager = new AlertManager();
-        for(PersistentAlert alert : alerts) {
+        for(SnortAlert alert : alerts) {
             alertManager.addAlert(alert);
         }
         
         return alerts.size();
     }
 
-    @WebMethod(operationName = "deleteAlert")
-    public Boolean deleteAlert(
+    @WebMethod(operationName = "addModSecurityAlerts")
+    public Integer addModSecurityAlerts(
+            @WebParam(name = "alerts") List<ModSecurityAlert> alerts) {
+
+        System.out.println("Received " + alerts.size() + " alerts.");
+
+        AlertManager alertManager = new AlertManager();
+        for(ModSecurityAlert alert : alerts) {
+            alertManager.addAlert(alert);
+        }
+
+        return alerts.size();
+    }
+
+    @WebMethod(operationName = "deleteSnortAlert")
+    public Boolean deleteSnortAlert(
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "record") Long record) {
@@ -48,25 +63,58 @@ public class Alerts {
         if(userAction.authenticate(user, password).authorized) {
             System.out.println("Deleting alert...");
             AlertManager alertManager = new AlertManager();
-            return alertManager.deleteAlert(record);
+            return alertManager.deleteSnortAlert(record);
         }
         return false;
     }
 
-    @WebMethod(operationName = "getAlerts")
-    public List<PersistentAlert> getAlerts(
+    @WebMethod(operationName = "deleteModSecurityAlert")
+    public Boolean deleteModSecurityAlert(
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password,
+            @WebParam(name = "record") Long record) {
+        UserAction userAction = new UserAction();
+        if(userAction.authenticate(user, password).authorized) {
+            System.out.println("Deleting alert...");
+            AlertManager alertManager = new AlertManager();
+            return alertManager.deleteModSecurityAlert(record);
+        }
+        return false;
+    }
+
+    @WebMethod(operationName = "getSnortAlerts")
+    public List<SnortAlert> getSnortAlerts(
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "constraints") String constraintsString) {
         UserAction userAction = new UserAction();
 
-        ArrayList<PersistentAlert> alerts = new ArrayList();
+        ArrayList<SnortAlert> alerts = new ArrayList();
 
         if(userAction.authenticate(user, password).authorized) {
             System.out.println("Retrieving alerts...");
             AlertManager alertManager = new AlertManager();
             Constraints constraints = new Constraints(constraintsString);
-            alerts.addAll(alertManager.getAlerts(constraints));
+            alerts.addAll(alertManager.getSnortAlerts(constraints));
+        }
+
+        return alerts;
+    }
+
+    @WebMethod(operationName = "getModSecurityAlerts")
+    public List<ModSecurityAlert> getModSecurityAlerts(
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password,
+            @WebParam(name = "constraints") String constraintsString) {
+        UserAction userAction = new UserAction();
+
+        ArrayList<ModSecurityAlert> alerts = new ArrayList();
+
+        if(userAction.authenticate(user, password).authorized) {
+            System.out.println("Retrieving alerts...");
+            AlertManager alertManager = new AlertManager();
+            Constraints constraints = new Constraints(constraintsString);
+            alerts.addAll(alertManager.getModSecurityAlerts(constraints));
         }
 
         return alerts;

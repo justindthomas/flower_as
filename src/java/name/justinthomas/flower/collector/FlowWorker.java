@@ -8,20 +8,18 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Calendar;
-import java.util.LinkedList;
 import java.util.Map.Entry;
 import javax.xml.datatype.DatatypeConfigurationException;
 import name.justinthomas.flower.analysis.element.Flow;
 import name.justinthomas.flower.analysis.persistence.FlowReceiver;
+import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
-import name.justinthomas.flower.analysis.services.xmlobjects.XMLFlow;
 
 /**
  *
@@ -318,24 +316,24 @@ public class FlowWorker implements Runnable {
             Long size = 0l;
             Long packets = 0l;
 
-            XMLFlow xnetflow = new XMLFlow();
+            PersistentFlow xnetflow = new PersistentFlow();
             for (Entry<Integer, Integer> entry : template.fields.entrySet()) {
                 try {
                     switch (entry.getKey()) {
                         case TemplateTypes.IPV4_SRC_ADDR:
-                            xnetflow.sourceAddress = parseAddress(input, entry.getValue()).getHostAddress();
+                            xnetflow.source = parseAddress(input, entry.getValue()).getHostAddress();
                             break;
 
                         case TemplateTypes.IPV4_DST_ADDR:
-                            xnetflow.destinationAddress = parseAddress(input, entry.getValue()).getHostAddress();
+                            xnetflow.destination = parseAddress(input, entry.getValue()).getHostAddress();
                             break;
 
                         case TemplateTypes.IPV6_SRC_ADDR:
-                            xnetflow.sourceAddress = parseAddress(input, entry.getValue()).getHostAddress();
+                            xnetflow.source = parseAddress(input, entry.getValue()).getHostAddress();
                             break;
 
                         case TemplateTypes.IPV6_DST_ADDR:
-                            xnetflow.destinationAddress = parseAddress(input, entry.getValue()).getHostAddress();
+                            xnetflow.destination = parseAddress(input, entry.getValue()).getHostAddress();
                             break;
 
                         case TemplateTypes.PROTOCOL:
@@ -379,11 +377,11 @@ public class FlowWorker implements Runnable {
                             break;
 
                         case TemplateTypes.FIRST_SWITCHED:
-                            xnetflow.startTimeStamp = parseDate(input, sysUpTime, epoch);
+                            xnetflow.setStartTimeStampMs(parseDate(input, sysUpTime, epoch) * 1000);
                             break;
 
                         case TemplateTypes.LAST_SWITCHED:
-                            xnetflow.lastTimeStamp = parseDate(input, sysUpTime, epoch);
+                            xnetflow.setLastTimeStampMs(parseDate(input, sysUpTime, epoch) * 1000);
                             break;
 
                         default:
@@ -393,14 +391,14 @@ public class FlowWorker implements Runnable {
                     dte.printStackTrace();
                 }
             }
-            xnetflow.bytesSent = size;
-            xnetflow.packetsSent = packets.intValue();
+            xnetflow.size = size;
+            xnetflow.packetCount = packets.intValue();
 
             // softflowd 0.9.8 mixes up the time stamps
-            if (xnetflow.startTimeStamp > xnetflow.lastTimeStamp) {
-                Long temp = xnetflow.startTimeStamp;
-                xnetflow.startTimeStamp = xnetflow.lastTimeStamp;
-                xnetflow.lastTimeStamp = temp;
+            if (xnetflow.getStartTimeStampMs() > xnetflow.getLastTimeStampMs()) {
+                Long temp = xnetflow.getStartTimeStampMs();
+                xnetflow.setStartTimeStampMs(xnetflow.getLastTimeStampMs());
+                xnetflow.setLastTimeStampMs(temp);
             }
 
             Flow flow = new Flow(xnetflow);

@@ -10,7 +10,6 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import name.justinthomas.flower.analysis.persistence.PersistentAlert.SourceType;
 
 /**
  *
@@ -31,7 +30,6 @@ public class Constraints {
     public ArrayList<Integer> protocolList = new ArrayList<Integer>();
     public Integer maxFlowSize = 0;
     public Integer minFlowSize = 0;
-    public SourceType alertType;
     public static final SimpleDateFormat timeDateFormat = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
 
     public Constraints(String pattern) {
@@ -128,12 +126,6 @@ public class Constraints {
                 } catch (UnknownHostException uhe) {
                     System.err.println("Couldn't parse destination host parameter: " + uhe.getMessage());
                 }
-            } else if (token[x].toLowerCase().equals("snort")) {
-                System.out.println("Alert Type: SNORT");
-                alertType = SourceType.SNORT;
-            } else if (token[x].toLowerCase().equals("modsecurity")) {
-                System.out.println("Alert Type: MODSECURITY");
-                alertType = SourceType.MODSECURITY;
             }
         }
     }

@@ -45,17 +45,17 @@ class TransferThread(Thread):
 				# 50000 is an arbitrary size to keep HTTP requests reasonable; I dislike arbitrary numbers and will probably change this after further analysis
 				while(len(str(xflowset)) < 50000 and not normalized_queue.empty()):
 					flow = normalized_queue.get_nowait()
-					xflow = client.factory.create("xmlFlow")
-					xflow.sourceAddress = flow["source"]
-					xflow.destinationAddress = flow["destination"]
+					xflow = client.factory.create("persistentFlow")
+					xflow.source = flow["source"]
+					xflow.destination = flow["destination"]
 					xflow.sourcePort = flow["sport"]
 					xflow.destinationPort = flow["dport"]
 					xflow.flags = flow["tcp_flags"]
-					xflow.bytesSent = flow["in_bytes"] + flow["out_bytes"]
-					xflow.packetsSent = flow["in_pkts"] + flow["out_pkts"]
+					xflow.size = flow["in_bytes"] + flow["out_bytes"]
+					xflow.packetCount = flow["in_pkts"] + flow["out_pkts"]
 					xflow.protocol = flow["protocol"]
-					xflow.startTimeStamp = flow["first_switched"]
-					xflow.lastTimeStamp = flow["last_switched"]
+					xflow.startTimeStampMs = flow["first_switched"]
+					xflow.lastTimeStampMs = flow["last_switched"]
 					xflowset.flows.append(xflow)
 				
 				if(len(xflowset.flows) > 0):

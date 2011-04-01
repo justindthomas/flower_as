@@ -52,16 +52,19 @@ public abstract class SessionManager {
 
     @SuppressWarnings("unchecked")
     public static List<Flow> getFlows(HttpSession session, String tracker) {
+        Map<String, List<Flow>> map;
         if (session.getAttribute("flows") == null) {
-            Map<String, List<Flow>> map = Collections.synchronizedMap(new HashMap<String, List<Flow>>());
-
-            List<Flow> flows = Collections.synchronizedList(new LinkedList<Flow>());
-            map.put(tracker, flows);
-
+            map = Collections.synchronizedMap(new HashMap<String, List<Flow>>());
             session.setAttribute("flows", map);
+        } else {
+            map = (Map<String, List<Flow>>) session.getAttribute("flows");
         }
 
-        List<Flow> flows = ((Map<String, List<Flow>>)session.getAttribute("flows")).get(tracker);
+        if (!map.containsKey(tracker)) {
+            map.put(tracker, Collections.synchronizedList(new LinkedList<Flow>()));
+        }
+
+        List<Flow> flows = ((Map<String, List<Flow>>) session.getAttribute("flows")).get(tracker);
         return flows;
     }
 
@@ -170,7 +173,7 @@ public abstract class SessionManager {
     }
 
     public static Boolean isProcessingPacketsComplete(HttpSession session, String tracker) {
-        if(session.getAttribute("processing_packets_complete") != null) {
+        if (session.getAttribute("processing_packets_complete") != null) {
             if (((Map<String, Boolean>) session.getAttribute("processing_packets_complete")).containsKey(tracker)) {
                 return ((Map<String, Boolean>) session.getAttribute("processing_packets_complete")).get(tracker);
             }
