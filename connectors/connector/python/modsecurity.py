@@ -86,6 +86,7 @@ class ModSecurityQueueProcessor(Thread):
 			sender, data = modsecurity_raw_queue.get_nowait()
 			id = ""
 			record = []
+			event = {}
 			
 			for line in data:
 				if(pattern.match(line)):
@@ -152,10 +153,9 @@ class ModSecurityQueueProcessor(Thread):
 class ModSecurityHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 	def do_PUT(self):
 		#print self.__dict__
-		event = {}
 		content_length = int(self.headers['Content-Length'])
 		data = self.rfile.readlines(content_length)
-		modsecurity_raw_queue.put((client_address[0], data))
+		modsecurity_raw_queue.put((self.client_address[0], data))
 		
 class ModSecurityReceiver(Thread):
 	def __init__(self, logger, args, options):
@@ -187,7 +187,7 @@ class ModSecurityReceiver(Thread):
 		self.transfer.stop()
 		self.normalizer.join()
 		self.transfer.join()
-		self.logger.info("mod_security processor thread completed."
+		self.logger.info("mod_security processor thread completed.")
 		
 #if __name__ == "__main__":
 #	server = BaseHTTPServer.HTTPServer
