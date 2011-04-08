@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import SocketServer
 import time
 import sys
@@ -29,7 +30,7 @@ class TransferThread(Thread):
 		self.tasks.run()
 		
 	def process(self, name):
-		self.logger.debug("Processing transfer queue...")
+		self.logger.debug("Processing netflow transfer queue...")
 		
 		try:
 			protocol = "http://"
@@ -63,12 +64,12 @@ class TransferThread(Thread):
 					if(client.service.addFlows(flows) != 0):
 						self.logger.error("Unexpected response from Analysis Server while attempting to add new flows")
 					else:
-						self.logger.debug("Server confirmed successful transmission.")
+						self.logger.debug("Server confirmed successful transmission of netflow data.")
 					
 		except URLError:
-			self.logger.error("Unable to connect to Analysis Server")
+			self.logger.error("Unable to connect to Analysis Server from netflow transfer thread")
 		except WebFault:
-			self.logger.error("Unable to complete data transfer to Analysis Server")
+			self.logger.error("Unable to complete netflow transfer to Analysis Server")
 		except:
 			self.logger.error(sys.exc_info())
 			sys.exc_clear()
@@ -106,7 +107,7 @@ class NetflowQueueProcessor(Thread):
 		self.tasks.run()
 		
 	def process(self, name):
-		self.logger.debug("Processing NetFlow queue...")
+		self.logger.debug("Processing netflow queue...")
 		
 		retry = []
 		while(not netflow_queue.empty()):
@@ -195,7 +196,7 @@ class NetflowQueueProcessor(Thread):
 					normalized_queue.put(flow)
 					netflows = netflows[flow_size:]
 				#print normalized
-				self.logger.debug("Normalized queue contains: " + str(normalized_queue.qsize()) + " entries")
+				self.logger.debug("netflow normalized queue contains: " + str(normalized_queue.qsize()) + " entries")
 			else:
 				counter = count
 				return data
@@ -279,12 +280,11 @@ class NetflowProcessor(Thread):
 		self.transfer = TransferThread(self.logger, self.args, self.options)
 		
 	def run(self):
-		self.logger.info("Starting normalizer and transfer threads")
+		self.logger.info("Starting netflow normalizer and transfer threads")
 		self.normalizer.start()
 		self.transfer.start()
 		
-		HOST = "::"
-		self.server = IPv6Server((HOST, int(self.options.local)), NetflowCollector)
+		self.server = IPv6Server(("::", int(self.options.netflow_port)), NetflowCollector)
 		self.server.serve_forever()
 			
 	def stop(self):
@@ -293,4 +293,7 @@ class NetflowProcessor(Thread):
 			self.server.shutdown()
 		self.normalizer.stop()
 		self.transfer.stop()
+		self.normalizer.join()
+		self.transfer.join()
+		self.logger.info("netflow processor thread completed.")
 

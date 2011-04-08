@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import struct
 import time
@@ -54,6 +55,7 @@ class SnortProcessor(Thread):
 			self.server.shutdown()
 			
 		self.queue_processor.stop()
+		self.queue_processor.join()
 
 class SnortAlertServer(SocketServer.UnixDatagramServer):
 	def __init__(self, logger, socket, handler):
