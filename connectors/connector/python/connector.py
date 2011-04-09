@@ -43,7 +43,11 @@ def stop_nicely():
 
 def startup():
 	if (not options.nosnort):
-		snort.start()
+		try:
+			snort.start()
+		except:
+			self.logger.error(sys.exc_info())
+			sys.exc_clear()
 	
 	if (not options.nomodsecurity):
 		modsecurity.start()

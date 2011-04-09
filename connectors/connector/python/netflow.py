@@ -13,7 +13,7 @@ from urllib2 import URLError
 from Queue import Queue
 
 netflow_queue = Queue()
-normalized_queue = Queue()
+netflow_normalized_queue = Queue()
 
 class TransferThread(Thread):
 	
@@ -30,7 +30,7 @@ class TransferThread(Thread):
 		self.tasks.run()
 		
 	def process(self, name):
-		self.logger.debug("Processing netflow transfer queue...")
+		self.logger.debug("netflow normalized queue contains: " + str(netflow_normalized_queue.qsize()) + " entries")
 		
 		try:
 			protocol = "http://"
@@ -41,11 +41,11 @@ class TransferThread(Thread):
 			self.logger.debug("Connecting to: " + protocol + self.args[0] + ":" + self.options.remote + "/flower/analysis/FlowInsertService?wsdl")
 			client = Client(protocol + self.args[0] + ":" + self.options.remote + "/flower/analysis/FlowInsertService?wsdl")
 			
-			while(not normalized_queue.empty()):
+			while(not netflow_normalized_queue.empty()):
 				flows = []
 				# 50000 is an arbitrary size to keep HTTP requests reasonable; I dislike arbitrary numbers and will probably change this after further analysis
-				while(len(str(flows)) < 50000 and not normalized_queue.empty()):
-					flow = normalized_queue.get_nowait()
+				while(len(str(flows)) < 50000 and not netflow_normalized_queue.empty()):
+					flow = netflow_normalized_queue.get_nowait()
 					xflow = client.factory.create("persistentFlow")
 					xflow.source = flow["source"]
 					xflow.destination = flow["destination"]
@@ -60,7 +60,7 @@ class TransferThread(Thread):
 					flows.append(xflow)
 				
 				if(len(flows) > 0):
-					self.logger.debug("Preparing to send XMLFlowSet of size: " + str(len(str(flows))))
+					self.logger.debug("Preparing to send flow list of size: " + str(len(str(flows))))
 					if(client.service.addFlows(flows) != 0):
 						self.logger.error("Unexpected response from Analysis Server while attempting to add new flows")
 					else:
@@ -107,7 +107,7 @@ class NetflowQueueProcessor(Thread):
 		self.tasks.run()
 		
 	def process(self, name):
-		self.logger.debug("Processing netflow queue...")
+		self.logger.debug("netflow raw queue contains: " + str(netflow_queue.qsize()) + " entries")
 		
 		retry = []
 		while(not netflow_queue.empty()):
@@ -133,14 +133,13 @@ class NetflowQueueProcessor(Thread):
 	def v9(self, sender, count, epoch, uptime, data):
 		sequence = self.parse_number(data[12:16])
 		source = self.parse_number(data[16:20])
-		#print (sequence, source)
+
 		flowsets = data[20:]
 		
 		counter = 0
 		while(counter < count):
 			id = self.parse_number(flowsets[:2])
 			length = self.parse_number(flowsets[2:4])
-			#print (id, length)
 			
 			flowset = flowsets[:length]
 			flowsets = flowsets[length:]
@@ -193,14 +192,11 @@ class NetflowQueueProcessor(Thread):
 							
 						flow_size += size
 						
-					normalized_queue.put(flow)
+					netflow_normalized_queue.put(flow)
 					netflows = netflows[flow_size:]
-				#print normalized
-				self.logger.debug("netflow normalized queue contains: " + str(normalized_queue.qsize()) + " entries")
 			else:
 				counter = count
 				return data
-				
 		return None
 		
 	def parse_address(self, data):
@@ -258,13 +254,11 @@ class NetflowCollector(SocketServer.DatagramRequestHandler):
 		data = self.rfile.read(4096)
 		client = self.client_address[0]
 		netflow_queue.put((client, data))
-		#print("Queue Size: " + str(netflows.qsize()) + " " + client)
-		#self.logger.debug("Netflow queue contains: " + str(netflow_queue.qsize()) + " entries")
 		
 	def finish(self):
 		pass
 
-class IPv6Server(SocketServer.UDPServer):
+class IPv6UDPServer(SocketServer.UDPServer):
 	address_family = AF_INET6
 
 class NetflowProcessor(Thread):
@@ -284,7 +278,7 @@ class NetflowProcessor(Thread):
 		self.normalizer.start()
 		self.transfer.start()
 		
-		self.server = IPv6Server(("::", int(self.options.netflow_port)), NetflowCollector)
+		self.server = IPv6UDPServer(("::", int(self.options.netflow_port)), NetflowCollector)
 		self.server.serve_forever()
 			
 	def stop(self):

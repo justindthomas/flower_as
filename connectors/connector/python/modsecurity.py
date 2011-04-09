@@ -5,6 +5,7 @@ from threading import Thread
 from sched import scheduler
 from suds.client import Client
 from Queue import Queue
+from socket import inet_ntop, AF_INET, AF_INET6
 import re
 import datetime
 import time
@@ -28,14 +29,14 @@ class ModSecurityTransferThread(Thread):
 		self.tasks.run()
 	
 	def process(self, name):
-		self.logger.debug("Processing mod_security transfer queue...")
+		self.logger.debug("mod_security normalized queue contains: " + str(modsecurity_normalized_queue.qsize()) + " alerts.")
 		
 		alerts = []
 		
 		while(not modsecurity_normalized_queue.empty()):
 			sender, alert = modsecurity_normalized_queue.get_nowait()
 			alerts.append(alert)
-			
+		
 		if (len(alerts) != 0):
 			try:
 				protocol = "http://"
@@ -80,7 +81,7 @@ class ModSecurityQueueProcessor(Thread):
 		self.tasks.run()
 	
 	def process(self, name):
-		self.logger.debug("Processing mod_security raw alert queue...")
+		self.logger.debug("mod_security raw alert queue contains: " + str(modsecurity_raw_queue.qsize()) + " alerts.")
 		
 		while(not modsecurity_raw_queue.empty()):
 			sender, data = modsecurity_raw_queue.get_nowait()
@@ -152,11 +153,13 @@ class ModSecurityQueueProcessor(Thread):
 		
 class ModSecurityHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 	def do_PUT(self):
-		#print self.__dict__
 		content_length = int(self.headers['Content-Length'])
 		data = self.rfile.readlines(content_length)
 		modsecurity_raw_queue.put((self.client_address[0], data))
 		
+class IPv6HTTPServer(BaseHTTPServer.HTTPServer):
+	address_family = AF_INET6
+	
 class ModSecurityReceiver(Thread):
 	def __init__(self, logger, args, options):
 		Thread.__init__(self)
@@ -174,7 +177,7 @@ class ModSecurityReceiver(Thread):
 		self.normalizer.start()
 		self.transfer.start()
 		
-		self.server = BaseHTTPServer.HTTPServer(('', int(self.options.modsecurity_port)), ModSecurityHandler)
+		self.server = IPv6HTTPServer(('', int(self.options.modsecurity_port)), ModSecurityHandler)
 		self.server.serve_forever()
 	
 	def stop(self):
