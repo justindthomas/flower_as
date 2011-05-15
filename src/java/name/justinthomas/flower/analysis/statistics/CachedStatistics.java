@@ -10,6 +10,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import javax.ejb.EJB;
 import javax.ejb.Singleton;
 import javax.ejb.Startup;
 import javax.naming.Context;
@@ -193,8 +194,8 @@ public class CachedStatistics {
                 lastUpdated.remove(key);
             }
 
-            StatisticsManager manager = new StatisticsManager();
-            manager.storeStatisticalIntervals(intervals);
+            StatisticsManager statisticsManager = new StatisticsManager();
+            statisticsManager.storeStatisticalIntervals(intervals);
 
             System.out.println("Statistics cache includes " + cache.size() + " entries after Persist.");
         }

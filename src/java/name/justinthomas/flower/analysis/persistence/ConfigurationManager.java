@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package name.justinthomas.flower.analysis.persistence;
 
 import com.sleepycat.je.Environment;
@@ -15,20 +11,14 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Properties;
 import javax.annotation.PostConstruct;
-import javax.ejb.Lock;
-import javax.ejb.LockType;
 import javax.ejb.Singleton;
-import javax.ejb.Startup;
-import javax.naming.Context;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
+import javax.ejb.Stateful;
 
 /**
  *
  * @author JustinThomas
  */
 @Singleton
-@Startup
 public class ConfigurationManager {
 
     private String host = null;
@@ -48,10 +38,9 @@ public class ConfigurationManager {
     private Environment environment = null;
     private EntityStore entityStore = null;
     private EnvironmentConfig environmentConfig = null;
-    private ConfigurationAccessor dataAccessor = null;
-    private PersistentConfiguration configuration = null;
+    private ConfigurationAccessor dataAccessor;
+    private PersistentConfiguration configuration;
     private File environmentHome = null;
-    private static ConfigurationManager configurationManager;
 
     synchronized private void setup() throws Exception {
         environmentConfig = new EnvironmentConfig();
@@ -86,7 +75,6 @@ public class ConfigurationManager {
 
     @PostConstruct
     public void init() {
-
         InputStream inputStream = ConfigurationManager.class.getResourceAsStream("resource.properties");
         this.properties = new Properties();
         try {
@@ -167,23 +155,6 @@ public class ConfigurationManager {
 
         configuration = hashTableConfiguration;
         reload();
-    }
-
-    public static ConfigurationManager getConfigurationManager() {
-        if (configurationManager != null) {
-            return configurationManager;
-        }
-
-        System.out.println("Locating ConfigurationManager by JNDI");
-        try {
-            Context context = new InitialContext();
-            configurationManager = (ConfigurationManager) context.lookup("java:global/Analysis/ConfigurationManager");
-        } catch (NamingException ne) {
-            configurationManager = new ConfigurationManager();
-            System.err.println("Could not locate ConfigurationManager by JNDI and started a new instance");
-        }
-
-        return configurationManager;
     }
 
     public String getBaseDirectory() {
@@ -297,4 +268,5 @@ public class ConfigurationManager {
     public void setResolution(HashMap<Long, Boolean> resolution) {
         this.resolution = resolution;
     }
+
 }

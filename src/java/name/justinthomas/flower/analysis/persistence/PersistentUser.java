@@ -7,6 +7,7 @@ package name.justinthomas.flower.analysis.persistence;
 
 import com.sleepycat.persist.model.Entity;
 import com.sleepycat.persist.model.PrimaryKey;
+import java.util.TimeZone;
 import javax.xml.bind.annotation.XmlType;
 
 /**
@@ -22,14 +23,16 @@ public class PersistentUser {
     public String hashedPassword;
     public String fullName;
     public Boolean administrator;
+    public String timeZone;
 
     private PersistentUser() { }
 
-    public PersistentUser(String username, String hashedPassword, String fullName, Boolean administrator) {
+    public PersistentUser(String username, String hashedPassword, String fullName, Boolean administrator, String timeZone) {
         this.username = username;
         this.hashedPassword = hashedPassword;
         this.fullName = fullName;
         this.administrator = administrator;
+        this.timeZone = timeZone;
     }
     
     public PersistentUser sanitize() {

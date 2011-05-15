@@ -4,9 +4,12 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Security;
+import javax.ejb.EJB;
 import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebService;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import name.justinthomas.flower.analysis.authentication.ActiveDirectory;
 import name.justinthomas.flower.analysis.authentication.AuthenticationToken;
 import name.justinthomas.flower.analysis.persistence.PersistentUser;
@@ -19,8 +22,6 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
  */
 @WebService()
 public class UserAction {
-
-    UserManager userManager = new UserManager();
 
     /**
      * Web service operation
@@ -60,7 +61,9 @@ public class UserAction {
         AuthenticationToken token = new AuthenticationToken();
         token.internal = true;
 
-        if ((username != null) && (password != null)) {
+        UserManager userManager = new UserManager();
+        
+        if ((username != null) && (password != null) && (userManager != null)) {
             PersistentUser user = userManager.getUser(username);
             if (user == null) {
                 System.out.println("Invalid User: " + username);
@@ -87,6 +90,7 @@ public class UserAction {
                     token.administrator = true;
                 }
                 token.fullName = user.fullName;
+                token.timeZone = user.timeZone;
                 System.out.println("Authenticated successfully against internal database: " + username);
                 return token;
             }
@@ -120,17 +124,33 @@ public class UserAction {
 
         return null;
     }
+    
+    @WebMethod(operationName = "getTimeZone")
+    public String getTimeZone(
+            @WebParam(name = "username") String username,
+            @WebParam(name = "password") String password) {
+        
+        AuthenticationToken token = authenticate(username, password);
+        if (token.authorized) {
+            return token.timeZone;
+        }
+
+        return null;  
+    }
 
     @WebMethod(operationName = "updateUser")
     public Boolean updateUser(
             @WebParam(name = "authUser") String authUser,
             @WebParam(name = "authPassword") String authPassword,
             @WebParam(name = "updatedPassword") String updatedPassword,
-            @WebParam(name = "fullName") String fullName) {
+            @WebParam(name = "fullName") String fullName,
+            @WebParam(name = "timeZone") String timeZone) {
 
         AuthenticationToken token = authenticate(authUser, authPassword);
+        
+        UserManager userManager = new UserManager();
         if (token.authorized && token.internal && (userManager.getUser(authUser) != null)) {
-            if (!userManager.updateUser(authUser, updatedPassword, fullName, false)) {
+            if (!userManager.updateUser(authUser, updatedPassword, fullName, false, timeZone)) {
                 return false;
             }
         } else {

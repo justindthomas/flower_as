@@ -23,8 +23,7 @@ public class Alerts {
 
     @Resource
     private WebServiceContext serviceContext;
-    @EJB
-    ConfigurationManager configurationManager;
+    @EJB private ConfigurationManager configurationManager;
 
     @WebMethod(operationName = "addSnortAlerts")
     public Integer addSnortAlerts(

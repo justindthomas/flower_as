@@ -24,6 +24,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.servlet.http.HttpSession;
 import name.justinthomas.flower.analysis.element.DefaultNode;
 import name.justinthomas.flower.analysis.element.Flow;
@@ -41,10 +43,21 @@ import name.justinthomas.flower.utility.AddressAnalysis;
  */
 public class StatisticsManager {
 
+    private static ConfigurationManager configurationManager;
     private static final Integer DEBUG = 1;
-    ConfigurationManager configurationManager = ConfigurationManager.getConfigurationManager();
+
+    public StatisticsManager() {
+        try {
+            if (configurationManager == null) {
+                StatisticsManager.configurationManager = InitialContext.doLookup("java:global/Analysis/ConfigurationManager");
+            }
+        } catch (NamingException e) {
+            e.printStackTrace();
+        }
+    }
 
     private Environment setupEnvironment() {
+
         File environmentHome = new File(configurationManager.getBaseDirectory() + "/" + configurationManager.getStatisticsDirectory());
 
         try {
@@ -190,8 +203,8 @@ public class StatisticsManager {
     public void addStatisticalSeconds(Flow flow, Long flowID, InetAddress collector) {
         try {
             if (CachedStatistics.hasOtherRepresentation(flow.getSourceAddress(), flow.getDestinationAddress(), collector)) {
-                System.out.println("Ignoring duplicate flow from: " + collector.getHostAddress() +
-                        ", already represented by: " + CachedStatistics.getRepresentation(flow.getSourceAddress(), flow.getDestinationAddress()).getHostAddress());
+                System.out.println("Ignoring duplicate flow from: " + collector.getHostAddress()
+                        + ", already represented by: " + CachedStatistics.getRepresentation(flow.getSourceAddress(), flow.getDestinationAddress()).getHostAddress());
                 return;
             }
         } catch (Exception e) {

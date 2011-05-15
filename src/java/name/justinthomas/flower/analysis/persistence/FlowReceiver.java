@@ -6,8 +6,10 @@ import com.sleepycat.je.EnvironmentConfig;
 import com.sleepycat.persist.EntityStore;
 import com.sleepycat.persist.StoreConfig;
 import java.io.File;
-import java.util.Date;
 import java.util.concurrent.TimeUnit;
+import javax.ejb.EJB;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.servlet.http.HttpServletRequest;
 import name.justinthomas.flower.analysis.element.Flow;
 
@@ -18,19 +20,24 @@ import name.justinthomas.flower.analysis.element.Flow;
 public class FlowReceiver {
 
     private static FrequencyManager frequencyManager;
-    private static ConfigurationManager configurationManager;
+    @EJB private ConfigurationManager configurationManager;
     private Environment environment;
 
     public FlowReceiver() {
-        if (configurationManager == null) {
-            configurationManager = ConfigurationManager.getConfigurationManager();
-        }
         if (frequencyManager == null) {
             frequencyManager = FrequencyManager.getFrequencyManager();
         }
     }
 
     private void setupEnvironment() {
+        if (configurationManager == null) {
+            try {
+                configurationManager = (ConfigurationManager) InitialContext.doLookup("java:global/Analysis/ConfigurationManager");
+            } catch (NamingException e) {
+                e.printStackTrace();
+            }
+        }
+        
         File environmentHome = new File(configurationManager.getBaseDirectory() + "/" + configurationManager.getFlowDirectory());
 
         try {

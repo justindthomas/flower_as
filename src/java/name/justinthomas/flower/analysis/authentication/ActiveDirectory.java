@@ -6,6 +6,7 @@ package name.justinthomas.flower.analysis.authentication;
 
 import java.util.HashMap;
 import java.util.Hashtable;
+import javax.ejb.EJB;
 import javax.naming.AuthenticationException;
 import javax.naming.CommunicationException;
 import javax.naming.Context;
@@ -51,7 +52,7 @@ public class ActiveDirectory {
     private String password = null;
     private String domain = null;
     private String distinguishedName = null;
-    private ConfigurationManager configurationManager = null;
+    @EJB private ConfigurationManager configurationManager;
     /*
     private void populateGroups() {
     this.directoryDomains = new HashMap();
@@ -67,7 +68,6 @@ public class ActiveDirectory {
      */
 
     public ActiveDirectory(String username, String password) {
-        this.configurationManager = ConfigurationManager.getConfigurationManager();
         this.username = username;
         this.password = password;
 

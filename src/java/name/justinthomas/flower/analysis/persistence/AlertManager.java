@@ -9,16 +9,16 @@ import com.sleepycat.persist.ForwardCursor;
 import com.sleepycat.persist.StoreConfig;
 import java.io.File;
 import java.util.ArrayList;
+import javax.ejb.EJB;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 
 public class AlertManager {
 
     private static final Integer DEBUG = 2;
+    @EJB
     private ConfigurationManager configurationManager;
 
-    public AlertManager() {
-        this.configurationManager = ConfigurationManager.getConfigurationManager();
-    }
-    
     public void addAlert(SnortAlert alert) {
         Environment environment;
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Alert", this.getStoreConfig(false));
@@ -81,7 +81,7 @@ public class AlertManager {
 
         ForwardCursor<SnortAlert> cursor = accessor.snortAlertsByDate.entities(start, true, end, true);
 
-        for(SnortAlert alert : cursor) {
+        for (SnortAlert alert : cursor) {
             alerts.add(alert);
         }
 
@@ -96,7 +96,7 @@ public class AlertManager {
         ArrayList<ModSecurityAlert> alerts = new ArrayList();
 
         System.out.println("Getting alerts from: " + constraints.startTime + " to: " + constraints.endTime);
-        
+
         Long start = constraints.startTime.getTime() / 1000;
         Long end = constraints.endTime.getTime() / 1000;
 
@@ -106,7 +106,7 @@ public class AlertManager {
 
         ForwardCursor<ModSecurityAlert> cursor = accessor.modSecurityAlertsByDate.entities(start, true, end, true);
 
-        for(ModSecurityAlert alert : cursor) {
+        for (ModSecurityAlert alert : cursor) {
             alerts.add(alert);
         }
 
@@ -118,6 +118,14 @@ public class AlertManager {
     }
 
     private Environment setupEnvironment() {
+        if (configurationManager == null) {
+            try {
+                configurationManager = (ConfigurationManager) InitialContext.doLookup("java:global/Analysis/ConfigurationManager");
+            } catch (NamingException e) {
+                e.printStackTrace();
+            }
+        }
+        
         File environmentHome = new File(configurationManager.getBaseDirectory() + "/" + configurationManager.getAlertDirectory());
 
         try {

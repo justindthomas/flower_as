@@ -15,6 +15,8 @@ import javax.ejb.EJB;
 import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebService;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import javax.xml.bind.annotation.XmlElement;
@@ -49,10 +51,7 @@ public class ChartData {
 
     @EJB
     ThreadManager threadManager;
-    //@EJB
-    //FlowManager flowManager;
-    @EJB
-    ConfigurationManager configurationManager;
+    
     @Resource
     private WebServiceContext serviceContext;
 
@@ -377,6 +376,7 @@ public class ChartData {
 
     @XmlType
     public static class FlowSet {
+
         @XmlElement
         public List<PersistentFlow> flows = new ArrayList();
         @XmlElement

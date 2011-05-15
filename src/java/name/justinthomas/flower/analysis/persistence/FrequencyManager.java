@@ -17,7 +17,7 @@ import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.PostConstruct;
-import javax.ejb.DependsOn;
+import javax.ejb.EJB;
 import javax.ejb.Lock;
 import javax.ejb.LockType;
 import javax.ejb.Singleton;
@@ -32,12 +32,11 @@ import javax.naming.NamingException;
  */
 @Singleton
 @Startup
-@DependsOn("ConfigurationManager")
 public class FrequencyManager {
 
     private static Integer DEBUG = 0;
     private File environmentHome = null;
-    private ConfigurationManager configurationManager;
+    @EJB private ConfigurationManager configurationManager;
     private final Map<String, Integer> map = Collections.synchronizedMap(new HashMap<String, Integer>());
 
     @PostConstruct
@@ -55,8 +54,6 @@ public class FrequencyManager {
     }
 
     private void setConfiguration() {
-        configurationManager = ConfigurationManager.getConfigurationManager();
-
         if (configurationManager == null) {
             System.err.println("ConfigurationManager is null");
         }

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.TimeZone;
 import javax.annotation.Resource;
 import javax.ejb.EJB;
 import javax.jws.WebMethod;
@@ -31,10 +32,7 @@ public class Administration {
 
     @Resource
     private WebServiceContext serviceContext;
-    @EJB
-    ConfigurationManager configurationManager;
-    //@EJB
-    UserManager userManager = new UserManager();
+    @EJB private ConfigurationManager configurationManager;
 
     @WebMethod(operationName = "addNetwork")
     public Boolean addNetwork(
@@ -143,13 +141,16 @@ public class Administration {
             @WebParam(name = "updatedUser") String updatedUser,
             @WebParam(name = "updatedPassword") String updatedPassword,
             @WebParam(name = "fullName") String fullName,
-            @WebParam(name = "administrator") Boolean administrator) {
+            @WebParam(name = "administrator") Boolean administrator,
+            @WebParam(name = "timeZone") String timeZone) {
 
         UserAction userAction = new UserAction();
         AuthenticationToken token = userAction.authenticate(user, password);
+        UserManager userManager = new UserManager();
+        
         if (token.authenticated && token.authorized && token.administrator) {
             if (userManager.getUser(updatedUser) == null) {
-                if (!userManager.updateUser(updatedUser, updatedPassword, fullName, administrator)) {
+                if (!userManager.updateUser(updatedUser, updatedPassword, fullName, administrator, timeZone)) {
                     return false;
                 }
             } else {
@@ -167,12 +168,15 @@ public class Administration {
             @WebParam(name = "updatedUser") String updatedUser,
             @WebParam(name = "updatedPassword") String updatedPassword,
             @WebParam(name = "fullName") String fullName,
-            @WebParam(name = "administrator") Boolean administrator) {
+            @WebParam(name = "administrator") Boolean administrator,
+            @WebParam(name = "timeZone") String timeZone) {
 
         UserAction userAction = new UserAction();
         AuthenticationToken token = userAction.authenticate(user, password);
+        
+        UserManager userManager = new UserManager();
         if (token.authenticated && token.authorized && token.administrator && (userManager.getUser(updatedUser) != null)) {
-            if (!userManager.updateUser(updatedUser, updatedPassword, fullName, administrator)) {
+            if (!userManager.updateUser(updatedUser, updatedPassword, fullName, administrator, timeZone)) {
                 return false;
             }
         } else {
@@ -191,6 +195,8 @@ public class Administration {
 
         UserAction userAction = new UserAction();
         AuthenticationToken token = userAction.authenticate(user, password);
+        
+        UserManager userManager = new UserManager();
         if (token.authenticated && token.authorized && token.administrator) {
             return userManager.deleteUser(deletedUser);
         }
@@ -206,6 +212,8 @@ public class Administration {
         List<PersistentUser> xusers = new ArrayList();
         UserAction userAction = new UserAction();
         AuthenticationToken token = userAction.authenticate(user, password);
+        
+        UserManager userManager = new UserManager();
         if (token.authenticated && token.authorized && token.administrator) {
             for (PersistentUser puser : userManager.getUsers()) {
                 xusers.add(puser.sanitize());

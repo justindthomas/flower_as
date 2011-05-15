@@ -12,6 +12,9 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Security;
 import java.util.ArrayList;
+import java.util.TimeZone;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 /**
@@ -22,6 +25,7 @@ public class UserManager {
 
     private static Integer DEBUG = 1;
     private Environment environment;
+    private static ConfigurationManager configurationManager;
 
     private void createFirstUser() {
         Security.addProvider(new BouncyCastleProvider());
@@ -38,7 +42,8 @@ public class UserManager {
 
         try {
             System.out.println("Creating first user (flower)");
-            updateUser(new PersistentUser("flower", new String(hash.digest()), "Administrator", true));
+            TimeZone PST = TimeZone.getTimeZone("PST");
+            updateUser(new PersistentUser("flower", new String(hash.digest()), "Administrator", true, "PST"));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -80,8 +85,8 @@ public class UserManager {
             user = accessor.userById.get(userName);
 
             entityStore.close();
-        } catch (DatabaseException e) {
-            System.err.println("DatabaseException in UserManager: " + e.getMessage());
+        } catch (Throwable t) {
+            System.err.println("Exception in UserManager: " + t.getMessage());
         } finally {
             closeEnvironment();
         }
@@ -89,7 +94,7 @@ public class UserManager {
         return user;
     }
 
-    public Boolean updateUser(String user, String password, String fullName, Boolean administrator) {
+    public Boolean updateUser(String user, String password, String fullName, Boolean administrator, String timeZone) {
 
         Security.addProvider(new BouncyCastleProvider());
         MessageDigest hash = null;
@@ -104,7 +109,7 @@ public class UserManager {
         }
 
         try {
-            updateUser(new PersistentUser(user, new String(hash.digest()), fullName, administrator));
+            updateUser(new PersistentUser(user, new String(hash.digest()), fullName, administrator, timeZone));
         } catch (Exception e) {
             e.printStackTrace();
             return false;
@@ -161,7 +166,15 @@ public class UserManager {
     }
 
     private void setupEnvironment() {
-        File environmentHome = new File(ConfigurationManager.getConfigurationManager().getBaseDirectory() + "/" + ConfigurationManager.getConfigurationManager().getUserDirectory());
+        if(configurationManager == null) {
+            try {
+                configurationManager = (ConfigurationManager) InitialContext.doLookup("java:global/Analysis/ConfigurationManager");
+            } catch (NamingException e) {
+                e.printStackTrace();
+            }
+        }
+        
+        File environmentHome = new File(configurationManager.getBaseDirectory() + "/" + configurationManager.getUserDirectory());
 
         if (!environmentHome.exists()) {
             if (environmentHome.mkdirs()) {

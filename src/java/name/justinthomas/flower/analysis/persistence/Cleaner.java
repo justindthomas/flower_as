@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.PostConstruct;
-import javax.ejb.DependsOn;
+import javax.ejb.EJB;
 import javax.ejb.Singleton;
 import javax.ejb.Startup;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
@@ -15,9 +15,8 @@ import name.justinthomas.flower.analysis.statistics.StatisticsManager;
  */
 @Singleton
 @Startup
-@DependsOn("ConfigurationManager")
 public class Cleaner implements Runnable {
-
+    
     private static Cleaner instance;
     private static ScheduledThreadPoolExecutor executor;
 

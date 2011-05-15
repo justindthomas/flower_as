@@ -21,4 +21,6 @@ public class AuthenticationToken {
     public String distinguishedName = null;
     @XmlElement
     public String fullName = null;
+    @XmlElement
+    public String timeZone = null;
 }
