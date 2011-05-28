@@ -1,5 +1,6 @@
 package name.justinthomas.flower.analysis.persistence;
 
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import com.sleepycat.je.CheckpointConfig;
 import com.sleepycat.je.DatabaseException;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
@@ -33,18 +34,18 @@ import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
 public class FlowManager {
 
     private static final Integer DEBUG = 2;
-    private ConfigurationManager configurationManager;
+    private GlobalConfigurationManager configurationManager;
 
     public FlowManager() {
         try {
-            configurationManager = InitialContext.doLookup("java:global/Analysis/ConfigurationManager");
+            configurationManager = InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
         } catch (NamingException e) {
             e.printStackTrace();
         }
     }
 
     private Environment setupEnvironment() {
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/" + configurationManager.getFlowDirectory());
+        File environmentHome = new File(configurationManager.getBaseDirectory() + "/flows");
 
         try {
             if (!environmentHome.exists()) {
@@ -300,7 +301,7 @@ public class FlowManager {
         System.out.println("Total flows deleted: " + deletedCount);
 
         closeStore(entityStore);
-        recordEnvironmentStatistics(environment);
+        //recordEnvironmentStatistics(environment);
         cleanLog(environment);
         checkpoint(environment);
         closeEnvironment(environment);

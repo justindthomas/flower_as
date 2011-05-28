@@ -1,13 +1,15 @@
 package name.justinthomas.flower.analysis.persistence;
 
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
 import com.sleepycat.persist.EntityStore;
 import com.sleepycat.persist.StoreConfig;
 import java.io.File;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
-import javax.ejb.EJB;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.servlet.http.HttpServletRequest;
@@ -20,7 +22,7 @@ import name.justinthomas.flower.analysis.element.Flow;
 public class FlowReceiver {
 
     private static FrequencyManager frequencyManager;
-    @EJB private ConfigurationManager configurationManager;
+    private static GlobalConfigurationManager globalConfigurationManager;
     private Environment environment;
 
     public FlowReceiver() {
@@ -30,15 +32,15 @@ public class FlowReceiver {
     }
 
     private void setupEnvironment() {
-        if (configurationManager == null) {
+        if (globalConfigurationManager == null) {
             try {
-                configurationManager = (ConfigurationManager) InitialContext.doLookup("java:global/Analysis/ConfigurationManager");
+                globalConfigurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
             } catch (NamingException e) {
                 e.printStackTrace();
             }
         }
-        
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/" + configurationManager.getFlowDirectory());
+
+        File environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/flows");
 
         try {
             if (!environmentHome.exists()) {
@@ -111,5 +113,55 @@ public class FlowReceiver {
         }
 
         return pflow.id;
+    }
+
+    public LinkedList<Long> addFlows(LinkedList<Flow> flows) {
+        return this.addFlows(flows, null);
+    }
+
+    public LinkedList<Long> addFlows(LinkedList<Flow> flows, HttpServletRequest request) {
+        LinkedList<Long> ids = new LinkedList();
+
+        try {
+            setupEnvironment();
+
+            EntityStore entityStore = null;
+            StoreConfig storeConfig = new StoreConfig();
+            storeConfig.setAllowCreate(true);
+            storeConfig.setReadOnly(false);
+            //storeConfig.setDeferredWrite(true);
+
+            entityStore = new EntityStore(environment, "Flow", storeConfig);
+            try {
+                FlowAccessor dataAccessor = new FlowAccessor(entityStore);
+                //System.out.println("Putting flow with start date: " + new Date(pflow.getStartTimeStampMs()));
+                for (Flow flow : flows) {
+                    if ((flow.protocol == 6) || (flow.protocol == 17)) {
+                        frequencyManager.addPort(flow.protocol, flow.ports);
+                    }
+
+                    PersistentFlow pflow = flow.toHashTableFlow();
+                    dataAccessor.flowById.put(pflow);
+
+                    ids.add(pflow.id);
+                }
+            } catch (DatabaseException e) {
+                System.err.println("addFlows Failed: " + e.getMessage());
+                if (request != null) {
+                    System.err.println("Requester: " + request.getRemoteAddr());
+                }
+            } finally {
+                entityStore.close();
+            }
+        } catch (DatabaseException e) {
+            System.err.println("Database Error: " + e.getMessage());
+            if (request != null) {
+                System.err.println("Requester: " + request.getRemoteAddr());
+            }
+        } finally {
+            closeEnvironment();
+        }
+
+        return ids;
     }
 }

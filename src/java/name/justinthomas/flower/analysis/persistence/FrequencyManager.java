@@ -4,6 +4,7 @@
  */
 package name.justinthomas.flower.analysis.persistence;
 
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
 import com.sleepycat.persist.EntityStore;
@@ -36,7 +37,7 @@ public class FrequencyManager {
 
     private static Integer DEBUG = 0;
     private File environmentHome = null;
-    @EJB private ConfigurationManager configurationManager;
+    @EJB private GlobalConfigurationManager globalConfigurationManager;
     private final Map<String, Integer> map = Collections.synchronizedMap(new HashMap<String, Integer>());
 
     @PostConstruct
@@ -54,13 +55,12 @@ public class FrequencyManager {
     }
 
     private void setConfiguration() {
-        if (configurationManager == null) {
+        if (globalConfigurationManager == null) {
             System.err.println("ConfigurationManager is null");
         }
 
         if (environmentHome == null) {
-            environmentHome = new File(configurationManager.getBaseDirectory() + "/"
-                    + configurationManager.getFrequencyDirectory());
+            environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/frequency");
 
             //System.out.println("Frequency Directory: " + environmentHome);
             try {

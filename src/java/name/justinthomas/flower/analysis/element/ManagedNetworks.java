@@ -3,10 +3,8 @@ package name.justinthomas.flower.analysis.element;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.LinkedHashMap;
-import java.util.Map.Entry;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
-import name.justinthomas.flower.analysis.persistence.ConfigurationManager;
+import name.justinthomas.flower.analysis.persistence.ManagedNetwork;
+import name.justinthomas.flower.analysis.persistence.ManagedNetworkManager;
 import name.justinthomas.flower.utility.AddressAnalysis;
 
 public class ManagedNetworks {
@@ -39,20 +37,16 @@ public class ManagedNetworks {
     }
 
     private void populate() {
-        try {
-            ConfigurationManager configurationManager = (ConfigurationManager) InitialContext.doLookup("java:global/Analysis/ConfigurationManager");
-            for (Entry<String, String> entry : configurationManager.getManagedNetworks().entrySet()) {
-                //System.out.println("Network ID: " + e.getValue());
+        ManagedNetworkManager mnm = new ManagedNetworkManager();
+        for (ManagedNetwork network : mnm.getManagedNetworks()) {
+            //System.out.println("Network ID: " + e.getValue());
 
-                String[] parts = entry.getKey().split("/");
-                try {
-                    addNetwork(entry.getValue(), new InetNetwork(InetAddress.getByName(parts[0].trim()), Integer.valueOf(parts[1].trim()), entry.getValue()));
-                } catch (UnknownHostException uhe) {
-                    System.err.println("Unable to parse address: " + uhe.getMessage());
-                }
+            String[] parts = network.address.split("/");
+            try {
+                addNetwork(network.description, new InetNetwork(InetAddress.getByName(parts[0].trim()), Integer.valueOf(parts[1].trim()), network.description));
+            } catch (UnknownHostException uhe) {
+                System.err.println("Unable to parse address: " + uhe.getMessage());
             }
-        } catch (NamingException e) {
-            e.printStackTrace();
         }
     }
 }

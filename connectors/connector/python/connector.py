@@ -58,7 +58,7 @@ def startup():
 	stop_nicely()
 
 if __name__ == "__main__":
-	parser = optparse.OptionParser(description="Netflow to Flower connector", usage="usage: %prog [options] server")
+	parser = optparse.OptionParser(description="Netflow to Flower connector", usage="usage: %prog [options] customer_id server")
 	parser.add_option("-n", "--no-ssl", help="don't use HTTPS to connect to the server", action="store_false", dest="ssl", default=True)
 	parser.add_option("-r", "--remote", help="specify the remote TCP server port (default: 8080)", dest="remote", default="8080")
 	parser.add_option("-f", "--netflow-port", help="specify the local UDP listen port to receive netflows (default: 9995)", dest="netflow_port", default="9995")
@@ -107,14 +107,14 @@ if __name__ == "__main__":
 		stop_nicely()
 		daemon.stop()
 	else:
-		if len(args) != 1:
-			parser.error("Please specify the name or address of a Flower Analysis Server")
+		if len(args) != 2:
+			parser.error("Please specify your customer ID and the name or address of a Flower Analysis Server")
 
 		if(options.debug):
 			logger.debug("Debugging enabled")
 
 		logger.info("Starting Netflow collector...")
-		logger.info("Flower Analysis Server: " + args[0] + ":" + options.remote)
+		logger.info("Flower Analysis Server: " + args[1] + ":" + options.remote)
 		logger.info("Listening on UDP port: " + options.netflow_port)
 		if(not options.ssl):
 			logger.info("SSL Disabled")

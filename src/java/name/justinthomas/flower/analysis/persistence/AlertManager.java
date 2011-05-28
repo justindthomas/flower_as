@@ -1,5 +1,6 @@
 package name.justinthomas.flower.analysis.persistence;
 
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import com.sleepycat.je.CheckpointConfig;
 import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.Environment;
@@ -17,7 +18,7 @@ public class AlertManager {
 
     private static final Integer DEBUG = 2;
     @EJB
-    private ConfigurationManager configurationManager;
+    private GlobalConfigurationManager configurationManager;
 
     public void addAlert(SnortAlert alert) {
         Environment environment;
@@ -120,13 +121,13 @@ public class AlertManager {
     private Environment setupEnvironment() {
         if (configurationManager == null) {
             try {
-                configurationManager = (ConfigurationManager) InitialContext.doLookup("java:global/Analysis/ConfigurationManager");
+                configurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
             } catch (NamingException e) {
                 e.printStackTrace();
             }
         }
         
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/" + configurationManager.getAlertDirectory());
+        File environmentHome = new File(configurationManager.getBaseDirectory() + "/alerts");
 
         try {
             if (!environmentHome.exists()) {

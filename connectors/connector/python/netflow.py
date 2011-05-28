@@ -38,8 +38,8 @@ class TransferThread(Thread):
 			if(self.options.ssl):
 				protocol = "https://"
 				
-			self.logger.debug("Connecting to: " + protocol + self.args[0] + ":" + self.options.remote + "/flower/analysis/FlowInsertService?wsdl")
-			client = Client(protocol + self.args[0] + ":" + self.options.remote + "/flower/analysis/FlowInsertService?wsdl")
+			self.logger.debug("Connecting to: " + protocol + self.args[1] + ":" + self.options.remote + "/flower/analysis/FlowInsertService?wsdl")
+			client = Client(protocol + self.args[1] + ":" + self.options.remote + "/flower/analysis/FlowInsertService?wsdl")
 			
 			while(not netflow_normalized_queue.empty()):
 				flows = []
@@ -61,7 +61,7 @@ class TransferThread(Thread):
 				
 				if(len(flows) > 0):
 					self.logger.debug("Preparing to send flow list of size: " + str(len(str(flows))))
-					if(client.service.addFlows(flows) != 0):
+					if(client.service.addFlows(self.args[0], flows) != 0):
 						self.logger.error("Unexpected response from Analysis Server while attempting to add new flows")
 					else:
 						self.logger.debug("Server confirmed successful transmission of netflow data.")

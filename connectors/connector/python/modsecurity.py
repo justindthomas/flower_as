@@ -42,7 +42,7 @@ class ModSecurityTransferThread(Thread):
 				protocol = "http://"
 				if(self.options.ssl):
 					protocol = "https://"
-				ws = protocol + self.args[0] + ":" + self.options.remote + "/flower/analysis/AlertsService?wsdl"
+				ws = protocol + self.args[1] + ":" + self.options.remote + "/flower/analysis/AlertsService?wsdl"
 				
 				self.logger.debug("Preparing to send mod_security alerts to: " + ws)
 				client = Client(ws)
@@ -112,7 +112,7 @@ class ModSecurityQueueProcessor(Thread):
 				protocol = "http://"
 				if(self.options.ssl):
 					protocol = "https://"
-				ws = protocol + self.args[0] + ":" + self.options.remote + "/flower/analysis/AlertsService?wsdl"
+				ws = protocol + self.args[1] + ":" + self.options.remote + "/flower/analysis/AlertsService?wsdl"
 				
 				client = Client(ws)
 				palert = client.factory.create("modSecurityAlert")

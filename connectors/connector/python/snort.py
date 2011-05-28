@@ -101,7 +101,7 @@ class SnortQueueProcessor(Thread):
 		self.logger.debug("Snort alert queue contains: " + str(snort_alert_queue.qsize()) + " entries")
 		palerts = []
 		
-		ws = 'http://' + self.args[0] + ':' + self.options.remote + '/flower/analysis/AlertsService?wsdl'
+		ws = 'http://' + self.args[1] + ':' + self.options.remote + '/flower/analysis/AlertsService?wsdl'
 		self.logger.debug('Connecting to web service: ' + ws + " for Snort alerts")
 		
 		try:

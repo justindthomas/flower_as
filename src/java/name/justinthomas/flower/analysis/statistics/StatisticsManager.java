@@ -33,7 +33,7 @@ import name.justinthomas.flower.analysis.element.InetNetwork;
 import name.justinthomas.flower.analysis.element.ManagedNetworks;
 import name.justinthomas.flower.analysis.element.Network;
 import name.justinthomas.flower.analysis.element.Node;
-import name.justinthomas.flower.analysis.persistence.ConfigurationManager;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.analysis.persistence.Constraints;
 import name.justinthomas.flower.utility.AddressAnalysis;
 
@@ -43,13 +43,13 @@ import name.justinthomas.flower.utility.AddressAnalysis;
  */
 public class StatisticsManager {
 
-    private static ConfigurationManager configurationManager;
+    private static GlobalConfigurationManager configurationManager;
     private static final Integer DEBUG = 1;
 
     public StatisticsManager() {
         try {
             if (configurationManager == null) {
-                StatisticsManager.configurationManager = InitialContext.doLookup("java:global/Analysis/ConfigurationManager");
+                StatisticsManager.configurationManager = InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
             }
         } catch (NamingException e) {
             e.printStackTrace();
@@ -58,7 +58,7 @@ public class StatisticsManager {
 
     private Environment setupEnvironment() {
 
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/" + configurationManager.getStatisticsDirectory());
+        File environmentHome = new File(configurationManager.getBaseDirectory() + "/statistics");
 
         try {
             if (!environmentHome.exists()) {
@@ -139,7 +139,7 @@ public class StatisticsManager {
         System.out.println("Null flow IDs found in StatisticalIntervals: " + nullIDs);
 
         closeStore(entityStore);
-        recordEnvironmentStatistics(environment);
+        //recordEnvironmentStatistics(environment);
         cleanLog(environment);
         checkpoint(environment);
         closeEnvironment(environment);
@@ -211,7 +211,7 @@ public class StatisticsManager {
             e.printStackTrace();
         }
 
-        for (Long resolution : configurationManager.getResolution().keySet()) {
+        for (Long resolution : configurationManager.getResolutionMap().keySet()) {
             HashMap<IntervalKey, StatisticalInterval> normalized = flowToInterval(flow, resolution, flowID);
 
             for (Entry<IntervalKey, StatisticalInterval> entry : normalized.entrySet()) {
@@ -222,7 +222,7 @@ public class StatisticsManager {
     }
 
     private Long getResolution(long duration, Integer bins) {
-        List<Long> resolutions = new ArrayList(configurationManager.getResolution().keySet());
+        List<Long> resolutions = new ArrayList(configurationManager.getResolutionMap().keySet());
 
         // This sorts the resolutions from highest to lowest (smallest number to largest number)
         Collections.sort(resolutions);
@@ -678,7 +678,7 @@ public class StatisticsManager {
 
         HashMap<IntervalKey, Boolean> expiredIntervals = new HashMap();
 
-        for (Entry<Long, Boolean> resolution : configurationManager.getResolution().entrySet()) {
+        for (Entry<Long, Boolean> resolution : configurationManager.getResolutionMap().entrySet()) {
             IntervalKey startKey = new IntervalKey();
             startKey.resolution = resolution.getKey();
             startKey.interval = start.getTime() / resolution.getKey();

@@ -1,4 +1,4 @@
-package name.justinthomas.flower.analysis.services;
+package name.justinthomas.flower.analysis.authentication;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -12,8 +12,8 @@ import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import name.justinthomas.flower.analysis.authentication.ActiveDirectory;
 import name.justinthomas.flower.analysis.authentication.AuthenticationToken;
-import name.justinthomas.flower.analysis.persistence.PersistentUser;
-import name.justinthomas.flower.analysis.persistence.UserManager;
+import name.justinthomas.flower.analysis.authentication.User;
+import name.justinthomas.flower.analysis.authentication.UserManager;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 /**
@@ -64,7 +64,7 @@ public class UserAction {
         UserManager userManager = new UserManager();
         
         if ((username != null) && (password != null) && (userManager != null)) {
-            PersistentUser user = userManager.getUser(username);
+            User user = userManager.getUser(username);
             if (user == null) {
                 System.out.println("Invalid User: " + username);
                 return token;

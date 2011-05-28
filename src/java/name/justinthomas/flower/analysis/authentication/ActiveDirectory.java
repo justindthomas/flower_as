@@ -4,12 +4,12 @@
  */
 package name.justinthomas.flower.analysis.authentication;
 
-import java.util.HashMap;
 import java.util.Hashtable;
-import javax.ejb.EJB;
+import java.util.Map;
 import javax.naming.AuthenticationException;
 import javax.naming.CommunicationException;
 import javax.naming.Context;
+import javax.naming.InitialContext;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import javax.naming.directory.Attribute;
@@ -21,7 +21,7 @@ import javax.naming.directory.SearchResult;
 import javax.naming.ldap.Control;
 import javax.naming.ldap.InitialLdapContext;
 import javax.naming.ldap.LdapContext;
-import name.justinthomas.flower.analysis.persistence.ConfigurationManager;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 
 /**
  *
@@ -52,22 +52,18 @@ public class ActiveDirectory {
     private String password = null;
     private String domain = null;
     private String distinguishedName = null;
-    @EJB private ConfigurationManager configurationManager;
-    /*
-    private void populateGroups() {
-    this.directoryDomains = new HashMap();
-
-    HashMap<String, Boolean> groups = new HashMap();
-    groups.put("Flower", false);
-    groups.put("Flower-Privileged", true);
-
-    this.directoryDomains.put("internal.jdthomas.net", groups);
-    System.out.println("DirectoryDomains has: " + directoryDomains.get("internal.jdthomas.net").keySet().size() + " groups");
-    }
-     *
-     */
+    private static GlobalConfigurationManager configurationManager;
+    private DirectoryDomainManager directoryDomainManager = new DirectoryDomainManager();
 
     public ActiveDirectory(String username, String password) {
+        if(configurationManager == null) {
+            try {
+                configurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+            } catch (NamingException e) {
+                e.printStackTrace();
+            }
+        }
+        
         this.username = username;
         this.password = password;
 
@@ -251,37 +247,38 @@ public class ActiveDirectory {
                 ctx = new InitialLdapContext(env, null);
             }
         } else {
-            for (String item : configurationManager.getDirectoryDomains().keySet()) {
-                System.out.println("Trying: " + username + "@" + item);
-                env.put(Context.SECURITY_PRINCIPAL, username + "@" + item);
-                String url = getLdapServer(item) + ":636";
+            for (DirectoryDomain item : directoryDomainManager.getDirectoryDomains()) {
+                System.out.println("Trying: " + username + "@" + item.domain);
+                env.put(Context.SECURITY_PRINCIPAL, username + "@" + item.domain);
+                String url = getLdapServer(item.domain) + ":636";
                 if (url != null) {
                     env.put(Context.PROVIDER_URL, url);
                     try {
                         ctx = new InitialLdapContext(env, null);
                     } catch (AuthenticationException e) {
-                        System.out.println("Failed: " + item);
+                        System.out.println("Failed: " + item.domain);
                         continue;
                     } catch (CommunicationException e) {
-                        System.err.println("Failed: " + item + " / " + e.getExplanation());
+                        System.err.println("Failed: " + item.domain + " / " + e.getExplanation());
+                        System.err.println("This is probably due to a certificate error.");
 
-                        if (configurationManager.getConfiguration().unsafeLdap) {
+                        if (configurationManager.getUnsafeLdap()) {
                             System.err.println("Attempting unencrypted authentication...");
-                            ctx = tryUnsafe(item, ctx, env);
+                            ctx = tryUnsafe(item.domain, ctx, env);
                         }
 
                         if (domain != null) {
-                            System.err.println("Unencrypted authentication was successful against: " + item);
+                            System.err.println("Unencrypted authentication was successful against: " + item.domain);
                             break;
                         }
 
                         continue;
                     } catch (NamingException e) {
-                        System.out.println("Failed: " + item + " / " + e.getExplanation());
+                        System.out.println("Failed: " + item.domain + " / " + e.getExplanation());
                         continue;
                     }
-                    this.domain = item;
-                    System.out.println("Authentication seems to have succeeded against: " + item);
+                    this.domain = item.domain;
+                    System.out.println("Authentication seems to have succeeded against: " + item.domain);
                     break;
                 }
             }
@@ -308,7 +305,7 @@ public class ActiveDirectory {
 
     private AuthenticationToken authorize(LdapContext ctx, String domain, AuthenticationToken token) {
         //System.out.println("Getting groups for: " + domain);
-        HashMap<String, Boolean> groups = configurationManager.getDirectoryDomains().get(domain);
+        Map<String, Boolean> groups = directoryDomainManager.getDirectoryDomain(domain).groups;
 
         for (String group : groups.keySet()) {
             //System.out.println("\tEvaluating: " + group);

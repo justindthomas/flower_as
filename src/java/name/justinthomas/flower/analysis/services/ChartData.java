@@ -1,5 +1,6 @@
 package name.justinthomas.flower.analysis.services;
 
+import name.justinthomas.flower.analysis.authentication.UserAction;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.security.MessageDigest;
@@ -30,7 +31,7 @@ import name.justinthomas.flower.analysis.persistence.FlowManager;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetwork;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
 import name.justinthomas.flower.analysis.element.ManagedNetworks;
-import name.justinthomas.flower.analysis.persistence.ConfigurationManager;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.analysis.persistence.Constraints;
 import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.persistence.SessionManager;

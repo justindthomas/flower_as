@@ -3,11 +3,10 @@
  * and open the template in the editor.
  */
 
-package name.justinthomas.flower.analysis.persistence;
+package name.justinthomas.flower.analysis.authentication;
 
 import com.sleepycat.persist.model.Entity;
 import com.sleepycat.persist.model.PrimaryKey;
-import java.util.TimeZone;
 import javax.xml.bind.annotation.XmlType;
 
 /**
@@ -16,7 +15,7 @@ import javax.xml.bind.annotation.XmlType;
  */
 @Entity
 @XmlType
-public class PersistentUser {
+public class User {
 
     @PrimaryKey
     public String username;
@@ -25,9 +24,9 @@ public class PersistentUser {
     public Boolean administrator;
     public String timeZone;
 
-    private PersistentUser() { }
+    private User() { }
 
-    public PersistentUser(String username, String hashedPassword, String fullName, Boolean administrator, String timeZone) {
+    public User(String username, String hashedPassword, String fullName, Boolean administrator, String timeZone) {
         this.username = username;
         this.hashedPassword = hashedPassword;
         this.fullName = fullName;
@@ -35,7 +34,7 @@ public class PersistentUser {
         this.timeZone = timeZone;
     }
     
-    public PersistentUser sanitize() {
+    public User sanitize() {
         hashedPassword = null;
         return this;
     }

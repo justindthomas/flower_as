@@ -4,8 +4,6 @@
  */
 package name.justinthomas.flower.analysis.authentication;
 
-import name.justinthomas.flower.analysis.services.UserAction;
-
 /**
  *
  * @author justin

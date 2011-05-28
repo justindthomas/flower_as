@@ -1,5 +1,6 @@
-package name.justinthomas.flower.analysis.persistence;
+package name.justinthomas.flower.analysis.authentication;
 
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
@@ -25,7 +26,7 @@ public class UserManager {
 
     private static Integer DEBUG = 1;
     private Environment environment;
-    private static ConfigurationManager configurationManager;
+    private static GlobalConfigurationManager configurationManager;
 
     private void createFirstUser() {
         Security.addProvider(new BouncyCastleProvider());
@@ -43,7 +44,7 @@ public class UserManager {
         try {
             System.out.println("Creating first user (flower)");
             TimeZone PST = TimeZone.getTimeZone("PST");
-            updateUser(new PersistentUser("flower", new String(hash.digest()), "Administrator", true, "PST"));
+            updateUser(new User("flower", new String(hash.digest()), "Administrator", true, "PST"));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -71,9 +72,9 @@ public class UserManager {
         return deleted;
     }
 
-    public PersistentUser getUser(String userName) {
+    public User getUser(String userName) {
         setupEnvironment();
-        PersistentUser user = null;
+        User user = null;
 
         try {
             StoreConfig storeConfig = new StoreConfig();
@@ -109,7 +110,7 @@ public class UserManager {
         }
 
         try {
-            updateUser(new PersistentUser(user, new String(hash.digest()), fullName, administrator, timeZone));
+            updateUser(new User(user, new String(hash.digest()), fullName, administrator, timeZone));
         } catch (Exception e) {
             e.printStackTrace();
             return false;
@@ -117,7 +118,7 @@ public class UserManager {
         return true;
     }
 
-    private void updateUser(PersistentUser user) {
+    private void updateUser(User user) {
         System.out.println("Updating User: " + user.username);
 
         setupEnvironment();
@@ -137,9 +138,9 @@ public class UserManager {
         }
     }
 
-    public ArrayList<PersistentUser> getUsers() {
+    public ArrayList<User> getUsers() {
         setupEnvironment();
-        ArrayList<PersistentUser> users = new ArrayList<PersistentUser>();
+        ArrayList<User> users = new ArrayList<User>();
 
         try {
             StoreConfig storeConfig = new StoreConfig();
@@ -148,9 +149,9 @@ public class UserManager {
             EntityStore entityStore = new EntityStore(environment, "User", storeConfig);
             UserAccessor accessor = new UserAccessor(entityStore);
 
-            ForwardCursor<PersistentUser> cursor = accessor.userById.entities();
+            ForwardCursor<User> cursor = accessor.userById.entities();
 
-            for(PersistentUser user : cursor) {
+            for(User user : cursor) {
                 users.add(user);
             }
 
@@ -168,13 +169,13 @@ public class UserManager {
     private void setupEnvironment() {
         if(configurationManager == null) {
             try {
-                configurationManager = (ConfigurationManager) InitialContext.doLookup("java:global/Analysis/ConfigurationManager");
+                configurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
             } catch (NamingException e) {
                 e.printStackTrace();
             }
         }
         
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/" + configurationManager.getUserDirectory());
+        File environmentHome = new File(configurationManager.getBaseDirectory() + "/users");
 
         if (!environmentHome.exists()) {
             if (environmentHome.mkdirs()) {

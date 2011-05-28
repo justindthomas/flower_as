@@ -1,15 +1,14 @@
 package name.justinthomas.flower.analysis.services;
 
+import name.justinthomas.flower.analysis.authentication.UserAction;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Resource;
-import javax.ejb.EJB;
 import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebService;
 import javax.xml.ws.WebServiceContext;
 import name.justinthomas.flower.analysis.persistence.AlertManager;
-import name.justinthomas.flower.analysis.persistence.ConfigurationManager;
 import name.justinthomas.flower.analysis.persistence.Constraints;
 import name.justinthomas.flower.analysis.persistence.ModSecurityAlert;
 import name.justinthomas.flower.analysis.persistence.SnortAlert;
@@ -23,7 +22,6 @@ public class Alerts {
 
     @Resource
     private WebServiceContext serviceContext;
-    @EJB private ConfigurationManager configurationManager;
 
     @WebMethod(operationName = "addSnortAlerts")
     public Integer addSnortAlerts(
