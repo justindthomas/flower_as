@@ -19,6 +19,7 @@ public class GlobalConfigurationManager {
     private Map<Long, Boolean> resolutionMap = null;
     private Properties properties;
     private Boolean unsafeLdap;
+    private String manager;
 
     @PostConstruct
     public void init() {
@@ -40,6 +41,7 @@ public class GlobalConfigurationManager {
         }
 
         unsafeLdap = Boolean.parseBoolean(properties.getProperty("unsafeLdap").trim());
+        manager = properties.getProperty("manager");
     }
 
     public String getBaseDirectory() {
@@ -64,5 +66,13 @@ public class GlobalConfigurationManager {
 
     public void setResolutionMap(Map<Long, Boolean> resolutionMap) {
         this.resolutionMap = resolutionMap;
+    }
+
+    public String getManager() {
+        return manager;
+    }
+
+    public void setManager(String manager) {
+        this.manager = manager;
     }
 }

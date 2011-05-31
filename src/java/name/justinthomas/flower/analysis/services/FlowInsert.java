@@ -1,6 +1,8 @@
 package name.justinthomas.flower.analysis.services;
 
 import java.net.InetAddress;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -8,6 +10,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import javax.annotation.Resource;
+import javax.ejb.EJB;
 import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebService;
@@ -18,6 +21,7 @@ import name.justinthomas.flower.analysis.element.Flow;
 import name.justinthomas.flower.analysis.persistence.FlowReceiver;
 import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.Customer;
 import name.justinthomas.flower.manager.services.Customer.Collectors;
 import name.justinthomas.flower.manager.services.CustomerAdministration;
@@ -32,6 +36,8 @@ public class FlowInsert {
 
     @Resource
     WebServiceContext context;
+    @EJB
+    GlobalConfigurationManager globalConfigurationManager;
 
     @WebMethod(operationName = "addFlows")
     public Integer addFlows(
@@ -44,13 +50,21 @@ public class FlowInsert {
         String address = request.getRemoteAddr();
         System.out.println("Request received from: " + address);
 
-        CustomerAdministrationService admin = new CustomerAdministrationService();
-        CustomerAdministration port = admin.getCustomerAdministrationPort();
-        Customer customer = port.getCustomer(null, null, customerID);
+        Customer customer = null;
+        
+        try {
+            CustomerAdministrationService admin = new CustomerAdministrationService(new URL(globalConfigurationManager.getManager() + "/CustomerAdministrationService?wsdl"));
+
+            CustomerAdministration port = admin.getCustomerAdministrationPort();
+            customer = port.getCustomer(null, null, customerID);
+        } catch (MalformedURLException e) {
+            System.err.println("Could not access Customer Administration service.");
+            return 1;
+        }
 
         Boolean found = false;
-        for(Collectors.Entry entry : customer.getCollectors().getEntry()) {
-            if(entry.getKey().equals(address)) {
+        for (Collectors.Entry entry : customer.getCollectors().getEntry()) {
+            if (entry.getKey().equals(address)) {
                 found = true;
                 break;
             }
@@ -107,7 +121,7 @@ public class FlowInsert {
             Iterator<Long> idIterator = flowIDs.iterator();
             Iterator<Flow> flowIterator = converted.iterator();
 
-            while(idIterator.hasNext()) {
+            while (idIterator.hasNext()) {
                 flows.put(idIterator.next(), flowIterator.next());
             }
 
