@@ -8,12 +8,12 @@ import com.sleepycat.persist.EntityStore;
 import com.sleepycat.persist.StoreConfig;
 import java.io.File;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.servlet.http.HttpServletRequest;
 import name.justinthomas.flower.analysis.element.Flow;
+import name.justinthomas.flower.manager.services.Customer;
 
 /**
  *
@@ -31,16 +31,16 @@ public class FlowReceiver {
         }
     }
 
-    private void setupEnvironment() {
+    private void setupEnvironment(Customer customer) throws Exception {
         if (globalConfigurationManager == null) {
             try {
                 globalConfigurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
             } catch (NamingException e) {
-                e.printStackTrace();
+                throw new Exception("Error retrieving GlobalConfigurationManager in FlowReceiver: " + e.getMessage());
             }
         }
 
-        File environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/flows");
+        File environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/flows");
 
         try {
             if (!environmentHome.exists()) {
@@ -70,11 +70,11 @@ public class FlowReceiver {
         }
     }
 
-    public Long addFlow(Flow flow) {
-        return this.addFlow(flow, null);
+    public Long addFlow(Customer customer, Flow flow) {
+        return this.addFlow(customer, flow, null);
     }
 
-    public Long addFlow(Flow flow, HttpServletRequest request) {
+    public Long addFlow(Customer customer, Flow flow, HttpServletRequest request) {
         if ((flow.protocol == 6) || (flow.protocol == 17)) {
             frequencyManager.addPort(flow.protocol, flow.ports);
         }
@@ -82,7 +82,7 @@ public class FlowReceiver {
         PersistentFlow pflow = flow.toHashTableFlow();
 
         try {
-            setupEnvironment();
+            setupEnvironment(customer);
 
             EntityStore entityStore = null;
             StoreConfig storeConfig = new StoreConfig();
@@ -108,6 +108,8 @@ public class FlowReceiver {
             if (request != null) {
                 System.err.println("Requester: " + request.getRemoteAddr());
             }
+        } catch (Exception e) {
+            System.err.println(e.getMessage());
         } finally {
             closeEnvironment();
         }
@@ -115,15 +117,15 @@ public class FlowReceiver {
         return pflow.id;
     }
 
-    public LinkedList<Long> addFlows(LinkedList<Flow> flows) {
-        return this.addFlows(flows, null);
+    public LinkedList<Long> addFlows(Customer customer, LinkedList<Flow> flows) {
+        return this.addFlows(customer, flows, null);
     }
 
-    public LinkedList<Long> addFlows(LinkedList<Flow> flows, HttpServletRequest request) {
+    public LinkedList<Long> addFlows(Customer customer, LinkedList<Flow> flows, HttpServletRequest request) {
         LinkedList<Long> ids = new LinkedList();
 
         try {
-            setupEnvironment();
+            setupEnvironment(customer);
 
             EntityStore entityStore = null;
             StoreConfig storeConfig = new StoreConfig();
@@ -158,6 +160,8 @@ public class FlowReceiver {
             if (request != null) {
                 System.err.println("Requester: " + request.getRemoteAddr());
             }
+        } catch (Exception e) {
+            System.err.println(e.getMessage());
         } finally {
             closeEnvironment();
         }

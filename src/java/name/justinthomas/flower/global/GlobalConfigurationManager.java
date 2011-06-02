@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Properties;
 import javax.annotation.PostConstruct;
 import javax.ejb.Singleton;
+import name.justinthomas.flower.analysis.statistics.CachedStatistics;
 
 /**
  *
@@ -15,8 +16,10 @@ import javax.ejb.Singleton;
 @Singleton
 public class GlobalConfigurationManager {
 
-    private String baseDirectory = null;
-    private Map<Long, Boolean> resolutionMap = null;
+    private String baseDirectory;
+    private Map<Long, Boolean> resolutionMap;
+    // <customer_id, CachedStatistics>
+    private Map<String, CachedStatistics> cachedStatisticsMap;
     private Properties properties;
     private Boolean unsafeLdap;
     private String manager;
@@ -39,6 +42,8 @@ public class GlobalConfigurationManager {
         for(String resolution : resolutions) {
             resolutionMap.put(Long.valueOf(resolution.trim()), true);
         }
+        
+        cachedStatisticsMap = new HashMap();
 
         unsafeLdap = Boolean.parseBoolean(properties.getProperty("unsafeLdap").trim());
         manager = properties.getProperty("manager");
@@ -74,5 +79,21 @@ public class GlobalConfigurationManager {
 
     public void setManager(String manager) {
         this.manager = manager;
+    }
+
+    public Map<String, CachedStatistics> getCachedStatisticsMap() {
+        return cachedStatisticsMap;
+    }
+
+    public void setCachedStatisticsMap(Map<String, CachedStatistics> cachedStatisticsMap) {
+        this.cachedStatisticsMap = cachedStatisticsMap;
+    }
+    
+    public CachedStatistics getCachedStatistics(String customerID) {
+        return this.cachedStatisticsMap.get(customerID);
+    }
+    
+    public void setCachedStatistics(String customerID, CachedStatistics cachedStatistics) {
+        this.cachedStatisticsMap.put(customerID, cachedStatistics);
     }
 }

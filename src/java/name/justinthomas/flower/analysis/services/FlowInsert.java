@@ -51,34 +51,40 @@ public class FlowInsert {
         System.out.println("Request received from: " + address);
 
         Customer customer = null;
-        
+
         try {
             CustomerAdministrationService admin = new CustomerAdministrationService(new URL(globalConfigurationManager.getManager() + "/CustomerAdministrationService?wsdl"));
 
             CustomerAdministration port = admin.getCustomerAdministrationPort();
             customer = port.getCustomer(null, null, customerID);
         } catch (MalformedURLException e) {
-            System.err.println("Could not access Customer Administration service.");
+            System.err.println("Could not access Customer Administration service at: " + globalConfigurationManager.getManager());
             return 1;
         }
 
-        Boolean found = false;
-        for (Collectors.Entry entry : customer.getCollectors().getEntry()) {
-            if (entry.getKey().equals(address)) {
-                found = true;
-                break;
+        if (customer != null) {
+            Boolean found = false;
+            for (Collectors.Entry entry : customer.getCollectors().getEntry()) {
+                if (entry.getKey().equals(address)) {
+                    found = true;
+                    break;
+                }
             }
-        }
 
-        if (found && customer != null) {
-            try {
-                InetAddress collector = InetAddress.getByName(address);
-                Thread thread = new Thread(new InsertThread(flowSet, collector));
-                thread.start();
-            } catch (UnknownHostException e) {
-                System.err.println("Could not resolve remote address.");
+            if (found) {
+                try {
+                    InetAddress collector = InetAddress.getByName(address);
+                    Thread thread = new Thread(new InsertThread(customer, flowSet, collector));
+                    thread.start();
+                } catch (UnknownHostException e) {
+                    System.err.println("Could not resolve remote address: " + address);
+                    return 1;
+                }
+            } else {
+                return 1;
             }
         } else {
+            System.err.println("Could not locate customer for request from: " + address);
             return 1;
         }
 
@@ -87,13 +93,15 @@ public class FlowInsert {
 
     class InsertThread implements Runnable {
 
+        Customer customer;
         InetAddress collector;
         List<PersistentFlow> flowSet;
         HashMap<Long, Flow> flows = new HashMap();
 
-        public InsertThread(List<PersistentFlow> flowSet, InetAddress collector) {
+        public InsertThread(Customer customer, List<PersistentFlow> flowSet, InetAddress collector) {
             this.flowSet = flowSet;
             this.collector = collector;
+            this.customer = customer;
         }
 
         @Override
@@ -116,7 +124,7 @@ public class FlowInsert {
             }
 
             FlowReceiver receiver = new FlowReceiver();
-            LinkedList<Long> flowIDs = receiver.addFlows(converted, null);
+            LinkedList<Long> flowIDs = receiver.addFlows(customer, converted, null);
 
             Iterator<Long> idIterator = flowIDs.iterator();
             Iterator<Flow> flowIterator = converted.iterator();

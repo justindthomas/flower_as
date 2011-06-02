@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.PostConstruct;
+import javax.ejb.DependsOn;
 import javax.ejb.EJB;
 import javax.ejb.Lock;
 import javax.ejb.LockType;
@@ -31,6 +32,7 @@ import javax.naming.NamingException;
  *
  * @author justin
  */
+@DependsOn("GlobalConfigurationManager")
 @Singleton
 @Startup
 public class FrequencyManager {
