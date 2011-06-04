@@ -30,6 +30,7 @@ import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolume;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
 import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
+import name.justinthomas.flower.manager.services.Customer;
 
 public class FlowManager {
 
@@ -100,13 +101,13 @@ public class FlowManager {
         }
     }
 
-    public void getFlows(HttpSession session, String constraintsString, String tracker) {
+    public void getFlows(Customer customer, HttpSession session, String constraintsString, String tracker) {
 
         System.out.println("getFlows called.");
         Constraints constraints = new Constraints(constraintsString);
         SessionManager.getFlows(session, tracker).clear();
 
-        StatisticsManager statisticsManager = new StatisticsManager();
+        StatisticsManager statisticsManager = new StatisticsManager(customer);
         LinkedList<StatisticalInterval> intervals = statisticsManager.getStatisticalIntervals(session, constraints, null);
 
         LinkedHashMap<Long, Long> flowIDs = new LinkedHashMap();
@@ -164,11 +165,11 @@ public class FlowManager {
         }
     }
 
-    public XMLDataVolumeList getXMLDataVolumes(HttpSession session, String constr, Integer nmb_bins) {
+    public XMLDataVolumeList getXMLDataVolumes(Customer customer, HttpSession session, String constr, Integer nmb_bins) {
         XMLDataVolumeList volumeList = new XMLDataVolumeList();
 
         Boolean cancelVolume = false;
-        StatisticsManager statisticsManager = new StatisticsManager();
+        StatisticsManager statisticsManager = new StatisticsManager(customer);
 
         Constraints constraints = new Constraints(constr);
         Long intervalDuration = (constraints.endTime.getTime() - constraints.startTime.getTime()) / nmb_bins;
@@ -252,9 +253,9 @@ public class FlowManager {
         return volumeList;
     }
 
-    public XMLNetworkList getXMLNetworks(HttpSession session, String constraints) {
+    public XMLNetworkList getXMLNetworks(Customer customer, HttpSession session, String constraints) {
         XMLNetworkList networkList = new XMLNetworkList();
-        StatisticsManager statisticsManager = new StatisticsManager();
+        StatisticsManager statisticsManager = new StatisticsManager(customer);
         ArrayList<Network> networks = statisticsManager.getNetworks(session, new Constraints(constraints));
 
         Boolean cancelNetworks = false;

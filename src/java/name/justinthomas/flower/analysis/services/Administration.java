@@ -5,6 +5,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
+import javax.ejb.EJB;
 import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebService;
@@ -22,6 +23,7 @@ import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryDomain;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryGroup;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetwork;
 import name.justinthomas.flower.analysis.statistics.CachedStatistics;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 
 /**
  *
@@ -30,6 +32,7 @@ import name.justinthomas.flower.analysis.statistics.CachedStatistics;
 @WebService()
 public class Administration {
 
+    @EJB GlobalConfigurationManager globalConfigurationManager;
     private ManagedNetworkManager managedNetworkManager = new ManagedNetworkManager();
     private DirectoryDomainManager directoryDomainManager = new DirectoryDomainManager();
 
@@ -244,17 +247,18 @@ public class Administration {
     @WebMethod(operationName = "getOperatingStatistics")
     public OperatingStatistics getStatistics(
             @WebParam(name = "user") String user,
-            @WebParam(name = "password") String password) {
+            @WebParam(name = "password") String password,
+            @WebParam(name = "customer") String customerID) {
 
         OperatingStatistics stats = new OperatingStatistics();
 
         UserAction userAction = new UserAction();
         AuthenticationToken token = userAction.authenticate(user, password);
         if (token.authenticated && token.authorized && token.administrator) {
-            stats.insertionCacheSize = CachedStatistics.getCacheSize();
+            stats.insertionCacheSize = globalConfigurationManager.getCachedStatistics(customerID).getCacheSize();
             stats.frequencyMapSize = FrequencyManager.getFrequencyManager().getMapSize();
             stats.largestFrequency = FrequencyManager.getFrequencyManager().getLargestFrequency();
-            stats.representationMap = CachedStatistics.getRepresentationMapSize();
+            stats.representationMap = globalConfigurationManager.getCachedStatistics(customerID).getRepresentationMapSize();
         }
 
         return stats;

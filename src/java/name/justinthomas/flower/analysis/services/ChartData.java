@@ -3,6 +3,8 @@ package name.justinthomas.flower.analysis.services;
 import name.justinthomas.flower.analysis.authentication.UserAction;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -16,8 +18,6 @@ import javax.ejb.EJB;
 import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebService;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import javax.xml.bind.annotation.XmlElement;
@@ -31,7 +31,6 @@ import name.justinthomas.flower.analysis.persistence.FlowManager;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetwork;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
 import name.justinthomas.flower.analysis.element.ManagedNetworks;
-import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.analysis.persistence.Constraints;
 import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.persistence.SessionManager;
@@ -41,6 +40,10 @@ import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNode;
 import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
+import name.justinthomas.flower.manager.services.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration;
+import name.justinthomas.flower.manager.services.CustomerAdministrationService;
 import org.bouncycastle.util.encoders.Base64;
 
 /**
@@ -52,7 +55,8 @@ public class ChartData {
 
     @EJB
     ThreadManager threadManager;
-    
+    @EJB
+    GlobalConfigurationManager globalConfigurationManager;
     @Resource
     private WebServiceContext serviceContext;
 
@@ -61,6 +65,7 @@ public class ChartData {
      */
     @WebMethod(operationName = "getNetworkMap")
     public XMLNetworkList getNetworkMap(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "constraints") String constraints,
@@ -79,41 +84,49 @@ public class ChartData {
             throw new WebServiceException("No session in WebServiceContext");
         }
 
-        XMLNetworkList networks = SessionManager.getNetworks(session);
+        Customer customer = this.getCustomer(customerID);
 
-        if (networks == null) {
-            System.out.println("networks session variable is null.");
-            if (!SessionManager.isMapBuilding(session)) {
-                SessionManager.isMapBuilding(session, true);
+        if (customer != null) {
 
-                System.out.println("Starting map build thread.");
-                BuildNetworkList task = new BuildNetworkList(session, constraints);
-                TimedThread thread = new TimedThread(task);
-                threadManager.start(user, thread);
+            XMLNetworkList networks = SessionManager.getNetworks(session);
 
-                if (wait) {
-                    try {
-                        thread.join();
-                        networks = SessionManager.getNetworks(session);
-                        SessionManager.setNetworks(session, null);
-                    } catch (InterruptedException e) {
-                        System.err.println("Thread: " + thread.getName() + " was interrupted.");
+            if (networks == null) {
+                System.out.println("networks session variable is null.");
+                if (!SessionManager.isMapBuilding(session)) {
+                    SessionManager.isMapBuilding(session, true);
+
+                    System.out.println("Starting map build thread.");
+                    BuildNetworkList task = new BuildNetworkList(customer, session, constraints);
+                    TimedThread thread = new TimedThread(task);
+                    threadManager.start(user, thread);
+
+                    if (wait) {
+                        try {
+                            thread.join();
+                            networks = SessionManager.getNetworks(session);
+                            SessionManager.setNetworks(session, null);
+                        } catch (InterruptedException e) {
+                            System.err.println("Thread: " + thread.getName() + " was interrupted.");
+                        }
                     }
                 }
+            } else {
+                networks = SessionManager.getNetworks(session);
+                SessionManager.setNetworks(session, null);
             }
+
+            if (networks == null) {
+                // networks will be null at this point if wait is false
+                // and the map has not been built yet, or if there is an error
+                networks = new XMLNetworkList();
+            }
+
+            System.out.println("ready flag set to: " + networks.ready);
+            return (networks);  // The "ready" Boolean in XMLNL is false by default
         } else {
-            networks = SessionManager.getNetworks(session);
-            SessionManager.setNetworks(session, null);
+            System.err.println("Could not identify customer.");
+            return null;
         }
-
-        if (networks == null) {
-            // networks will be null at this point if wait is false
-            // and the map has not been built yet, or if there is an error
-            networks = new XMLNetworkList();
-        }
-
-        System.out.println("ready flag set to: " + networks.ready);
-        return (networks);  // The "ready" Boolean in XMLNL is false by default
     }
 
     private void createTraceFile(XMLNetworkList xmlNetworkList) {
@@ -137,6 +150,7 @@ public class ChartData {
      */
     @WebMethod(operationName = "getFlows")
     public FlowSet getFlows(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "constraints") String constraints,
@@ -155,67 +169,76 @@ public class ChartData {
             throw new WebServiceException("No session in WebServiceContext");
         }
 
-        System.out.println("constraints: " + constraints + ", tracker: " + tracker);
-        if (tracker == null || tracker.isEmpty()) {
-            //This is a new request
-            //System.out.println("It appears that processing has not begun...");
-            SessionManager.isProcessingPackets(session, true);
+        Customer customer = this.getCustomer(customerID);
 
-            Integer r = new Random().nextInt();
-            byte[] b = new byte[1];
-            b[0] = r.byteValue();
+        if (customer != null) {
 
+            System.out.println("constraints: " + constraints + ", tracker: " + tracker);
+            if (tracker == null || tracker.isEmpty()) {
+                //This is a new request
+                //System.out.println("It appears that processing has not begun...");
+                SessionManager.isProcessingPackets(session, true);
+
+                Integer r = new Random().nextInt();
+                byte[] b = new byte[1];
+                b[0] = r.byteValue();
+
+                try {
+                    MessageDigest md = MessageDigest.getInstance("MD5");
+                    md.update(b);
+                    tracker = new String(Base64.encode(md.digest()));
+                    System.out.println("New Tracker: " + tracker);
+                } catch (NoSuchAlgorithmException e) {
+                    e.printStackTrace();
+                }
+
+                BuildFlowList task = new BuildFlowList(customer, session, constraints, tracker);
+                threadManager.start(user, new TimedThread(task));
+            }
+
+            //if (!SessionManager.isProcessingPacketsComplete(session, constraints)) {
+            //    //System.out.println("It appears that processing is not complete...");
+            //    if (!SessionManager.isProcessingPackets(session)) {
+            //        //System.out.println("It appears that processing has not begun...");
+            //        SessionManager.isProcessingPackets(session, true);
+            //
+            //        //System.out.println("Starting packet processing thread.");
+            //        BuildFlowList task = new BuildFlowList(session, constraints);
+            //        threadManager.start(user, new TimedThread(task));
+            //    }
+            //}
+
+
+            FlowSet xmlPacketList = new FlowSet();
+
+            Integer resultCount = 0;
+            final Integer MAX_REQUEST_RESULTS = 1000;
             try {
-                MessageDigest md = MessageDigest.getInstance("MD5");
-                md.update(b);
-                tracker = new String(Base64.encode(md.digest()));
-                System.out.println("New Tracker: " + tracker);
-            } catch (NoSuchAlgorithmException e) {
-                e.printStackTrace();
+                while (!SessionManager.getFlows(session, tracker).isEmpty() && (resultCount++ < MAX_REQUEST_RESULTS)) {
+                    xmlPacketList.flows.add(SessionManager.getFlows(session, tracker).remove(0).toHashTableFlow());
+                }
+
+                if (SessionManager.getFlows(session, tracker).isEmpty() && SessionManager.isProcessingPacketsComplete(session, tracker)) {
+                    xmlPacketList.finished = true;
+                    SessionManager.isProcessingPackets(session, null);
+                    SessionManager.isProcessingPacketsComplete(session, tracker, null);
+                    SessionManager.getFlows(session, tracker).clear();
+                }
+            } catch (NullPointerException e) {
+                System.err.println("Could not access flows; this is probably due to a non-existent tracker reference.");
             }
 
-            BuildFlowList task = new BuildFlowList(session, constraints, tracker);
-            threadManager.start(user, new TimedThread(task));
+            xmlPacketList.tracker = tracker;
+            return xmlPacketList;
+        } else {
+            System.err.println("Could not identify customer.");
+            return null;
         }
-
-        //if (!SessionManager.isProcessingPacketsComplete(session, constraints)) {
-        //    //System.out.println("It appears that processing is not complete...");
-        //    if (!SessionManager.isProcessingPackets(session)) {
-        //        //System.out.println("It appears that processing has not begun...");
-        //        SessionManager.isProcessingPackets(session, true);
-        //
-        //        //System.out.println("Starting packet processing thread.");
-        //        BuildFlowList task = new BuildFlowList(session, constraints);
-        //        threadManager.start(user, new TimedThread(task));
-        //    }
-        //}
-
-
-        FlowSet xmlPacketList = new FlowSet();
-
-        Integer resultCount = 0;
-        final Integer MAX_REQUEST_RESULTS = 1000;
-        try {
-            while (!SessionManager.getFlows(session, tracker).isEmpty() && (resultCount++ < MAX_REQUEST_RESULTS)) {
-                xmlPacketList.flows.add(SessionManager.getFlows(session, tracker).remove(0).toHashTableFlow());
-            }
-
-            if (SessionManager.getFlows(session, tracker).isEmpty() && SessionManager.isProcessingPacketsComplete(session, tracker)) {
-                xmlPacketList.finished = true;
-                SessionManager.isProcessingPackets(session, null);
-                SessionManager.isProcessingPacketsComplete(session, tracker, null);
-                SessionManager.getFlows(session, tracker).clear();
-            }
-        } catch (NullPointerException e) {
-            System.err.println("Could not access flows; this is probably due to a non-existent tracker reference.");
-        }
-
-        xmlPacketList.tracker = tracker;
-        return xmlPacketList;
     }
 
     @WebMethod(operationName = "getIntervals")
     public List<StatisticalInterval> getIntervals(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "constraints") String constraints,
@@ -227,7 +250,19 @@ public class ChartData {
             return (null);
         }
 
-        StatisticsManager statisticsManager = new StatisticsManager();
+        Customer customer = null;
+
+        try {
+            CustomerAdministrationService admin = new CustomerAdministrationService(new URL(globalConfigurationManager.getManager() + "/CustomerAdministrationService?wsdl"));
+
+            CustomerAdministration port = admin.getCustomerAdministrationPort();
+            customer = port.getCustomer(null, null, customerID);
+        } catch (MalformedURLException e) {
+            System.err.println("Could not access Customer Administration service at: " + globalConfigurationManager.getManager());
+            return null;
+        }
+
+        StatisticsManager statisticsManager = new StatisticsManager(customer);
         return statisticsManager.getStatisticalIntervals(null, new Constraints(constraints), resolution);
     }
 
@@ -236,6 +271,7 @@ public class ChartData {
      */
     @WebMethod(operationName = "getDataVolume")
     public XMLDataVolumeList getDataVolume(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "constraints") String constraints,
@@ -255,31 +291,53 @@ public class ChartData {
             throw new WebServiceException("No session in WebServiceContext");
         }
 
-        XMLDataVolumeList volumes = SessionManager.getVolumes(session);
+        Customer customer = this.getCustomer(customerID);
 
-        if (volumes == null) {
-            volumes = new XMLDataVolumeList();
-            if (!SessionManager.isHistogramBuilding(session)) {
-                SessionManager.isHistogramBuilding(session, true);
-                System.out.println("Starting volume build thread: " + constraints + ", " + bins);
-                BuildDataVolumeList task = new BuildDataVolumeList(session, constraints, bins);
-                TimedThread thread = new TimedThread(task);
-                threadManager.start(user, thread);
-                if (wait) {
-                    try {
-                        thread.join();
-                        volumes = SessionManager.getVolumes(session);
-                        SessionManager.setVolumes(session, null);
-                    } catch (InterruptedException e) {
-                        System.err.println("Thread: " + thread.getName() + " was interrupted.");
+        if (customer != null) {
+            XMLDataVolumeList volumes = SessionManager.getVolumes(session);
+
+            if (volumes == null) {
+                volumes = new XMLDataVolumeList();
+                if (!SessionManager.isHistogramBuilding(session)) {
+                    SessionManager.isHistogramBuilding(session, true);
+                    System.out.println("Starting volume build thread: " + constraints + ", " + bins);
+                    BuildDataVolumeList task = new BuildDataVolumeList(customer, session, constraints, bins);
+                    TimedThread thread = new TimedThread(task);
+                    threadManager.start(user, thread);
+                    if (wait) {
+                        try {
+                            thread.join();
+                            volumes = SessionManager.getVolumes(session);
+                            SessionManager.setVolumes(session, null);
+                        } catch (InterruptedException e) {
+                            System.err.println("Thread: " + thread.getName() + " was interrupted.");
+                        }
                     }
                 }
+            } else {
+                SessionManager.setVolumes(session, null);
             }
+
+            return (volumes);  // The "ready" Boolean in XMLDVL is false by default
         } else {
-            SessionManager.setVolumes(session, null);
+            System.err.println("Could not identify customer.");
+            return null;
+        }
+    }
+
+    private Customer getCustomer(String customerID) {
+        Customer customer = null;
+
+        try {
+            CustomerAdministrationService admin = new CustomerAdministrationService(new URL(globalConfigurationManager.getManager() + "/CustomerAdministrationService?wsdl"));
+
+            CustomerAdministration port = admin.getCustomerAdministrationPort();
+            customer = port.getCustomer(null, null, customerID);
+        } catch (MalformedURLException e) {
+            System.err.println("Could not access Customer Administration service at: " + globalConfigurationManager.getManager());
         }
 
-        return (volumes);  // The "ready" Boolean in XMLDVL is false by default
+        return customer;
     }
 
     private class BuildFlowList implements Runnable {
@@ -287,17 +345,19 @@ public class ChartData {
         private HttpSession session;
         private String constraints;
         private String tracker;
+        private Customer customer;
 
-        private BuildFlowList(HttpSession session, String constraints, String tracker) {
+        private BuildFlowList(Customer customer, HttpSession session, String constraints, String tracker) {
             this.session = session;
             this.constraints = constraints;
             this.tracker = tracker;
+            this.customer = customer;
         }
 
         @Override
         public void run() {
             FlowManager flowManager = new FlowManager();
-            flowManager.getFlows(session, constraints, tracker);
+            flowManager.getFlows(customer, session, constraints, tracker);
 
             //System.out.println("FlowManager getPackets() appears to have completed...");
             SessionManager.isProcessingPacketsComplete(session, tracker, true);
@@ -308,8 +368,10 @@ public class ChartData {
 
         private HttpSession session;
         private String constraints;
+        private Customer customer;
 
-        private BuildNetworkList(HttpSession session, String constraints) {
+        private BuildNetworkList(Customer customer, HttpSession session, String constraints) {
+            this.customer = customer;
             this.session = session;
             this.constraints = constraints;
         }
@@ -317,7 +379,7 @@ public class ChartData {
         @Override
         public void run() {
             FlowManager flowManager = new FlowManager();
-            flowManager.getXMLNetworks(session, constraints);
+            flowManager.getXMLNetworks(customer, session, constraints);
             System.out.println("Completed BuildNetworkList thread.");
         }
     }
@@ -327,17 +389,19 @@ public class ChartData {
         private HttpSession session;
         private String constraints;
         private Integer bins;
+        private Customer customer;
 
-        private BuildDataVolumeList(HttpSession session, String constraints, Integer bins) {
+        private BuildDataVolumeList(Customer customer, HttpSession session, String constraints, Integer bins) {
             this.session = session;
             this.constraints = constraints;
             this.bins = bins;
+            this.customer = customer;
         }
 
         @Override
         public void run() {
             FlowManager flowManager = new FlowManager();
-            flowManager.getXMLDataVolumes(session, constraints, bins);
+            flowManager.getXMLDataVolumes(customer, session, constraints, bins);
         }
     }
 

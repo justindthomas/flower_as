@@ -136,7 +136,7 @@ public class FlowInsert {
             System.out.println("Completed storing and beginning to process statistics for " + flows.size() + " flows.");
 
             for (Entry<Long, Flow> flow : flows.entrySet()) {
-                StatisticsManager statisticsManager = new StatisticsManager();
+                StatisticsManager statisticsManager = new StatisticsManager(customer);
                 statisticsManager.addStatisticalSeconds(flow.getValue(), flow.getKey(), collector);
             }
 

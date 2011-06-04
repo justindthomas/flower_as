@@ -2,6 +2,7 @@ package name.justinthomas.flower.global;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -43,7 +44,7 @@ public class GlobalConfigurationManager {
             resolutionMap.put(Long.valueOf(resolution.trim()), true);
         }
         
-        cachedStatisticsMap = new HashMap();
+        cachedStatisticsMap = Collections.synchronizedMap(new HashMap());
 
         unsafeLdap = Boolean.parseBoolean(properties.getProperty("unsafeLdap").trim());
         manager = properties.getProperty("manager");

@@ -12,6 +12,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.net.UnknownHostException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -36,6 +38,8 @@ import name.justinthomas.flower.analysis.element.Node;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.analysis.persistence.Constraints;
 import name.justinthomas.flower.manager.services.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration;
+import name.justinthomas.flower.manager.services.CustomerAdministrationService;
 import name.justinthomas.flower.utility.AddressAnalysis;
 
 /**
@@ -46,8 +50,11 @@ public class StatisticsManager {
 
     private static GlobalConfigurationManager configurationManager;
     private static final Integer DEBUG = 1;
+    private Customer customer;
 
-    public StatisticsManager() {
+    public StatisticsManager(Customer customer) {
+        this.customer = customer;
+        
         try {
             if (configurationManager == null) {
                 StatisticsManager.configurationManager = InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
@@ -57,8 +64,7 @@ public class StatisticsManager {
         }
     }
 
-    private Environment setupEnvironment(Customer customer) {
-
+    private Environment setupEnvironment() {        
         File environmentHome = new File(configurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/statistics");
 
         try {
@@ -114,13 +120,13 @@ public class StatisticsManager {
         }
     }
 
-    public ArrayList<Long> cleanStatisticalIntervals(Customer customer) {
-        HashMap<IntervalKey, Boolean> keys = identifyExpiredIntervals(customer);
+    public ArrayList<Long> cleanStatisticalIntervals() {
+        HashMap<IntervalKey, Boolean> keys = identifyExpiredIntervals();
 
         System.out.println("Deleting expired intervals...");
 
         Environment environment;
-        EntityStore entityStore = new EntityStore(environment = setupEnvironment(customer), "Statistics", this.getStoreConfig(false));
+        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(false));
         StatisticsAccessor dataAccessor = new StatisticsAccessor(entityStore);
         int nullIDs = 0;
         ArrayList<Long> flowIDs = new ArrayList();
@@ -164,13 +170,13 @@ public class StatisticsManager {
         return normalized;
     }
 
-    public void storeStatisticalIntervals(Customer customer, ArrayList<StatisticalInterval> intervals) {
+    public void storeStatisticalIntervals(ArrayList<StatisticalInterval> intervals) {
         //System.out.println("Persisting " + intervals.size() + " intervals to long-term storage.");
         EntityStore entityStore = null;
         Environment environment = null;
 
         try {
-            environment = setupEnvironment(customer);
+            environment = setupEnvironment();
 
             entityStore = new EntityStore(environment, "Statistics", this.getStoreConfig(false));
 
@@ -202,10 +208,16 @@ public class StatisticsManager {
     }
 
     public void addStatisticalSeconds(Flow flow, Long flowID, InetAddress collector) {
+        CachedStatistics cachedStatistics = configurationManager.getCachedStatistics(customer.getId());
+
+        if (cachedStatistics == null) {
+            cachedStatistics = new CachedStatistics(customer);
+        }
+
         try {
-            if (CachedStatistics.hasOtherRepresentation(flow.getSourceAddress(), flow.getDestinationAddress(), collector)) {
+            if (cachedStatistics.hasOtherRepresentation(flow.getSourceAddress(), flow.getDestinationAddress(), collector)) {
                 System.out.println("Ignoring duplicate flow from: " + collector.getHostAddress()
-                        + ", already represented by: " + CachedStatistics.getRepresentation(flow.getSourceAddress(), flow.getDestinationAddress()).getHostAddress());
+                        + ", already represented by: " + cachedStatistics.getRepresentation(flow.getSourceAddress(), flow.getDestinationAddress()).getHostAddress());
                 return;
             }
         } catch (Exception e) {
@@ -216,10 +228,12 @@ public class StatisticsManager {
             HashMap<IntervalKey, StatisticalInterval> normalized = flowToInterval(flow, resolution, flowID);
 
             for (Entry<IntervalKey, StatisticalInterval> entry : normalized.entrySet()) {
-                CachedStatistics.put(entry.getKey(), entry.getValue());
+                cachedStatistics.put(entry.getKey(), entry.getValue());
             }
             //System.out.println("Adding " + normalized.size() + " intervals to resolution " + resolution);
         }
+
+        configurationManager.setCachedStatistics(customer.getId(), cachedStatistics);
     }
 
     private Long getResolution(long duration, Integer bins) {
@@ -258,14 +272,14 @@ public class StatisticsManager {
         return returnValue;
     }
 
-    public LinkedList<StatisticalInterval> getStatisticalIntervals(Customer customer, HttpSession session, Constraints constraints, Integer resolution) {
+    public LinkedList<StatisticalInterval> getStatisticalIntervals(HttpSession session, Constraints constraints, Integer resolution) {
         LinkedList<StatisticalInterval> intervals = new LinkedList();
 
         Long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
         Environment environment;
         Long r = (resolution != null) ? resolution : getResolution(duration, null);
 
-        EntityStore store = new EntityStore(environment = setupEnvironment(customer), "Statistics", this.getStoreConfig(true));
+        EntityStore store = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
         StatisticsAccessor accessor = new StatisticsAccessor(store);
         Long start = constraints.startTime.getTime() / r;
         IntervalKey startKey = new IntervalKey(start, r);
@@ -285,7 +299,7 @@ public class StatisticsManager {
         return intervals;
     }
 
-    public LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> getVolumeByTime(Customer customer, Constraints constraints, Integer bins)
+    public LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> getVolumeByTime(Constraints constraints, Integer bins)
             throws ClassNotFoundException {
 
         LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> consolidated = new LinkedHashMap();
@@ -326,7 +340,7 @@ public class StatisticsManager {
         Environment environment;
         Long resolution = getResolution(duration, bins);
 
-        EntityStore store = new EntityStore(environment = setupEnvironment(customer), "Statistics", this.getStoreConfig(true));
+        EntityStore store = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
         StatisticsAccessor accessor = new StatisticsAccessor(store);
         Long start = constraints.startTime.getTime() / resolution;
         IntervalKey startKey = new IntervalKey(start, resolution);
@@ -506,7 +520,7 @@ public class StatisticsManager {
         return flow;
     }
 
-    public ArrayList<Network> getNetworks(Customer customer, HttpSession session, Constraints constraints) {
+    public ArrayList<Network> getNetworks(HttpSession session, Constraints constraints) {
         LinkedHashMap<String, InetNetwork> managedNetworks = new ManagedNetworks().getNetworks();
 
         ArrayList<Network> networks = new ArrayList<Network>();
@@ -530,7 +544,7 @@ public class StatisticsManager {
         long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
         long resolution = getResolution(duration, null);
         Environment environment;
-        EntityStore readOnlyEntityStore = new EntityStore(environment = setupEnvironment(customer), "Statistics", this.getStoreConfig(true));
+        EntityStore readOnlyEntityStore = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
         StatisticsAccessor accessor = new StatisticsAccessor(readOnlyEntityStore);
         IntervalKey startKey = new IntervalKey(constraints.startTime.getTime() / resolution, resolution);
         IntervalKey endKey = new IntervalKey(constraints.endTime.getTime() / resolution, resolution);
@@ -666,11 +680,11 @@ public class StatisticsManager {
         }
     }
 
-    private HashMap<IntervalKey, Boolean> identifyExpiredIntervals(Customer customer) {
+    private HashMap<IntervalKey, Boolean> identifyExpiredIntervals() {
         System.out.println("Identifying expired intervals...");
 
         Environment environment;
-        EntityStore entityStore = new EntityStore(environment = setupEnvironment(customer), "Statistics", this.getStoreConfig(true));
+        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
         StatisticsAccessor dataAccessor = new StatisticsAccessor(entityStore);
 
         Date now = new Date();
