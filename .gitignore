@@ -7,3 +7,7 @@
 /connectors/connector/python/daemon.pyc
 /connectors/connector/python/netflow.pyc
 /connectors/connector/python/snort.pyc
+/src/conf/xml-resources/web-service-references/
+/web/WEB-INF/jax-ws-catalog.xml
+/web/WEB-INF/wsdl/
+/catalog.xml

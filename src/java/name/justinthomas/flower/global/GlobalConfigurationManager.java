@@ -2,7 +2,6 @@ package name.justinthomas.flower.global;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -11,7 +10,7 @@ import javax.annotation.PostConstruct;
 import javax.ejb.Singleton;
 import name.justinthomas.flower.analysis.persistence.FrequencyManager;
 import name.justinthomas.flower.analysis.statistics.CachedStatistics;
-import name.justinthomas.flower.manager.services.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 
 /**
  *

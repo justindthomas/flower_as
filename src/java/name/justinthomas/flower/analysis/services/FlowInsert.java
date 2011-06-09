@@ -1,8 +1,6 @@
 package name.justinthomas.flower.analysis.services;
 
 import java.net.InetAddress;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -10,7 +8,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import javax.annotation.Resource;
-import javax.ejb.EJB;
 import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebService;
@@ -21,11 +18,8 @@ import name.justinthomas.flower.analysis.element.Flow;
 import name.justinthomas.flower.analysis.persistence.FlowReceiver;
 import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
-import name.justinthomas.flower.global.GlobalConfigurationManager;
-import name.justinthomas.flower.manager.services.Customer;
-import name.justinthomas.flower.manager.services.Customer.Collectors;
-import name.justinthomas.flower.manager.services.CustomerAdministration;
-import name.justinthomas.flower.manager.services.CustomerAdministrationService;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer.Collectors;
 
 /**
  *

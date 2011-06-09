@@ -16,13 +16,12 @@ import java.util.Map.Entry;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
-import name.justinthomas.flower.analysis.persistence.FrequencyManager;
 import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlowDetail;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlowDetail.Count;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
-import name.justinthomas.flower.manager.services.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 
 public class Flow implements Serializable {
 

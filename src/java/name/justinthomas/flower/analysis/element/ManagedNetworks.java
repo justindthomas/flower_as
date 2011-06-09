@@ -5,7 +5,7 @@ import java.net.UnknownHostException;
 import java.util.LinkedHashMap;
 import name.justinthomas.flower.analysis.persistence.ManagedNetwork;
 import name.justinthomas.flower.analysis.persistence.ManagedNetworkManager;
-import name.justinthomas.flower.manager.services.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import name.justinthomas.flower.utility.AddressAnalysis;
 
 public class ManagedNetworks {

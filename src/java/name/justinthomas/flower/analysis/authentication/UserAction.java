@@ -13,9 +13,9 @@ import javax.jws.WebService;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
-import name.justinthomas.flower.manager.services.Customer;
-import name.justinthomas.flower.manager.services.CustomerAdministration;
-import name.justinthomas.flower.manager.services.CustomerAdministrationService;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration.CustomerAdministration;
+import name.justinthomas.flower.manager.services.CustomerAdministration.CustomerAdministrationService;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 /**

@@ -39,9 +39,9 @@ import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNode;
 import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
-import name.justinthomas.flower.manager.services.Customer;
-import name.justinthomas.flower.manager.services.CustomerAdministration;
-import name.justinthomas.flower.manager.services.CustomerAdministrationService;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration.CustomerAdministration;
+import name.justinthomas.flower.manager.services.CustomerAdministration.CustomerAdministrationService;
 import org.bouncycastle.util.encoders.Base64;
 
 /**

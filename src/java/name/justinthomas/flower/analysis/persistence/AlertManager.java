@@ -12,7 +12,7 @@ import java.io.File;
 import java.util.ArrayList;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
-import name.justinthomas.flower.manager.services.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 
 public class AlertManager {
 

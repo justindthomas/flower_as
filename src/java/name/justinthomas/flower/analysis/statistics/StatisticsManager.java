@@ -35,7 +35,7 @@ import name.justinthomas.flower.analysis.element.Network;
 import name.justinthomas.flower.analysis.element.Node;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.analysis.persistence.Constraints;
-import name.justinthomas.flower.manager.services.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import name.justinthomas.flower.utility.AddressAnalysis;
 
 /**

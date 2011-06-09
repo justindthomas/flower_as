@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map.Entry;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlowDetail;
-import name.justinthomas.flower.manager.services.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import org.bouncycastle.util.encoders.UrlBase64Encoder;
 
 public class Node {

@@ -1,7 +1,5 @@
 package name.justinthomas.flower.analysis.services;
 
-import java.net.MalformedURLException;
-import java.net.URL;
 import name.justinthomas.flower.analysis.authentication.UserAction;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -22,11 +20,8 @@ import name.justinthomas.flower.analysis.authentication.UserManager;
 import name.justinthomas.flower.analysis.authentication.User;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryDomain;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryGroup;
-import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetwork;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
-import name.justinthomas.flower.manager.services.Customer;
-import name.justinthomas.flower.manager.services.CustomerAdministration;
-import name.justinthomas.flower.manager.services.CustomerAdministrationService;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 
 /**
  *

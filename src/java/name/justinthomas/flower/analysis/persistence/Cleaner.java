@@ -12,9 +12,9 @@ import javax.ejb.Singleton;
 import javax.ejb.Startup;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
-import name.justinthomas.flower.manager.services.Customer;
-import name.justinthomas.flower.manager.services.CustomerAdministration;
-import name.justinthomas.flower.manager.services.CustomerAdministrationService;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration.CustomerAdministration;
+import name.justinthomas.flower.manager.services.CustomerAdministration.CustomerAdministrationService;
 
 /**
  *
