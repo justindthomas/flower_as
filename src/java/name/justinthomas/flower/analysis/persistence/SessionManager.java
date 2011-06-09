@@ -4,19 +4,17 @@
  */
 package name.justinthomas.flower.analysis.persistence;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.servlet.http.HttpSession;
 import name.justinthomas.flower.analysis.element.Flow;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
-import org.bouncycastle.util.encoders.Base64;
 
 /**
  *
@@ -54,10 +52,11 @@ public abstract class SessionManager {
     public static List<Flow> getFlows(HttpSession session, String tracker) {
         Map<String, List<Flow>> map;
         if (session.getAttribute("flows") == null) {
-            map = Collections.synchronizedMap(new HashMap<String, List<Flow>>());
+            //map = Collections.synchronizedMap(new HashMap<String, List<Flow>>());
+            map = new ConcurrentHashMap();
             session.setAttribute("flows", map);
         } else {
-            map = (Map<String, List<Flow>>) session.getAttribute("flows");
+            map = (Map) session.getAttribute("flows");
         }
 
         if (!map.containsKey(tracker)) {

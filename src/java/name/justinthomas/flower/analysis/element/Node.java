@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map.Entry;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlowDetail;
+import name.justinthomas.flower.manager.services.Customer;
 import org.bouncycastle.util.encoders.UrlBase64Encoder;
 
 public class Node {
@@ -97,13 +98,13 @@ public class Node {
         return bytesReceived;
     }
 
-    public void addFlow(StatisticalFlow statisticalFlow) {
+    public void addFlow(Customer customer, StatisticalFlow statisticalFlow) {
         try {
             if (!statisticalFlow.getCount().isEmpty()) {
                 for (Entry<StatisticalFlowDetail, Long> entry : statisticalFlow.getCount().entrySet()) {
                     //System.out.println("Adding TCP statFlow: " + statisticalFlow.getSource() + ":" + entry.getKey().getSource() + " -> " +
                     //        statisticalFlow.getDestination() + ":" + entry.getKey().getDestination() + " " + entry.getValue() + " bytes");
-                    addFlow(new Flow(entry, statisticalFlow));
+                    addFlow(new Flow(customer, entry, statisticalFlow));
                 }
             }
         } catch (UnknownHostException e) {

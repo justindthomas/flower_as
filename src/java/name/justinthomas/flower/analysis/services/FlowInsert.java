@@ -36,8 +36,6 @@ public class FlowInsert {
 
     @Resource
     WebServiceContext context;
-    @EJB
-    GlobalConfigurationManager globalConfigurationManager;
 
     @WebMethod(operationName = "addFlows")
     public Integer addFlows(
@@ -50,17 +48,7 @@ public class FlowInsert {
         String address = request.getRemoteAddr();
         System.out.println("Request received from: " + address);
 
-        Customer customer = null;
-
-        try {
-            CustomerAdministrationService admin = new CustomerAdministrationService(new URL(globalConfigurationManager.getManager() + "/CustomerAdministrationService?wsdl"));
-
-            CustomerAdministration port = admin.getCustomerAdministrationPort();
-            customer = port.getCustomer(null, null, customerID);
-        } catch (MalformedURLException e) {
-            System.err.println("Could not access Customer Administration service at: " + globalConfigurationManager.getManager());
-            return 1;
-        }
+        Customer customer = Utility.getCustomer(customerID);
 
         if (customer != null) {
             Boolean found = false;
@@ -114,7 +102,7 @@ public class FlowInsert {
                     if (xflow.size.longValue() < 0) {
                         throw new Exception("Negative bytesSent value (" + xflow.size.longValue() + ") in XMLFlow received.");
                     }
-                    converted.add(new Flow(xflow));
+                    converted.add(new Flow(customer, xflow));
                     //Flow flow = new Flow(xflow);
 
                     ;
@@ -123,8 +111,8 @@ public class FlowInsert {
                 }
             }
 
-            FlowReceiver receiver = new FlowReceiver();
-            LinkedList<Long> flowIDs = receiver.addFlows(customer, converted, null);
+            FlowReceiver receiver = new FlowReceiver(customer);
+            LinkedList<Long> flowIDs = receiver.addFlows(converted, null);
 
             Iterator<Long> idIterator = flowIDs.iterator();
             Iterator<Flow> flowIterator = converted.iterator();

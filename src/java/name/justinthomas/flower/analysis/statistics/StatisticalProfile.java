@@ -19,7 +19,7 @@ public class StatisticalProfile {
     //public static final Long HISTORICAL_INTERVAL = 14 * 24 * 60 * 60 * 1000l;
     private ProfileType type;
     private HashMap<String, ServiceList> nodes = new HashMap<String, ServiceList>();
-    FrequencyManager frequencyManager = FrequencyManager.getFrequencyManager();
+    FrequencyManager frequencyManager;// = FrequencyManager.getFrequencyManager();
 
     public void addStatisticalSecond(StatisticalInterval second) {
         for (StatisticalFlow flow : second.flows.values()) {

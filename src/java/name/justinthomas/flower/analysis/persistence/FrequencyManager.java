@@ -10,40 +10,31 @@ import com.sleepycat.je.EnvironmentConfig;
 import com.sleepycat.persist.EntityStore;
 import com.sleepycat.persist.StoreConfig;
 import java.io.File;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.PostConstruct;
-import javax.ejb.DependsOn;
-import javax.ejb.EJB;
-import javax.ejb.Lock;
-import javax.ejb.LockType;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
-import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import name.justinthomas.flower.manager.services.Customer;
 
 /**
  *
  * @author justin
  */
-@DependsOn("GlobalConfigurationManager")
-@Singleton
-@Startup
 public class FrequencyManager {
 
     private static Integer DEBUG = 0;
+    private Customer customer;
     private File environmentHome = null;
-    @EJB private GlobalConfigurationManager globalConfigurationManager;
-    private final Map<String, Integer> map = Collections.synchronizedMap(new HashMap<String, Integer>());
+    private static GlobalConfigurationManager globalConfigurationManager;
+    //private final Map<String, Integer> map = Collections.synchronizedMap(new HashMap<String, Integer>());
+    private final Map<String, Integer> map = new ConcurrentHashMap();
 
-    @PostConstruct
-    public void init() {
+    public FrequencyManager(Customer customer) {
+        this.customer = customer;
         setConfiguration();
         loadMap();
 
@@ -52,17 +43,21 @@ public class FrequencyManager {
         }
 
         ScheduledThreadPoolExecutor stpe = new ScheduledThreadPoolExecutor(3);
-        UpdateDatabase ud = new UpdateDatabase(environmentHome);
+        UpdateDatabase ud = new UpdateDatabase(environmentHome, this);
         stpe.scheduleAtFixedRate(ud, 15, 15, TimeUnit.MINUTES);
     }
 
     private void setConfiguration() {
-        if (globalConfigurationManager == null) {
-            System.err.println("ConfigurationManager is null");
+        try {
+            if (globalConfigurationManager == null) {
+                globalConfigurationManager = InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+            }
+        } catch (NamingException e) {
+            e.printStackTrace();
         }
 
         if (environmentHome == null) {
-            environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/frequency");
+            environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/frequency");
 
             //System.out.println("Frequency Directory: " + environmentHome);
             try {
@@ -111,7 +106,6 @@ public class FrequencyManager {
         }
     }
 
-    @Lock(LockType.WRITE)
     public void incrementFrequency(String protocol_port) {
         if (DEBUG >= 3) {
             System.out.println("Incrementing frequency for: " + protocol_port);
@@ -124,7 +118,6 @@ public class FrequencyManager {
         }
     }
 
-    @Lock(LockType.READ)
     public Integer getFrequency(String protocol_port) {
         if (map.get(protocol_port) == null) {
             return 0;
@@ -133,43 +126,30 @@ public class FrequencyManager {
         return map.get(protocol_port);
     }
 
-    @Lock(LockType.WRITE)
     public void addPort(Integer protocol, Integer port) {
         String key = protocol.toString() + "_" + port.toString();
         incrementFrequency(key);
     }
 
-    @Lock(LockType.WRITE)
     public void addPort(Integer protocol, Integer[] port) {
         for (int i = 0; i < port.length; i++) {
             addPort(protocol, port[i]);
         }
     }
 
-    @Lock(LockType.READ)
     public Integer getFrequency(Integer protocol, Integer port) {
         String key = protocol.toString() + "_" + port.toString();
         return getFrequency(key);
     }
 
-    public static FrequencyManager getFrequencyManager() {
-        FrequencyManager frequencyManager = null;
-        //System.out.println("Locating FrequencyManager by JNDI");
-        try {
-            Context context = new InitialContext();
-            frequencyManager = (FrequencyManager) context.lookup("java:global/Analysis/FrequencyManager");
-        } catch (NamingException ne) {
-            ne.printStackTrace();
-        }
-        return frequencyManager;
-    }
-
     public class UpdateDatabase implements Runnable {
 
         File environmentHome;
+        FrequencyManager frequencyManager;
 
-        public UpdateDatabase(File environmentHome) {
+        public UpdateDatabase(File environmentHome, FrequencyManager frequencyManager) {
             this.environmentHome = environmentHome;
+            this.frequencyManager = frequencyManager;
         }
 
         private void saveMap() {
@@ -234,7 +214,7 @@ public class FrequencyManager {
 
         @Override
         public void run() {
-            if(FrequencyManager.getFrequencyManager().getLargestFrequency() > (0.75 * Integer.MAX_VALUE)) {
+            if(frequencyManager.getLargestFrequency() > (0.75 * Integer.MAX_VALUE)) {
                 pruneMap();
             }
 

@@ -10,15 +10,19 @@ import com.sleepycat.persist.ForwardCursor;
 import com.sleepycat.persist.StoreConfig;
 import java.io.File;
 import java.util.ArrayList;
-import javax.ejb.EJB;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import name.justinthomas.flower.manager.services.Customer;
 
 public class AlertManager {
 
+    private Customer customer;
     private static final Integer DEBUG = 2;
-    @EJB
-    private GlobalConfigurationManager configurationManager;
+    private static GlobalConfigurationManager configurationManager;
+    
+    public AlertManager(Customer customer) {
+        this.customer = customer;
+    }
 
     public void addAlert(SnortAlert alert) {
         Environment environment;
@@ -127,7 +131,7 @@ public class AlertManager {
             }
         }
         
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/alerts");
+        File environmentHome = new File(configurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/alerts");
 
         try {
             if (!environmentHome.exists()) {

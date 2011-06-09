@@ -12,8 +12,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.net.UnknownHostException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -38,8 +36,6 @@ import name.justinthomas.flower.analysis.element.Node;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.analysis.persistence.Constraints;
 import name.justinthomas.flower.manager.services.Customer;
-import name.justinthomas.flower.manager.services.CustomerAdministration;
-import name.justinthomas.flower.manager.services.CustomerAdministrationService;
 import name.justinthomas.flower.utility.AddressAnalysis;
 
 /**
@@ -521,7 +517,7 @@ public class StatisticsManager {
     }
 
     public ArrayList<Network> getNetworks(HttpSession session, Constraints constraints) {
-        LinkedHashMap<String, InetNetwork> managedNetworks = new ManagedNetworks().getNetworks();
+        LinkedHashMap<String, InetNetwork> managedNetworks = new ManagedNetworks(customer).getNetworks();
 
         ArrayList<Network> networks = new ArrayList<Network>();
 
@@ -573,9 +569,9 @@ public class StatisticsManager {
 
                                 //System.out.println(".");
                                 // Associate the flow with the source (flows are never associated with the destination)
-                                sourceNode.addFlow(flow);
+                                sourceNode.addFlow(customer, flow);
                                 // On that last point, just kidding
-                                destinationNode.addFlow(flow);
+                                destinationNode.addFlow(customer, flow);
 
                                 Boolean sourceCaptured = false;
                                 Boolean destinationCaptured = false;
@@ -603,10 +599,10 @@ public class StatisticsManager {
 
                                 if (!sourceCaptured) {
                                     if (!flow.getDestination().equals("0.0.0.0")) {
-                                        defaultNode.addFlow(flow);
+                                        defaultNode.addFlow(customer, flow);
                                     }
                                 } else if (!destinationCaptured) {
-                                    defaultNode.addFlow(flow);
+                                    defaultNode.addFlow(customer, flow);
                                 }
 
                                 // If the flow was not captured, add it to the default node

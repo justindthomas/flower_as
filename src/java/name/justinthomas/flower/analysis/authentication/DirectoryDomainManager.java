@@ -4,7 +4,6 @@
  */
 package name.justinthomas.flower.analysis.authentication;
 
-import name.justinthomas.flower.analysis.authentication.DirectoryDomain;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
 import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.Environment;
@@ -18,6 +17,7 @@ import java.util.List;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import name.justinthomas.flower.analysis.persistence.CustomerConfigurationAccessor;
+import name.justinthomas.flower.manager.services.Customer;
 
 /**
  *
@@ -25,9 +25,14 @@ import name.justinthomas.flower.analysis.persistence.CustomerConfigurationAccess
  */
 public class DirectoryDomainManager {
 
+    private Customer customer;
     private Environment environment;
     private static GlobalConfigurationManager configurationManager;
 
+    public DirectoryDomainManager(Customer customer) { 
+        this.customer = customer;
+    }
+    
     public Boolean removeGroup(String domain, String group) {
         Boolean error = false;
         setupEnvironment();
@@ -156,7 +161,7 @@ public class DirectoryDomainManager {
             }
         }
 
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/configuration");
+        File environmentHome = new File(configurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/configuration");
 
         if (!environmentHome.exists()) {
             if (environmentHome.mkdirs()) {

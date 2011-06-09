@@ -21,9 +21,12 @@ import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlowDetail;
 import name.justinthomas.flower.analysis.statistics.StatisticalFlowDetail.Count;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
+import name.justinthomas.flower.manager.services.Customer;
 
 public class Flow implements Serializable {
 
+    private Customer customer;
     private static final Integer DEBUG = 1;
     public Date startTimeStamp;
     public Date lastTimeStamp;
@@ -42,29 +45,28 @@ public class Flow implements Serializable {
     public static final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss.SSS");
     public static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
     public static final SimpleDateFormat timeDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-    FrequencyManager frequencyManager;
+    private static GlobalConfigurationManager globalConfigurationManager;
 
-    private void init() {
-        try {
-            Context context = new InitialContext();
-            frequencyManager = (FrequencyManager) context.lookup("java:global/Analysis/FrequencyManager");
-        } catch (NamingException ne) {
-            ne.printStackTrace();
+    public Flow(Customer customer) {
+        this.customer = customer;
+        if (globalConfigurationManager == null) {
+            try {
+                Context context = new InitialContext();
+                globalConfigurationManager = (GlobalConfigurationManager) context.lookup("java:global/Analysis/GlobalConfigurationManager");
+            } catch (NamingException ne) {
+                ne.printStackTrace();
+            }
         }
-
+        
         populateIpTypes();
     }
 
-    public Flow() {
-        init();
-    }
-
-    public Flow(Entry<StatisticalFlowDetail, Long> entry, StatisticalFlow statisticalFlow) throws UnknownHostException {
-        this();
+    public Flow(Customer customer, Entry<StatisticalFlowDetail, Long> entry, StatisticalFlow statisticalFlow) throws UnknownHostException {
+        this(customer);
 
         Integer sourceMapping = 0;
         if (entry.getKey().getProtocol().equals(6) || entry.getKey().getProtocol().equals(17)) {
-            if (frequencyManager.getFrequency(entry.getKey().getProtocol(), entry.getKey().getSource()) > frequencyManager.getFrequency(entry.getKey().getProtocol(), entry.getKey().getDestination())) {
+            if (globalConfigurationManager.getFrequency(customer, entry.getKey().getProtocol(), entry.getKey().getSource()) > globalConfigurationManager.getFrequency(customer, entry.getKey().getProtocol(), entry.getKey().getDestination())) {
                 sourceMapping = 1;
             }
 
@@ -91,36 +93,36 @@ public class Flow implements Serializable {
             }
         }
     }
-/*
+    /*
     public Flow(XMLFlow xflow) throws UnknownHostException {
-        this();
-
-        this.bytesSent = new BigDecimal(xflow.bytesSent);
-        this.bytesReceived = new BigDecimal(xflow.bytesReceived);
-        this.addresses[0] = InetAddress.getByName(xflow.sourceAddress);
-        this.addresses[1] = InetAddress.getByName(xflow.destinationAddress);
-        this.ports[0] = xflow.sourcePort;
-        this.ports[1] = xflow.destinationPort;
-
-        this.ethernetType = xflow.ethernetType;
-
-        this.startTimeStamp = new Date(xflow.startTimeStamp);
-        this.lastTimeStamp = new Date(xflow.lastTimeStamp);
-        this.packetsSent = xflow.packetsSent;
-        this.packetsReceived = xflow.packetsReceived;
-        this.protocol = xflow.protocol;
-        this.flags = xflow.flags;
-        if (this.flags < 0) {
-            System.err.println("Negative flags value in Flow(XMLFlow): " + this.flags);
-        }
-
-        this.reportedBy = xflow.reportedBy;
+    this();
+    
+    this.bytesSent = new BigDecimal(xflow.bytesSent);
+    this.bytesReceived = new BigDecimal(xflow.bytesReceived);
+    this.addresses[0] = InetAddress.getByName(xflow.sourceAddress);
+    this.addresses[1] = InetAddress.getByName(xflow.destinationAddress);
+    this.ports[0] = xflow.sourcePort;
+    this.ports[1] = xflow.destinationPort;
+    
+    this.ethernetType = xflow.ethernetType;
+    
+    this.startTimeStamp = new Date(xflow.startTimeStamp);
+    this.lastTimeStamp = new Date(xflow.lastTimeStamp);
+    this.packetsSent = xflow.packetsSent;
+    this.packetsReceived = xflow.packetsReceived;
+    this.protocol = xflow.protocol;
+    this.flags = xflow.flags;
+    if (this.flags < 0) {
+    System.err.println("Negative flags value in Flow(XMLFlow): " + this.flags);
     }
- *
- */
+    
+    this.reportedBy = xflow.reportedBy;
+    }
+     *
+     */
 
-    public Flow(PersistentFlow sflow) throws UnknownHostException {
-        this();
+    public Flow(Customer customer, PersistentFlow sflow) throws UnknownHostException {
+        this(customer);
 
         this.bytesSent = new BigDecimal(sflow.size);
 
@@ -151,56 +153,55 @@ public class Flow implements Serializable {
 
     /*
     public XMLFlow toXMLFlow() {
-        XMLFlow xflow = new XMLFlow();
-
-        if (startTimeStamp != null) {
-            xflow.startTimeStamp = startTimeStamp.getTime();
-        }
-
-        if (lastTimeStamp != null) {
-            xflow.lastTimeStamp = lastTimeStamp.getTime();
-        }
-
-        xflow.ethernetType = ethernetType;
-
-        try {
-            xflow.sourceAddress = getUnfixedSourceAddress().getHostAddress();
-            xflow.destinationAddress = getUnfixedDestinationAddress().getHostAddress();
-            xflow.sourcePort = getUnfixedSourcePort();
-            xflow.destinationPort = getUnfixedDestinationPort();
-        } catch (Exception e) {
-            System.err.println("Exception in Flow: " + e.getMessage());
-        }
-
-        if (protocol != null) {
-            xflow.protocol = protocol;
-        }
-
-        if (bytesSent != null) {
-            xflow.bytesSent = bytesSent.longValue();
-        }
-
-        if (bytesReceived != null) {
-            xflow.bytesReceived = bytesReceived.longValue();
-        }
-
-        if (packetsSent != null) {
-            xflow.packetsSent = packetsSent;
-        }
-
-        if (packetsReceived != null) {
-            xflow.packetsReceived = packetsReceived;
-        }
-
-        xflow.flags = this.flags;
-
-        xflow.reportedBy = this.reportedBy;
-
-        return xflow;
+    XMLFlow xflow = new XMLFlow();
+    
+    if (startTimeStamp != null) {
+    xflow.startTimeStamp = startTimeStamp.getTime();
+    }
+    
+    if (lastTimeStamp != null) {
+    xflow.lastTimeStamp = lastTimeStamp.getTime();
+    }
+    
+    xflow.ethernetType = ethernetType;
+    
+    try {
+    xflow.sourceAddress = getUnfixedSourceAddress().getHostAddress();
+    xflow.destinationAddress = getUnfixedDestinationAddress().getHostAddress();
+    xflow.sourcePort = getUnfixedSourcePort();
+    xflow.destinationPort = getUnfixedDestinationPort();
+    } catch (Exception e) {
+    System.err.println("Exception in Flow: " + e.getMessage());
+    }
+    
+    if (protocol != null) {
+    xflow.protocol = protocol;
+    }
+    
+    if (bytesSent != null) {
+    xflow.bytesSent = bytesSent.longValue();
+    }
+    
+    if (bytesReceived != null) {
+    xflow.bytesReceived = bytesReceived.longValue();
+    }
+    
+    if (packetsSent != null) {
+    xflow.packetsSent = packetsSent;
+    }
+    
+    if (packetsReceived != null) {
+    xflow.packetsReceived = packetsReceived;
+    }
+    
+    xflow.flags = this.flags;
+    
+    xflow.reportedBy = this.reportedBy;
+    
+    return xflow;
     }
      * 
      */
-
     private Boolean determineDirectionality() {
         if ((protocol != 6) && (protocol != 17)) {
             sourceOrdinal = 0;
@@ -223,7 +224,7 @@ public class Flow implements Serializable {
                 Integer[] frequency = new Integer[2];
 
                 for (int i = 0; i < 2; i++) {
-                    frequency[i] = frequencyManager.getFrequency(protocol, ports[i]);
+                    frequency[i] = globalConfigurationManager.getFrequency(customer, protocol, ports[i]);
                 }
 
                 // If the frequency of ports[0] == the frequency of ports[1], ports[0] will be used.
@@ -563,4 +564,3 @@ public class Flow implements Serializable {
         this.packetsSent = packetsSent;
     }
 }
-

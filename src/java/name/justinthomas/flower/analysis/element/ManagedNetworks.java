@@ -5,13 +5,19 @@ import java.net.UnknownHostException;
 import java.util.LinkedHashMap;
 import name.justinthomas.flower.analysis.persistence.ManagedNetwork;
 import name.justinthomas.flower.analysis.persistence.ManagedNetworkManager;
+import name.justinthomas.flower.manager.services.Customer;
 import name.justinthomas.flower.utility.AddressAnalysis;
 
 public class ManagedNetworks {
 
+    private Customer customer;
     Boolean DEBUG = true;
-    LinkedHashMap<String, InetNetwork> subnets = new LinkedHashMap<String, InetNetwork>();
+    LinkedHashMap<String, InetNetwork> subnets = new LinkedHashMap();
 
+    public ManagedNetworks(Customer customer) {
+        this.customer = customer;
+    }
+    
     public void addNetwork(String id, InetNetwork network) {
         subnets.put(id, network);
     }
@@ -37,7 +43,7 @@ public class ManagedNetworks {
     }
 
     private void populate() {
-        ManagedNetworkManager mnm = new ManagedNetworkManager();
+        ManagedNetworkManager mnm = new ManagedNetworkManager(customer);
         for (ManagedNetwork network : mnm.getManagedNetworks()) {
             //System.out.println("Network ID: " + e.getValue());
 

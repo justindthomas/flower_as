@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import name.justinthomas.flower.manager.services.Customer;
@@ -26,9 +27,15 @@ public class CachedStatistics {
     public CachedStatistics(Customer customer) {
         this.customer = customer;
         System.out.println("Setting CachedStatistics Persist to run every 60 seconds.");
-        cache = Collections.synchronizedMap(new HashMap());
-        lastUpdated = Collections.synchronizedMap(new HashMap());
-        sourceMap = Collections.synchronizedMap(new HashMap());
+        //cache = Collections.synchronizedMap(new HashMap());
+        cache = new ConcurrentHashMap();
+        
+        //lastUpdated = Collections.synchronizedMap(new HashMap());
+        lastUpdated = new ConcurrentHashMap();
+        
+        //sourceMap = Collections.synchronizedMap(new HashMap());
+        sourceMap = new ConcurrentHashMap();
+        
         executor = new ScheduledThreadPoolExecutor(3);
 
         executor.scheduleAtFixedRate(new Task(customer), 60, 60, TimeUnit.SECONDS);

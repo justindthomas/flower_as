@@ -9,9 +9,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Random;
 import javax.annotation.Resource;
 import javax.ejb.EJB;
@@ -26,12 +24,13 @@ import javax.xml.bind.annotation.XmlType;
 import javax.xml.ws.WebServiceContext;
 import javax.xml.ws.WebServiceException;
 import javax.xml.ws.handler.MessageContext;
-import name.justinthomas.flower.analysis.element.InetNetwork;
+import name.justinthomas.flower.analysis.authentication.AuthenticationToken;
 import name.justinthomas.flower.analysis.persistence.FlowManager;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetwork;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
-import name.justinthomas.flower.analysis.element.ManagedNetworks;
 import name.justinthomas.flower.analysis.persistence.Constraints;
+import name.justinthomas.flower.analysis.persistence.ManagedNetwork;
+import name.justinthomas.flower.analysis.persistence.ManagedNetworkManager;
 import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.persistence.SessionManager;
 import name.justinthomas.flower.analysis.persistence.ThreadManager;
@@ -40,7 +39,6 @@ import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNode;
 import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
-import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.Customer;
 import name.justinthomas.flower.manager.services.CustomerAdministration;
 import name.justinthomas.flower.manager.services.CustomerAdministrationService;
@@ -55,8 +53,7 @@ public class ChartData {
 
     @EJB
     ThreadManager threadManager;
-    @EJB
-    GlobalConfigurationManager globalConfigurationManager;
+    
     @Resource
     private WebServiceContext serviceContext;
 
@@ -73,7 +70,7 @@ public class ChartData {
 
         UserAction userAction = new UserAction();
 
-        if (!userAction.authenticate(user, password).authorized) {
+        if (!userAction.authenticate(customerID, user, password).authorized) {
             return (null);
         }
 
@@ -84,7 +81,7 @@ public class ChartData {
             throw new WebServiceException("No session in WebServiceContext");
         }
 
-        Customer customer = this.getCustomer(customerID);
+        Customer customer = Utility.getCustomer(customerID);
 
         if (customer != null) {
 
@@ -158,7 +155,7 @@ public class ChartData {
 
         UserAction userAction = new UserAction();
 
-        if (!userAction.authenticate(user, password).authorized) {
+        if (!userAction.authenticate(customerID, user, password).authorized) {
             return (null);
         }
 
@@ -169,7 +166,7 @@ public class ChartData {
             throw new WebServiceException("No session in WebServiceContext");
         }
 
-        Customer customer = this.getCustomer(customerID);
+        Customer customer = Utility.getCustomer(customerID);
 
         if (customer != null) {
 
@@ -195,19 +192,6 @@ public class ChartData {
                 BuildFlowList task = new BuildFlowList(customer, session, constraints, tracker);
                 threadManager.start(user, new TimedThread(task));
             }
-
-            //if (!SessionManager.isProcessingPacketsComplete(session, constraints)) {
-            //    //System.out.println("It appears that processing is not complete...");
-            //    if (!SessionManager.isProcessingPackets(session)) {
-            //        //System.out.println("It appears that processing has not begun...");
-            //        SessionManager.isProcessingPackets(session, true);
-            //
-            //        //System.out.println("Starting packet processing thread.");
-            //        BuildFlowList task = new BuildFlowList(session, constraints);
-            //        threadManager.start(user, new TimedThread(task));
-            //    }
-            //}
-
 
             FlowSet xmlPacketList = new FlowSet();
 
@@ -246,19 +230,19 @@ public class ChartData {
 
         UserAction userAction = new UserAction();
 
-        if (!userAction.authenticate(user, password).authorized) {
+        if (!userAction.authenticate(customerID, user, password).authorized) {
             return (null);
         }
 
         Customer customer = null;
 
         try {
-            CustomerAdministrationService admin = new CustomerAdministrationService(new URL(globalConfigurationManager.getManager() + "/CustomerAdministrationService?wsdl"));
+            CustomerAdministrationService admin = new CustomerAdministrationService(new URL(Utility.getGlobalConfigurationManager().getManager() + "/CustomerAdministrationService?wsdl"));
 
             CustomerAdministration port = admin.getCustomerAdministrationPort();
             customer = port.getCustomer(null, null, customerID);
         } catch (MalformedURLException e) {
-            System.err.println("Could not access Customer Administration service at: " + globalConfigurationManager.getManager());
+            System.err.println("Could not access Customer Administration service at: " + Utility.getGlobalConfigurationManager().getManager());
             return null;
         }
 
@@ -280,7 +264,7 @@ public class ChartData {
 
         UserAction userAction = new UserAction();
 
-        if (!userAction.authenticate(user, password).authorized) {
+        if (!userAction.authenticate(customerID, user, password).authorized) {
             return (null);
         }
 
@@ -291,7 +275,7 @@ public class ChartData {
             throw new WebServiceException("No session in WebServiceContext");
         }
 
-        Customer customer = this.getCustomer(customerID);
+        Customer customer = Utility.getCustomer(customerID);
 
         if (customer != null) {
             XMLDataVolumeList volumes = SessionManager.getVolumes(session);
@@ -324,20 +308,31 @@ public class ChartData {
             return null;
         }
     }
+    
+    @WebMethod(operationName = "getManagedNetworks")
+    public List<XMLNetwork> getManagedNetworks(
+            @WebParam(name = "customer") String customerID,
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password) {
 
-    private Customer getCustomer(String customerID) {
-        Customer customer = null;
+        List<XMLNetwork> xnetworks = new ArrayList<XMLNetwork>();
 
-        try {
-            CustomerAdministrationService admin = new CustomerAdministrationService(new URL(globalConfigurationManager.getManager() + "/CustomerAdministrationService?wsdl"));
+        UserAction userAction = new UserAction();
+        
+        AuthenticationToken token = userAction.authenticate(customerID, user, password);
+        if (token.authenticated && token.authorized) {
+            for (ManagedNetwork network : new ManagedNetworkManager(Utility.getCustomer(customerID)).getManagedNetworks()) {
+                XMLNetwork xnetwork = new XMLNetwork();
+                xnetwork.name = network.description;
+                String cidr = network.address;
+                String[] cidrParts = cidr.split("/");
+                xnetwork.address = cidrParts[0];
+                xnetwork.mask = Integer.parseInt(cidrParts[1].trim());
 
-            CustomerAdministration port = admin.getCustomerAdministrationPort();
-            customer = port.getCustomer(null, null, customerID);
-        } catch (MalformedURLException e) {
-            System.err.println("Could not access Customer Administration service at: " + globalConfigurationManager.getManager());
+                xnetworks.add(xnetwork);
+            }
         }
-
-        return customer;
+        return xnetworks;
     }
 
     private class BuildFlowList implements Runnable {
@@ -356,8 +351,8 @@ public class ChartData {
 
         @Override
         public void run() {
-            FlowManager flowManager = new FlowManager();
-            flowManager.getFlows(customer, session, constraints, tracker);
+            FlowManager flowManager = new FlowManager(customer);
+            flowManager.getFlows(session, constraints, tracker);
 
             //System.out.println("FlowManager getPackets() appears to have completed...");
             SessionManager.isProcessingPacketsComplete(session, tracker, true);
@@ -378,8 +373,8 @@ public class ChartData {
 
         @Override
         public void run() {
-            FlowManager flowManager = new FlowManager();
-            flowManager.getXMLNetworks(customer, session, constraints);
+            FlowManager flowManager = new FlowManager(customer);
+            flowManager.getXMLNetworks(session, constraints);
             System.out.println("Completed BuildNetworkList thread.");
         }
     }
@@ -400,42 +395,8 @@ public class ChartData {
 
         @Override
         public void run() {
-            FlowManager flowManager = new FlowManager();
-            flowManager.getXMLDataVolumes(customer, session, constraints, bins);
-        }
-    }
-
-    /**
-     * Web service operation
-     */
-    @WebMethod(operationName = "getManagedNetworks")
-    public XMLNetworkList getManagedNetworks(
-            @WebParam(name = "user") String user,
-            @WebParam(name = "password") String password) {
-
-        UserAction userAction = new UserAction();
-
-        if (!userAction.authenticate(user, password).authorized) {
-            XMLNetworkList networkList = new XMLNetworkList();
-            networkList.ready = true;
-
-            return (networkList);
-        }
-
-        {
-            LinkedHashMap<String, InetNetwork> networks = new ManagedNetworks().getNetworks();
-            XMLNetworkList networkList = new XMLNetworkList();
-
-            for (Entry<String, InetNetwork> entry : networks.entrySet()) {
-                XMLNetwork xnetwork = new XMLNetwork();
-                xnetwork.address = entry.getValue().getAddress().getHostAddress();
-                xnetwork.mask = entry.getValue().getMask();
-                xnetwork.name = entry.getValue().getName();
-
-                networkList.networks.add(xnetwork);
-            }
-
-            return networkList;
+            FlowManager flowManager = new FlowManager(customer);
+            flowManager.getXMLDataVolumes(session, constraints, bins);
         }
     }
 

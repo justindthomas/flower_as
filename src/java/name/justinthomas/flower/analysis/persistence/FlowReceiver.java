@@ -21,25 +21,28 @@ import name.justinthomas.flower.manager.services.Customer;
  */
 public class FlowReceiver {
 
-    private static FrequencyManager frequencyManager;
+    private Customer customer;
+    //private static FrequencyManager frequencyManager;
     private static GlobalConfigurationManager globalConfigurationManager;
     private Environment environment;
 
-    public FlowReceiver() {
-        if (frequencyManager == null) {
-            frequencyManager = FrequencyManager.getFrequencyManager();
-        }
-    }
-
-    private void setupEnvironment(Customer customer) throws Exception {
+    public FlowReceiver(Customer customer) {
+        this.customer = customer;
+        
         if (globalConfigurationManager == null) {
             try {
                 globalConfigurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
             } catch (NamingException e) {
-                throw new Exception("Error retrieving GlobalConfigurationManager in FlowReceiver: " + e.getMessage());
+                System.err.println("Error retrieving GlobalConfigurationManager in FlowReceiver: " + e.getMessage());
             }
         }
+        
+        //if (frequencyManager == null) {
+        //    frequencyManager = globalConfigurationManager.getFrequencyManager(this.customer);
+        //}   
+    }
 
+    private void setupEnvironment() throws Exception {
         File environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/flows");
 
         try {
@@ -70,19 +73,20 @@ public class FlowReceiver {
         }
     }
 
-    public Long addFlow(Customer customer, Flow flow) {
-        return this.addFlow(customer, flow, null);
+    public Long addFlow(Flow flow) {
+        return this.addFlow(flow, null);
     }
 
-    public Long addFlow(Customer customer, Flow flow, HttpServletRequest request) {
+    public Long addFlow(Flow flow, HttpServletRequest request) {
         if ((flow.protocol == 6) || (flow.protocol == 17)) {
-            frequencyManager.addPort(flow.protocol, flow.ports);
+            globalConfigurationManager.addFrequency(customer, flow.protocol, flow.ports);
+            //frequencyManager.addPort(flow.protocol, flow.ports);
         }
 
         PersistentFlow pflow = flow.toHashTableFlow();
 
         try {
-            setupEnvironment(customer);
+            setupEnvironment();
 
             EntityStore entityStore = null;
             StoreConfig storeConfig = new StoreConfig();
@@ -117,15 +121,15 @@ public class FlowReceiver {
         return pflow.id;
     }
 
-    public LinkedList<Long> addFlows(Customer customer, LinkedList<Flow> flows) {
-        return this.addFlows(customer, flows, null);
+    public LinkedList<Long> addFlows(LinkedList<Flow> flows) {
+        return this.addFlows(flows, null);
     }
 
-    public LinkedList<Long> addFlows(Customer customer, LinkedList<Flow> flows, HttpServletRequest request) {
+    public LinkedList<Long> addFlows(LinkedList<Flow> flows, HttpServletRequest request) {
         LinkedList<Long> ids = new LinkedList();
 
         try {
-            setupEnvironment(customer);
+            setupEnvironment();
 
             EntityStore entityStore = null;
             StoreConfig storeConfig = new StoreConfig();
@@ -139,7 +143,8 @@ public class FlowReceiver {
                 //System.out.println("Putting flow with start date: " + new Date(pflow.getStartTimeStampMs()));
                 for (Flow flow : flows) {
                     if ((flow.protocol == 6) || (flow.protocol == 17)) {
-                        frequencyManager.addPort(flow.protocol, flow.ports);
+                        globalConfigurationManager.addFrequency(customer, flow.protocol, flow.ports);
+                        //frequencyManager.addPort(flow.protocol, flow.ports);
                     }
 
                     PersistentFlow pflow = flow.toHashTableFlow();

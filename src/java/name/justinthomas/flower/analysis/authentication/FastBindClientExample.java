@@ -17,7 +17,7 @@ public class FastBindClientExample {
     public static void run() {
         UserAction action = new UserAction();
 
-        AuthenticationToken token = action.authenticate("justin@internal.jdthomas.net", "");
+        AuthenticationToken token = action.authenticate("1111", "justin@internal.jdthomas.net", "");
         if (token.authenticated) {
             System.out.println("Authenticated: " + token.fullName);
         } else {

@@ -22,6 +22,7 @@ import javax.naming.ldap.Control;
 import javax.naming.ldap.InitialLdapContext;
 import javax.naming.ldap.LdapContext;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
+import name.justinthomas.flower.manager.services.Customer;
 
 /**
  *
@@ -47,15 +48,18 @@ class FastBindConnectionControl implements Control {
 
 public class ActiveDirectory {
 
+    private Customer customer;
     private String username = null;
     private String bareUsername = null;
     private String password = null;
     private String domain = null;
     private String distinguishedName = null;
     private static GlobalConfigurationManager configurationManager;
-    private DirectoryDomainManager directoryDomainManager = new DirectoryDomainManager();
+    private DirectoryDomainManager directoryDomainManager;
 
-    public ActiveDirectory(String username, String password) {
+    public ActiveDirectory(Customer customer, String username, String password) {
+        this.customer = customer;
+        
         if(configurationManager == null) {
             try {
                 configurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
@@ -63,6 +67,8 @@ public class ActiveDirectory {
                 e.printStackTrace();
             }
         }
+        
+        this.directoryDomainManager = new DirectoryDomainManager(customer);
         
         this.username = username;
         this.password = password;

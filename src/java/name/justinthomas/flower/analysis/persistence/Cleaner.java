@@ -42,32 +42,28 @@ public class Cleaner implements Runnable {
     private void clean() {
         Collection<String> customers;
 
-        synchronized (customers = globalConfigurationManager.getCachedStatisticsMap().keySet()) {
-            System.out.println("Cleaning statistics...");
-            Customer customer = null;
+        //synchronized (customers = globalConfigurationManager.getCachedStatisticsMap().keySet()) {
+        customers = globalConfigurationManager.getCachedStatisticsMap().keySet();
+        System.out.println("Cleaning statistics...");
+        Customer customer = null;
 
-
+        try {
+            CustomerAdministrationService admin = new CustomerAdministrationService(new URL(globalConfigurationManager.getManager() + "/CustomerAdministrationService?wsdl"));
+            CustomerAdministration port = admin.getCustomerAdministrationPort();
 
             for (String customerID : customers) {
-                try {
-                    CustomerAdministrationService admin = new CustomerAdministrationService(new URL(globalConfigurationManager.getManager() + "/CustomerAdministrationService?wsdl"));
+                customer = port.getCustomer(null, null, customerID);
 
-                    CustomerAdministration port = admin.getCustomerAdministrationPort();
-                    customer = port.getCustomer(null, null, customerID);
-                } catch (MalformedURLException e) {
-                    System.err.println("Could not access Customer Administration service at: " + globalConfigurationManager.getManager());
-                    break;
-                }
-                
                 StatisticsManager statisticsManager = new StatisticsManager(customer);
                 ArrayList<Long> flowIDs = statisticsManager.cleanStatisticalIntervals();
                 System.out.println("Cleaning flows...");
-                FlowManager flowManager = new FlowManager();
+                FlowManager flowManager = new FlowManager(customer);
                 flowManager.cleanFlows(flowIDs);
             }
+        } catch (MalformedURLException e) {
+            System.err.println("Could not access Customer Administration service at: " + globalConfigurationManager.getManager());
         }
-
-
+        //}
 
         if (DEBUG >= 1) {
             System.out.println("Cleaning completed.");

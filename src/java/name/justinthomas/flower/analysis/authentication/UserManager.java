@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.TimeZone;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import name.justinthomas.flower.manager.services.Customer;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 /**
@@ -24,10 +25,23 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
  */
 public class UserManager {
 
+    private Customer customer;
     private static Integer DEBUG = 1;
     private Environment environment;
     private static GlobalConfigurationManager configurationManager;
 
+    public UserManager(Customer customer) {
+        this.customer = customer;
+        
+        if(configurationManager == null) {
+            try {
+                configurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+            } catch (NamingException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    
     private void createFirstUser() {
         Security.addProvider(new BouncyCastleProvider());
         MessageDigest hash = null;
@@ -166,16 +180,8 @@ public class UserManager {
         return users;
     }
 
-    private void setupEnvironment() {
-        if(configurationManager == null) {
-            try {
-                configurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
-            } catch (NamingException e) {
-                e.printStackTrace();
-            }
-        }
-        
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/users");
+    private void setupEnvironment() {        
+        File environmentHome = new File(configurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/users");
 
         if (!environmentHome.exists()) {
             if (environmentHome.mkdirs()) {

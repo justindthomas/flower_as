@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import name.justinthomas.flower.manager.services.Customer;
 
 /**
  *
@@ -23,9 +24,14 @@ import javax.naming.NamingException;
  */
 public class ManagedNetworkManager {
 
-    private static GlobalConfigurationManager configurationManager;
+    private Customer customer;
+    private static GlobalConfigurationManager globalConfigurationManager;
     private Environment environment;
 
+    public ManagedNetworkManager(Customer customer) {
+        this.customer = customer;
+    }
+    
     public List<ManagedNetwork> getManagedNetworks() {
         ArrayList<ManagedNetwork> networks = new ArrayList();
 
@@ -112,15 +118,15 @@ public class ManagedNetworkManager {
     }
     
     private void setupEnvironment() {
-        if (configurationManager == null) {
+        if (globalConfigurationManager == null) {
             try {
-                configurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+                globalConfigurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
             } catch (NamingException e) {
                 e.printStackTrace();
             }
         }
 
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/configuration");
+        File environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/configuration");
 
         if (!environmentHome.exists()) {
             if (environmentHome.mkdirs()) {

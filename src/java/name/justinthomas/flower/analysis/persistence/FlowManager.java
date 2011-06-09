@@ -34,10 +34,13 @@ import name.justinthomas.flower.manager.services.Customer;
 
 public class FlowManager {
 
+    private Customer customer;
     private static final Integer DEBUG = 2;
     private GlobalConfigurationManager configurationManager;
 
-    public FlowManager() {
+    public FlowManager(Customer customer) {
+        this.customer = customer;
+        
         try {
             configurationManager = InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
         } catch (NamingException e) {
@@ -46,7 +49,7 @@ public class FlowManager {
     }
 
     private Environment setupEnvironment() {
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/flows");
+        File environmentHome = new File(configurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/flows");
 
         try {
             if (!environmentHome.exists()) {
@@ -101,7 +104,7 @@ public class FlowManager {
         }
     }
 
-    public void getFlows(Customer customer, HttpSession session, String constraintsString, String tracker) {
+    public void getFlows(HttpSession session, String constraintsString, String tracker) {
 
         System.out.println("getFlows called.");
         Constraints constraints = new Constraints(constraintsString);
@@ -140,7 +143,7 @@ public class FlowManager {
                     }
 
                     if (select) {
-                        SessionManager.getFlows(session, tracker).add(new Flow(pflow));
+                        SessionManager.getFlows(session, tracker).add(new Flow(customer, pflow));
                     }
 
                     if (DEBUG > 0) {
@@ -165,7 +168,7 @@ public class FlowManager {
         }
     }
 
-    public XMLDataVolumeList getXMLDataVolumes(Customer customer, HttpSession session, String constr, Integer nmb_bins) {
+    public XMLDataVolumeList getXMLDataVolumes(HttpSession session, String constr, Integer nmb_bins) {
         XMLDataVolumeList volumeList = new XMLDataVolumeList();
 
         Boolean cancelVolume = false;
@@ -253,7 +256,7 @@ public class FlowManager {
         return volumeList;
     }
 
-    public XMLNetworkList getXMLNetworks(Customer customer, HttpSession session, String constraints) {
+    public XMLNetworkList getXMLNetworks(HttpSession session, String constraints) {
         XMLNetworkList networkList = new XMLNetworkList();
         StatisticsManager statisticsManager = new StatisticsManager(customer);
         ArrayList<Network> networks = statisticsManager.getNetworks(session, new Constraints(constraints));

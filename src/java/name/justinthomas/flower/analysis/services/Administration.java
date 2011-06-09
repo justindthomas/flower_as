@@ -1,5 +1,7 @@
 package name.justinthomas.flower.analysis.services;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import name.justinthomas.flower.analysis.authentication.UserAction;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -14,7 +16,6 @@ import javax.xml.bind.annotation.XmlType;
 import name.justinthomas.flower.analysis.authentication.AuthenticationToken;
 import name.justinthomas.flower.analysis.authentication.DirectoryDomain;
 import name.justinthomas.flower.analysis.authentication.DirectoryDomainManager;
-import name.justinthomas.flower.analysis.persistence.FrequencyManager;
 import name.justinthomas.flower.analysis.persistence.ManagedNetwork;
 import name.justinthomas.flower.analysis.persistence.ManagedNetworkManager;
 import name.justinthomas.flower.analysis.authentication.UserManager;
@@ -22,8 +23,10 @@ import name.justinthomas.flower.analysis.authentication.User;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryDomain;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryGroup;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetwork;
-import name.justinthomas.flower.analysis.statistics.CachedStatistics;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
+import name.justinthomas.flower.manager.services.Customer;
+import name.justinthomas.flower.manager.services.CustomerAdministration;
+import name.justinthomas.flower.manager.services.CustomerAdministrationService;
 
 /**
  *
@@ -32,12 +35,12 @@ import name.justinthomas.flower.global.GlobalConfigurationManager;
 @WebService()
 public class Administration {
 
-    @EJB GlobalConfigurationManager globalConfigurationManager;
-    private ManagedNetworkManager managedNetworkManager = new ManagedNetworkManager();
-    private DirectoryDomainManager directoryDomainManager = new DirectoryDomainManager();
-
+    @EJB
+    GlobalConfigurationManager globalConfigurationManager;
+    
     @WebMethod(operationName = "addManagedNetwork")
     public Boolean addManagedNetwork(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "name") String name,
@@ -45,10 +48,10 @@ public class Administration {
 
         System.out.println("Attempting to add: " + user + ", " + name + ", " + address);
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(user, password);
+        AuthenticationToken token = userAction.authenticate(customerID, user, password);
         if (token.authenticated && token.authorized && token.administrator) {
             try {
-                return managedNetworkManager.addManagedNetwork(new ManagedNetwork(address, name));
+                return new ManagedNetworkManager(Utility.getCustomer(customerID)).addManagedNetwork(new ManagedNetwork(address, name));
             } catch (UnknownHostException e) {
                 System.err.println("Managed network address appears to be malformed.");
                 return false;
@@ -60,6 +63,7 @@ public class Administration {
 
     @WebMethod(operationName = "addDomainGroup")
     public Boolean addDomainGroup(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "domain") String domain,
@@ -67,24 +71,25 @@ public class Administration {
             @WebParam(name = "privileged") Boolean privileged) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(user, password);
+        AuthenticationToken token = userAction.authenticate(customerID, user, password);
         if (token.authenticated && token.authorized && token.administrator) {
-            return directoryDomainManager.addDirectoryDomain(domain, group, privileged);
+            return new DirectoryDomainManager(Utility.getCustomer(customerID)).addDirectoryDomain(domain, group, privileged);
         }
-        
+
         return false;
     }
 
     @WebMethod(operationName = "removeManagedNetwork")
     public Boolean removeManagedNetwork(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "address") String address) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(user, password);
+        AuthenticationToken token = userAction.authenticate(customerID, user, password);
         if (token.authenticated && token.authorized && token.administrator) {
-            return managedNetworkManager.deleteManagedNetwork(address);
+            return new ManagedNetworkManager(Utility.getCustomer(customerID)).deleteManagedNetwork(address);
         }
 
         return false;
@@ -92,15 +97,16 @@ public class Administration {
 
     @WebMethod(operationName = "removeDomainGroup")
     public Boolean removeDomainGroup(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "domain") String domain,
             @WebParam(name = "group") String group) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(user, password);
+        AuthenticationToken token = userAction.authenticate(customerID, user, password);
         if (token.authenticated && token.authorized && token.administrator) {
-            directoryDomainManager.removeGroup(domain, group);
+            new DirectoryDomainManager(Utility.getCustomer(customerID)).removeGroup(domain, group);
             return true;
         }
 
@@ -109,6 +115,7 @@ public class Administration {
 
     @WebMethod(operationName = "addUser")
     public Boolean addUser(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "updatedUser") String updatedUser,
@@ -118,17 +125,24 @@ public class Administration {
             @WebParam(name = "timeZone") String timeZone) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(user, password);
-        UserManager userManager = new UserManager();
+        AuthenticationToken token = userAction.authenticate(customerID, user, password);
 
-        if (token.authenticated && token.authorized && token.administrator) {
-            if (userManager.getUser(updatedUser) == null) {
-                if (!userManager.updateUser(updatedUser, updatedPassword, fullName, administrator, timeZone)) {
+        Customer customer = Utility.getCustomer(customerID);
+
+        if (customer != null) {
+            UserManager userManager = new UserManager(customer);
+
+            if (token.authenticated && token.authorized && token.administrator) {
+                if (userManager.getUser(updatedUser) == null) {
+                    if (!userManager.updateUser(updatedUser, updatedPassword, fullName, administrator, timeZone)) {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
-            } else {
-                return false;
             }
+        } else {
+            return false;
         }
 
         return true;
@@ -136,6 +150,7 @@ public class Administration {
 
     @WebMethod(operationName = "privilegedUpdateUser")
     public Boolean privilegedUpdateUser(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "updatedUser") String updatedUser,
@@ -145,11 +160,17 @@ public class Administration {
             @WebParam(name = "timeZone") String timeZone) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(user, password);
+        AuthenticationToken token = userAction.authenticate(customerID, user, password);
 
-        UserManager userManager = new UserManager();
-        if (token.authenticated && token.authorized && token.administrator && (userManager.getUser(updatedUser) != null)) {
-            if (!userManager.updateUser(updatedUser, updatedPassword, fullName, administrator, timeZone)) {
+        Customer customer = Utility.getCustomer(customerID);
+
+        if (customer != null) {
+            UserManager userManager = new UserManager(customer);
+            if (token.authenticated && token.authorized && token.administrator && (userManager.getUser(updatedUser) != null)) {
+                if (!userManager.updateUser(updatedUser, updatedPassword, fullName, administrator, timeZone)) {
+                    return false;
+                }
+            } else {
                 return false;
             }
         } else {
@@ -162,16 +183,21 @@ public class Administration {
 
     @WebMethod(operationName = "deleteUser")
     public Boolean deleteUser(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password,
             @WebParam(name = "deletedUser") String deletedUser) {
 
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(user, password);
+        AuthenticationToken token = userAction.authenticate(customerID, user, password);
 
-        UserManager userManager = new UserManager();
-        if (token.authenticated && token.authorized && token.administrator) {
-            return userManager.deleteUser(deletedUser);
+        Customer customer = Utility.getCustomer(customerID);
+
+        if (customer != null) {
+            UserManager userManager = new UserManager(customer);
+            if (token.authenticated && token.authorized && token.administrator) {
+                return userManager.deleteUser(deletedUser);
+            }
         }
 
         return false;
@@ -179,17 +205,22 @@ public class Administration {
 
     @WebMethod(operationName = "getUsers")
     public List<User> getUsers(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password) {
 
         List<User> xusers = new ArrayList();
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(user, password);
+        AuthenticationToken token = userAction.authenticate(customerID, user, password);
 
-        UserManager userManager = new UserManager();
-        if (token.authenticated && token.authorized && token.administrator) {
-            for (User puser : userManager.getUsers()) {
-                xusers.add(puser.sanitize());
+        Customer customer = Utility.getCustomer(customerID);
+
+        if (customer != null) {
+            UserManager userManager = new UserManager(customer);
+            if (token.authenticated && token.authorized && token.administrator) {
+                for (User puser : userManager.getUsers()) {
+                    xusers.add(puser.sanitize());
+                }
             }
         }
 
@@ -198,14 +229,15 @@ public class Administration {
 
     @WebMethod(operationName = "getDirectoryDomains")
     public List<XMLDirectoryDomain> getDirectoryDomains(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password) {
 
         List<XMLDirectoryDomain> xdomains = new ArrayList();
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(user, password);
+        AuthenticationToken token = userAction.authenticate(customerID, user, password);
         if (token.authenticated && token.authorized && token.administrator) {
-            for (DirectoryDomain directoryDomain : directoryDomainManager.getDirectoryDomains()) {
+            for (DirectoryDomain directoryDomain : new DirectoryDomainManager(Utility.getCustomer(customerID)).getDirectoryDomains()) {
                 XMLDirectoryDomain xdomain = new XMLDirectoryDomain();
                 xdomain.domain = directoryDomain.domain;
                 for (Entry<String, Boolean> group : directoryDomain.groups.entrySet()) {
@@ -219,45 +251,23 @@ public class Administration {
         }
         return xdomains;
     }
-
-    @WebMethod(operationName = "getManagedNetworks")
-    public List<XMLNetwork> getManagedNetworks(
+    
+    @WebMethod(operationName = "getOperatingStatistics")
+    public OperatingStatistics getStatistics(
+            @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password) {
 
-        List<XMLNetwork> xnetworks = new ArrayList<XMLNetwork>();
-
-        UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(user, password);
-        if (token.authenticated && token.authorized && token.administrator) {
-            for (ManagedNetwork network : managedNetworkManager.getManagedNetworks()) {
-                XMLNetwork xnetwork = new XMLNetwork();
-                xnetwork.name = network.description;
-                String cidr = network.address;
-                String[] cidrParts = cidr.split("/");
-                xnetwork.address = cidrParts[0];
-                xnetwork.mask = Integer.parseInt(cidrParts[1].trim());
-
-                xnetworks.add(xnetwork);
-            }
-        }
-        return xnetworks;
-    }
-
-    @WebMethod(operationName = "getOperatingStatistics")
-    public OperatingStatistics getStatistics(
-            @WebParam(name = "user") String user,
-            @WebParam(name = "password") String password,
-            @WebParam(name = "customer") String customerID) {
-
         OperatingStatistics stats = new OperatingStatistics();
 
+        Customer customer = Utility.getCustomer(customerID);
+
         UserAction userAction = new UserAction();
-        AuthenticationToken token = userAction.authenticate(user, password);
+        AuthenticationToken token = userAction.authenticate(customerID, user, password);
         if (token.authenticated && token.authorized && token.administrator) {
             stats.insertionCacheSize = globalConfigurationManager.getCachedStatistics(customerID).getCacheSize();
-            stats.frequencyMapSize = FrequencyManager.getFrequencyManager().getMapSize();
-            stats.largestFrequency = FrequencyManager.getFrequencyManager().getLargestFrequency();
+            stats.frequencyMapSize = globalConfigurationManager.getFrequencyManager(customer).getMapSize();
+            stats.largestFrequency = globalConfigurationManager.getFrequencyManager(customer).getLargestFrequency();
             stats.representationMap = globalConfigurationManager.getCachedStatistics(customerID).getRepresentationMapSize();
         }
 
