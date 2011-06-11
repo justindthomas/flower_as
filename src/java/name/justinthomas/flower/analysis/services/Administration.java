@@ -22,6 +22,7 @@ import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryDomain;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryGroup;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
+import org.apache.log4j.Logger;
 
 /**
  *
@@ -30,6 +31,8 @@ import name.justinthomas.flower.manager.services.CustomerAdministration.Customer
 @WebService()
 public class Administration {
 
+    private static Logger log = Logger.getLogger(Administration.class.getName());
+    
     @EJB
     GlobalConfigurationManager globalConfigurationManager;
     
@@ -41,7 +44,7 @@ public class Administration {
             @WebParam(name = "name") String name,
             @WebParam(name = "address") String address) {
 
-        System.out.println("Attempting to add: " + user + ", " + name + ", " + address);
+        log.debug("Attempting to add: " + user + ", " + name + ", " + address);
         UserAction userAction = new UserAction();
         AuthenticationToken token = userAction.authenticate(customerID, user, password);
         if (token.authenticated && token.authorized && token.administrator) {

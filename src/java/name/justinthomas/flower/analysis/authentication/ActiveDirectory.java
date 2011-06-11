@@ -23,6 +23,7 @@ import javax.naming.ldap.InitialLdapContext;
 import javax.naming.ldap.LdapContext;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
+import org.apache.log4j.Logger;
 
 /**
  *
@@ -48,6 +49,7 @@ class FastBindConnectionControl implements Control {
 
 public class ActiveDirectory {
 
+    private static final Logger log = Logger.getLogger(ActiveDirectory.class.getName());
     private Customer customer;
     private String username = null;
     private String bareUsername = null;
@@ -59,12 +61,12 @@ public class ActiveDirectory {
 
     public ActiveDirectory(Customer customer, String username, String password) {
         this.customer = customer;
-        
+
         if(configurationManager == null) {
             try {
                 configurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
             } catch (NamingException e) {
-                e.printStackTrace();
+                log.warn("Could not locate GlobalConfigurationManager: " + e.getExplanation());
             }
         }
         
@@ -98,11 +100,9 @@ public class ActiveDirectory {
 
             ctx.close();
         } catch (AuthenticationException e) {
-            System.out.println(username + " failed authentication");
-            e.printStackTrace();
+            log.warn(username + " failed authentication: " + e.getExplanation());
         } catch (NamingException e) {
-            System.out.println(username + " failed authentication");
-            e.printStackTrace();
+            log.warn(username + " failed authentication: " + e.getExplanation());
         } finally {
             return token;
         }
@@ -124,13 +124,12 @@ public class ActiveDirectory {
 
             while (answer.hasMoreElements()) {
                 SearchResult sr = (SearchResult) answer.next();
-                //System.out.println(">>>" + sr.getName());
 
                 Attributes attrs = sr.getAttributes();
                 if (attrs != null) {
                     for (NamingEnumeration ae = attrs.getAll(); ae.hasMore();) {
                         Attribute attr = (Attribute) ae.next();
-                        //System.out.println("Attribute: " + attr.getID());
+
                         for (NamingEnumeration e = attr.getAll(); e.hasMore(); totalResults++) {
                             if (distinguishedName.equals(e.next())) {
                                 return true;
@@ -139,12 +138,10 @@ public class ActiveDirectory {
                     }
                 }
             }
-
-            //System.out.println("Total members: " + totalResults);
         } catch (AuthenticationException e) {
-            e.printStackTrace();
+            log.info(group + " failed lookup: " + e.getExplanation());
         } catch (NamingException e) {
-            e.printStackTrace();
+            log.info(group + " failed lookup: " + e.getExplanation());
         }
 
         return false;
@@ -162,7 +159,7 @@ public class ActiveDirectory {
             dns = servers[0];
         }
 
-        System.out.println("DNS Server: " + dns);
+        log.debug("DNS Server: " + dns);
         return dns;
     }
 
@@ -184,7 +181,7 @@ public class ActiveDirectory {
         }
 
         ctx.close();
-        System.out.println("LDAP Server: " + server);
+        log.debug("LDAP Server: " + server);
         return "ldap://" + server;
     }
 
@@ -196,7 +193,7 @@ public class ActiveDirectory {
         try {
             SearchControls controls = new SearchControls();
             controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-            //System.out.println("Searching for displayName for: " + bareUsername);
+            log.debug("Searching for displayName for: " + bareUsername);
             String searchString = "(&(objectClass=person)(sAMAccountName=" + bareUsername + "))";
             NamingEnumeration directoryEntries = ctx.search(fqdnToBase(domain), searchString, controls);
 
@@ -206,13 +203,13 @@ public class ActiveDirectory {
                 while (attributeEnumeration.hasMoreElements()) {
                     Attribute attribute = (Attribute) attributeEnumeration.next();
                     if (attribute.getID().equals("displayName")) {
-                        //System.out.println("Display Name: " + attribute.get());
+                        log.debug("Display Name: " + attribute.get());
                         return (String) attribute.get();
                     }
                 }
             }
         } catch (NullPointerException e) {
-            e.printStackTrace();
+            log.warn("Error attempting to get display name for " + bareUsername + ":" + e.getMessage());
         }
         return null;
     }
@@ -230,7 +227,7 @@ public class ActiveDirectory {
                 return subEntry + "," + fqdnToBase(domain);
             }
         } catch (NullPointerException e) {
-            e.printStackTrace();
+            log.warn("Error attempting to get DN for " + bareUsername + ":" + e.getMessage());
         }
         return null;
     }
@@ -246,7 +243,7 @@ public class ActiveDirectory {
 
         if (domain != null) {
             env.put(Context.SECURITY_PRINCIPAL, username);
-            System.out.println("Trying: " + username + "@" + domain);
+            log.debug("Trying: " + username + "@" + domain);
             String url = getLdapServer(domain) + ":636";
             if (url != null) {
                 env.put(Context.PROVIDER_URL, url);
@@ -254,7 +251,7 @@ public class ActiveDirectory {
             }
         } else {
             for (DirectoryDomain item : directoryDomainManager.getDirectoryDomains()) {
-                System.out.println("Trying: " + username + "@" + item.domain);
+                log.debug("Trying: " + username + "@" + domain);
                 env.put(Context.SECURITY_PRINCIPAL, username + "@" + item.domain);
                 String url = getLdapServer(item.domain) + ":636";
                 if (url != null) {
@@ -262,29 +259,28 @@ public class ActiveDirectory {
                     try {
                         ctx = new InitialLdapContext(env, null);
                     } catch (AuthenticationException e) {
-                        System.out.println("Failed: " + item.domain);
+                        log.warn("Failed: " + item.domain);
                         continue;
                     } catch (CommunicationException e) {
-                        System.err.println("Failed: " + item.domain + " / " + e.getExplanation());
-                        System.err.println("This is probably due to a certificate error.");
+                        log.warn("Failed: " + item.domain + "/" + e.getExplanation() + " this is probably due to a certificate error.");
 
                         if (configurationManager.getUnsafeLdap()) {
-                            System.err.println("Attempting unencrypted authentication...");
+                            log.warn("Attempting unencrypted authentication: " + item.domain);
                             ctx = tryUnsafe(item.domain, ctx, env);
                         }
 
                         if (domain != null) {
-                            System.err.println("Unencrypted authentication was successful against: " + item.domain);
+                            log.warn("Unencrypted authentication was successful against: " + item.domain);
                             break;
                         }
 
                         continue;
                     } catch (NamingException e) {
-                        System.out.println("Failed: " + item.domain + " / " + e.getExplanation());
+                        log.warn("Failed: " + item.domain + "/" + e.getExplanation());
                         continue;
                     }
                     this.domain = item.domain;
-                    System.out.println("Authentication seems to have succeeded against: " + item.domain);
+                    log.debug("Authentication seems to have succeeded against: " + item.domain);
                     break;
                 }
             }
@@ -300,21 +296,21 @@ public class ActiveDirectory {
             ctx = new InitialLdapContext(env, null);
             this.domain = domain;
         } catch (AuthenticationException e) {
-            System.out.println("Failed: " + domain);
+            log.info("Unencrypted authentication failed: " + domain + "/" + e.getExplanation());
         } catch (CommunicationException e) {
-            System.out.println("Failed: " + domain + " / " + e.getExplanation());
+            log.warn("Unencrypted authentication failed: " + domain + "/" + e.getExplanation());
         } catch (NamingException e) {
-            System.out.println("Failed: " + domain + " / " + e.getExplanation());
+            log.warn("Unencrypted authentication failed: " + domain + "/" + e.getExplanation());
         }
         return ctx;
     }
 
     private AuthenticationToken authorize(LdapContext ctx, String domain, AuthenticationToken token) {
-        //System.out.println("Getting groups for: " + domain);
+        log.debug("Getting groups for: " + domain);
         Map<String, Boolean> groups = directoryDomainManager.getDirectoryDomain(domain).groups;
 
         for (String group : groups.keySet()) {
-            //System.out.println("\tEvaluating: " + group);
+            log.debug("Evaluating: " + group);
 
             if (isMember(ctx, group)) {
                 if (groups.get(group)) {
