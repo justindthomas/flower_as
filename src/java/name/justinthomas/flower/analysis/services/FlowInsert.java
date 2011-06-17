@@ -97,16 +97,14 @@ public class FlowInsert {
                         throw new Exception("Negative bytesSent value (" + xflow.size.longValue() + ") in XMLFlow received.");
                     }
                     converted.add(new Flow(customer, xflow));
-                    //Flow flow = new Flow(xflow);
-
-                    ;
                 } catch (Exception e) {
                     e.printStackTrace();
+                    return;
                 }
             }
 
             FlowReceiver receiver = new FlowReceiver(customer);
-            LinkedList<Long> flowIDs = receiver.addFlows(converted, null);
+            LinkedList<Long> flowIDs = receiver.addFlows(collector.getHostAddress(), converted, null);
 
             Iterator<Long> idIterator = flowIDs.iterator();
             Iterator<Flow> flowIterator = converted.iterator();
