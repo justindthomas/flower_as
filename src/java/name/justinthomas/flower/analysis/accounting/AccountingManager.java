@@ -4,13 +4,16 @@
  */
 package name.justinthomas.flower.analysis.accounting;
 
-import java.util.Date;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.ejb.Singleton;
 import javax.ejb.Startup;
+import name.justinthomas.flower.analysis.services.Utility;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Accounting;
 
 /**
  *
@@ -20,91 +23,34 @@ import javax.ejb.Startup;
 @Startup
 public class AccountingManager {
     // <account ID, flows received>
+
     private static Queue<Accounting> queue = new ConcurrentLinkedQueue();
     private static ScheduledThreadPoolExecutor executor;
-    
+
     public AccountingManager() {
-        executor = new ScheduledThreadPoolExecutor(3);  
+        executor = new ScheduledThreadPoolExecutor(3);
         executor.scheduleAtFixedRate(new Charge(), 60, 60, TimeUnit.SECONDS);
     }
-    
+
     public void addFlows(String account, String sender, Integer count) {
-        queue.add(new Accounting(sender, count));
+        Accounting accounting = new Accounting();
+        accounting.setCustomer(account);
+        accounting.setSender(sender);
+        accounting.setCount(count);
+        queue.add(accounting);
     }
-    
+
     class Charge implements Runnable {
-        
+
         @Override
         public void run() {
-             for(Accounting accounting : queue) {
-                 AccountingManager.queue.remove(accounting);
-             }
-        }
-    }
-    
-    static class Accounting {
-        private String sender;
-        private Date date;
-        private Integer count;
-        
-        public Accounting(String sender, Integer count) {
-            date = new Date();
-            this.sender = sender;
-            this.count = count;
-        }
+            List<Accounting> accountings = new ArrayList();
 
-        public Integer getCount() {
-            return count;
-        }
-
-        public void setCount(Integer count) {
-            this.count = count;
-        }
-
-        public Date getDate() {
-            return date;
-        }
-
-        public void setDate(Date date) {
-            this.date = date;
-        }
-
-        public String getSender() {
-            return sender;
-        }
-
-        public void setSender(String sender) {
-            this.sender = sender;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == null) {
-                return false;
+            while (!queue.isEmpty() && (accountings.size() < 100)) {
+                accountings.add(AccountingManager.queue.remove());
             }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            final Accounting other = (Accounting) obj;
-            if ((this.sender == null) ? (other.sender != null) : !this.sender.equals(other.sender)) {
-                return false;
-            }
-            if (this.date != other.date && (this.date == null || !this.date.equals(other.date))) {
-                return false;
-            }
-            if (this.count != other.count && (this.count == null || !this.count.equals(other.count))) {
-                return false;
-            }
-            return true;
-        }
-
-        @Override
-        public int hashCode() {
-            int hash = 7;
-            hash = 97 * hash + (this.sender != null ? this.sender.hashCode() : 0);
-            hash = 97 * hash + (this.date != null ? this.date.hashCode() : 0);
-            hash = 97 * hash + (this.count != null ? this.count.hashCode() : 0);
-            return hash;
+            
+            Utility.chargeCustomers(accountings);
         }
     }
 }

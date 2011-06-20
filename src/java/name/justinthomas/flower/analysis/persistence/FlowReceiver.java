@@ -79,54 +79,6 @@ public class FlowReceiver {
         }
     }
 
-    public Long addFlow(Flow flow) {
-        return this.addFlow(flow, null);
-    }
-
-    public Long addFlow(Flow flow, HttpServletRequest request) {
-        if ((flow.protocol == 6) || (flow.protocol == 17)) {
-            globalConfigurationManager.addFrequency(customer, flow.protocol, flow.ports);
-            //frequencyManager.addPort(flow.protocol, flow.ports);
-        }
-
-        PersistentFlow pflow = flow.toHashTableFlow();
-
-        try {
-            setupEnvironment();
-
-            EntityStore entityStore = null;
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
-            //storeConfig.setDeferredWrite(true);
-
-            entityStore = new EntityStore(environment, "Flow", storeConfig);
-            try {
-                FlowAccessor dataAccessor = new FlowAccessor(entityStore);
-                //System.out.println("Putting flow with start date: " + new Date(pflow.getStartTimeStampMs()));
-                dataAccessor.flowById.put(pflow);
-            } catch (DatabaseException e) {
-                System.err.println("addVolume Failed: " + e.getMessage());
-                if (request != null) {
-                    System.err.println("Requester: " + request.getRemoteAddr());
-                }
-            } finally {
-                entityStore.close();
-            }
-        } catch (DatabaseException e) {
-            System.err.println("Database Error: " + e.getMessage());
-            if (request != null) {
-                System.err.println("Requester: " + request.getRemoteAddr());
-            }
-        } catch (Exception e) {
-            System.err.println(e.getMessage());
-        } finally {
-            closeEnvironment();
-        }
-
-        return pflow.id;
-    }
-
     public LinkedList<Long> addFlows(String sender, LinkedList<Flow> flows) {
         return this.addFlows(sender, flows, null);
     }
