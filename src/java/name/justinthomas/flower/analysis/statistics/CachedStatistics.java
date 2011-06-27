@@ -20,6 +20,7 @@ public class CachedStatistics {
     private Map<IntervalKey, StatisticalInterval> cache;
     private Map<IntervalKey, Date> lastUpdated;
     private Map<AddressPair, Representation> sourceMap;
+    private StatisticalEngine engine = new StatisticalEngine();
     public static final long MAX_WAIT = 300000;
 
     public CachedStatistics(Customer customer) {
@@ -178,8 +179,7 @@ public class CachedStatistics {
 
             System.out.println("Removing intervals from cache.");
             for (IntervalKey key : keys) {
-                intervals.add(cache.get(key));
-                cache.remove(key);
+                intervals.add(engine.addStatisticalInterval(cache.remove(key)));
                 lastUpdated.remove(key);
             }
 
