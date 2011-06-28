@@ -18,7 +18,6 @@ import org.apache.commons.math.stat.inference.TestUtils;
  *
  * @author justin
  */
-
 public class StatisticalEngine {
     // <source, <destination, <interval, sizes>>>
 
@@ -26,37 +25,44 @@ public class StatisticalEngine {
     private Map<String, Map<String, DescriptiveStatistics>> statistics = new ConcurrentHashMap();
 
     public StatisticalInterval addStatisticalInterval(StatisticalInterval interval) {
-        for (StatisticalFlowIdentifier flow : interval.flows.keySet()) {
-            if (!cube.containsKey(flow.source) || !cube.get(flow.source).containsKey(flow.destination)) {
-                this.addFile(flow.source, flow.destination);
-            }
-
-            Long size = null;
-            for (StatisticalFlowDetail detail : interval.flows.get(flow).count.keySet()) {
-                if (detail.type == StatisticalFlowDetail.Count.BYTE) {
-                    size = interval.flows.get(flow).count.get(detail);
+        if ((interval != null) && (interval.key != null) && (interval.key.resolution == 10000) && (interval.flows != null)) {
+            for (StatisticalFlowIdentifier flow : interval.flows.keySet()) {
+                if (!cube.containsKey(flow.source) || !cube.get(flow.source).containsKey(flow.destination)) {
+                    this.addFile(flow.source, flow.destination);
                 }
-            }
 
-            List<Double> doubleObjs = new LinkedList();
-            for(Long value : cube.get(flow.source).get(flow.destination).values()) {
-                doubleObjs.add(new Double(value));
-            }
-            
-            double[] doubles = new double[doubleObjs.size()];
+                Long size = null;
+                for (StatisticalFlowDetail detail : interval.flows.get(flow).count.keySet()) {
+                    if (detail.type == StatisticalFlowDetail.Count.BYTE) {
+                        size = interval.flows.get(flow).count.get(detail);
+                    }
+                }
 
-            System.arraycopy(doubleObjs.toArray(), 0, doubles, 0, doubleObjs.size());
-            
-            try {
-                System.out.println("t-test for " + flow.source + " to " + flow.destination + ": " + TestUtils.tTest(size, doubles, 0.25));
-            } catch (MathException e) {
-                e.printStackTrace();
+                List<Double> doubleObjs = new LinkedList();
+                for (Long value : cube.get(flow.source).get(flow.destination).values()) {
+                    doubleObjs.add(new Double(value));
+                }
+
+                double[] doubles = new double[doubleObjs.size()];
+
+                int i = 0;
+                for (Double d : doubleObjs) {
+                    doubles[i++] = d.doubleValue();
+                }
+
+                try {
+                    if (doubles.length >= 2) {
+                        System.out.println("t-test for " + flow.source + " to " + flow.destination + ": " + TestUtils.tTest(size, doubles, 0.25));
+                    }
+                } catch (MathException e) {
+                    e.printStackTrace();
+                }
+
+                statistics.get(flow.source).get(flow.destination).addValue(size);
+                cube.get(flow.source).get(flow.destination).put(interval.key.interval, size);
             }
-            
-            statistics.get(flow.source).get(flow.destination).addValue(size);
-            cube.get(flow.source).get(flow.destination).put(interval.key.interval, size);    
         }
-        
+
         return interval;
     }
 
