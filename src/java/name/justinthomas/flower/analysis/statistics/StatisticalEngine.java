@@ -25,7 +25,7 @@ public class StatisticalEngine {
     private Map<String, Map<String, DescriptiveStatistics>> statistics = new ConcurrentHashMap();
 
     public StatisticalInterval addStatisticalInterval(StatisticalInterval interval) {
-        if ((interval != null) && (interval.key != null) && (interval.key.resolution == 10000) && (interval.flows != null)) {
+        if ((interval != null) && (interval.key != null) && (interval.key.resolution == 1000000) && (interval.flows != null)) {
             for (StatisticalFlowIdentifier flow : interval.flows.keySet()) {
                 if (!cube.containsKey(flow.source) || !cube.get(flow.source).containsKey(flow.destination)) {
                     this.addFile(flow.source, flow.destination);
