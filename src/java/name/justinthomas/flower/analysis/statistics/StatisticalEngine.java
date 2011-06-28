@@ -5,6 +5,7 @@
 package name.justinthomas.flower.analysis.statistics;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,10 +38,14 @@ public class StatisticalEngine {
                 }
             }
 
-            Long[] values = (Long[]) cube.get(flow.source).get(flow.destination).values().toArray();
-            double[] doubles = {};
+            List<Double> doubleObjs = new LinkedList();
+            for(Long value : cube.get(flow.source).get(flow.destination).values()) {
+                doubleObjs.add(new Double(value));
+            }
+            
+            double[] doubles = new double[doubleObjs.size()];
 
-            System.arraycopy(values, 0, doubles, 0, values.length);
+            System.arraycopy(doubleObjs.toArray(), 0, doubles, 0, doubleObjs.size());
             
             try {
                 System.out.println("t-test for " + flow.source + " to " + flow.destination + ": " + TestUtils.tTest(size, doubles, 0.25));
