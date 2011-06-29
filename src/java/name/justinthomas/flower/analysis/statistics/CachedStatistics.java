@@ -179,7 +179,7 @@ public class CachedStatistics {
 
             System.out.println("Removing intervals from cache.");
             for (IntervalKey key : keys) {
-                intervals.add(engine.addStatisticalInterval(cache.remove(key)));
+                intervals.add(engine.addStatisticalInterval(customer, cache.remove(key)));
                 lastUpdated.remove(key);
             }
 

@@ -4,15 +4,19 @@
  */
 package name.justinthomas.flower.analysis.statistics;
 
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.commons.math.MathException;
+import name.justinthomas.flower.analysis.element.ManagedNetworks;
+import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math.stat.descriptive.SynchronizedDescriptiveStatistics;
-import org.apache.commons.math.stat.inference.TestUtils;
+import org.apache.commons.math.stat.inference.TTestImpl;
 
 /**
  *
@@ -24,11 +28,39 @@ public class StatisticalEngine {
     private Map<String, Map<String, Map<Long, Long>>> cube = new ConcurrentHashMap();
     private Map<String, Map<String, DescriptiveStatistics>> statistics = new ConcurrentHashMap();
 
-    public StatisticalInterval addStatisticalInterval(StatisticalInterval interval) {
+    public StatisticalInterval addStatisticalInterval(Customer customer, StatisticalInterval interval) {
         if ((interval != null) && (interval.key != null) && (interval.key.resolution == 1000000) && (interval.flows != null)) {
+            ManagedNetworks managedNetworks = new ManagedNetworks(customer);
+
             for (StatisticalFlowIdentifier flow : interval.flows.keySet()) {
-                if (!cube.containsKey(flow.source) || !cube.get(flow.source).containsKey(flow.destination)) {
-                    this.addFile(flow.source, flow.destination);
+                String source = flow.source;
+                String destination = flow.destination;
+                
+                try {
+                    InetAddress sourceAddress = InetAddress.getByName(flow.source);
+                    InetAddress destinationAddress = InetAddress.getByName(flow.destination);
+
+                    if (!managedNetworks.isManaged(sourceAddress)) {
+                        if (sourceAddress instanceof Inet4Address) {
+                            source = "untracked-v4";
+                        } else if (sourceAddress instanceof Inet6Address) {
+                            source = "untracked-v6";
+                        }
+                    }
+
+                    if (!managedNetworks.isManaged(destinationAddress)) {
+                        if (destinationAddress instanceof Inet4Address) {
+                            destination = "untracked-v4";
+                        } else if (destinationAddress instanceof Inet6Address) {
+                            destination = "untracked-v6";
+                        }
+                    }
+                } catch (UnknownHostException e) {
+                    e.printStackTrace();
+                }
+
+                if (!cube.containsKey(source) || !cube.get(source).containsKey(destination)) {
+                    this.addFile(source, destination);
                 }
 
                 Long size = null;
@@ -38,28 +70,28 @@ public class StatisticalEngine {
                     }
                 }
 
-                List<Double> doubleObjs = new LinkedList();
+                /*List<Double> doubleObjs = new LinkedList();
                 for (Long value : cube.get(flow.source).get(flow.destination).values()) {
-                    doubleObjs.add(new Double(value));
+                doubleObjs.add(new Double(value));
                 }
-
+                
                 double[] doubles = new double[doubleObjs.size()];
-
+                
                 int i = 0;
                 for (Double d : doubleObjs) {
-                    doubles[i++] = d.doubleValue();
+                doubles[i++] = d.doubleValue();
+                }*/
+
+                DescriptiveStatistics stats = statistics.get(source).get(destination);
+
+                if (stats.getValues().length >= 2) {
+                    double mu = stats.getMean();
+                    TTestImpl ttest = new TTestImpl();
+                    System.out.println("t-test for " + source + " to " + destination + ": " + ttest.t(mu, statistics.get(source).get(destination)));
                 }
 
-                try {
-                    if (doubles.length >= 2) {
-                        System.out.println("t-test for " + flow.source + " to " + flow.destination + ": " + TestUtils.tTest(size, doubles, 0.25));
-                    }
-                } catch (MathException e) {
-                    e.printStackTrace();
-                }
-
-                statistics.get(flow.source).get(flow.destination).addValue(size);
-                cube.get(flow.source).get(flow.destination).put(interval.key.interval, size);
+                statistics.get(source).get(destination).addValue(size);
+                cube.get(source).get(destination).put(interval.key.interval, size);
             }
         }
 
