@@ -29,6 +29,7 @@ import org.apache.log4j.Logger;
 public class StatisticalEngine {
 
     private static final Logger log = Logger.getLogger(StatisticalEngine.class.getName());
+    private final Integer history = 100;
     private Map<String, Map<String, Map<Long, Long>>> cube = new ConcurrentHashMap();
     private Map<String, Map<String, DescriptiveStatistics>> statistics = new ConcurrentHashMap();
 
@@ -92,24 +93,51 @@ public class StatisticalEngine {
                         log.debug("Data for: " + source + " -> " + destination);
                         double mu = stats.getMean();
                         log.debug("\tmu: " + mu + " " + statistics.size() + "x" + statistics.get(source).size() + "x" + statistics.get(source).get(destination).getValues().length);
+
+                        StringBuilder builder = new StringBuilder();
+                        for (double value : statistics.get(source).get(destination).getValues()) {
+                            builder.append(value);
+                            builder.append(", ");
+                        }
+                        log.debug("Values: " + builder.toString());
+
                         TTestImpl ttest = new TTestImpl();
                         try {
-                            log.debug("\tmanual tTest: " + ttest.tTest(mu, statistics.get(source).get(destination), 0.25) + ", " + ttest.tTest(mu, statistics.get(source).get(destination)));
+                            log.debug("\tmanual tTest: " + ttest.tTest(mu, statistics.get(source).get(destination).getValues(), 0.25) + ", " + ttest.tTest(mu, statistics.get(source).get(destination).getValues()));
                             log.debug("\tstatic tTest: " + TestUtils.tTest(mu, stats, 0.25));
                             log.debug("\tmanual tTest on Cube: " + ttest.tTest(mu, doubles, 0.25) + ", " + ttest.tTest(mu, doubles));
                             log.debug("\tstatic tTest on Cube: " + TestUtils.tTest(mu, doubles));
                         } catch (MathException e) {
                             log.warn(e.getMessage());
                         }
+                        
+                        this.add(source, destination, interval.key.interval, size);
                     }
-
-                    statistics.get(source).get(destination).addValue(new Double(size).doubleValue());
-                    cube.get(source).get(destination).put(interval.key.interval, size);
                 }
             }
         }
 
         return interval;
+    }
+
+    private void add(String source, String destination, Long interval, Long size) {
+        statistics.get(source).get(destination).addValue(new Double(size).doubleValue());
+        
+        while(cube.get(source).get(destination).size() >= (history - 1)) {
+            Long earliest = null;
+            for(Long value : cube.get(source).get(destination).keySet()) {
+                if(earliest == null) {
+                    earliest = value;
+                } else {
+                    if(earliest > value) {
+                        earliest = value;
+                    }
+                }
+            }
+            log.debug("Removing: " + earliest);
+            cube.get(source).get(destination).remove(earliest);
+        }
+        cube.get(source).get(destination).put(interval, size);
     }
 
     private Integer addFile(String source, String destination) {
@@ -134,10 +162,13 @@ public class StatisticalEngine {
             statistics.get(source).put(destination, new SynchronizedDescriptiveStatistics());
         }
 
+        /*
         for (Long interval : intervals) {
             cube.get(source).get(destination).put(interval, 0l);
             statistics.get(source).get(destination).addValue(0);
         }
+         * 
+         */
 
         return intervals.size();
 
