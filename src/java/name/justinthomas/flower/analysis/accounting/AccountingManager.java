@@ -10,6 +10,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.PostConstruct;
 import javax.ejb.Singleton;
 import javax.ejb.Startup;
 import name.justinthomas.flower.analysis.services.Utility;
@@ -24,12 +25,13 @@ import name.justinthomas.flower.manager.services.CustomerAdministration.Accounti
 public class AccountingManager {
     // <account ID, flows received>
 
-    private static Queue<Accounting> queue = new ConcurrentLinkedQueue();
-    private static ScheduledThreadPoolExecutor executor;
+    private Queue<Accounting> queue = new ConcurrentLinkedQueue();
+    private ScheduledThreadPoolExecutor executor;
 
-    public AccountingManager() {
-        executor = new ScheduledThreadPoolExecutor(3);
-        executor.scheduleAtFixedRate(new Charge(), 60, 60, TimeUnit.SECONDS);
+    @PostConstruct
+    public void init() {
+        executor = new ScheduledThreadPoolExecutor(1);
+        executor.scheduleWithFixedDelay(new Charge(queue), 60, 60, TimeUnit.SECONDS);
     }
 
     public void addFlows(String account, String sender, Integer count) {
@@ -42,15 +44,24 @@ public class AccountingManager {
 
     class Charge implements Runnable {
 
+        Queue<Accounting> queue;
+
+        public Charge(Queue queue) {
+            this.queue = queue;
+        }
+
         @Override
         public void run() {
+            System.out.println("Running charge thread to empty queue.");
             List<Accounting> accountings = new ArrayList();
 
             while (!queue.isEmpty() && (accountings.size() < 100)) {
-                accountings.add(AccountingManager.queue.remove());
+                accountings.add(queue.remove());
             }
-            
-            Utility.chargeCustomers(accountings);
+
+            if (!accountings.isEmpty()) {
+                Utility.chargeCustomers(accountings);
+            }
         }
     }
 }

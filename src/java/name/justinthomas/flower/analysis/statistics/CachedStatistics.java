@@ -25,7 +25,7 @@ public class CachedStatistics {
 
     public CachedStatistics(Customer customer) {
         this.customer = customer;
-        System.out.println("Setting CachedStatistics Persist to run every 60 seconds.");
+        System.out.println("Setting CachedStatistics Persist to run every 60 seconds (" + customer.getId() + ").");
         //cache = Collections.synchronizedMap(new HashMap());
         cache = new ConcurrentHashMap();
         
@@ -167,7 +167,7 @@ public class CachedStatistics {
 
         @Override
         public void run() {
-            System.out.println("Statistics cache includes " + cache.size() + " entries before Persist.");
+            System.out.println("Statistics cache (" + customer.getId() + ") includes " + cache.size() + " entries before Persist.");
             ArrayList<IntervalKey> keys = new ArrayList();
             for (IntervalKey key : lastUpdated.keySet()) {
                 if ((new Date().getTime() - lastUpdated.get(key).getTime() > MAX_WAIT) || flush) {
@@ -177,7 +177,7 @@ public class CachedStatistics {
 
             ArrayList<StatisticalInterval> intervals = new ArrayList();
 
-            System.out.println("Removing intervals from cache.");
+            System.out.println("Removing intervals from cache (" + customer.getId() + ").");
             for (IntervalKey key : keys) {
                 intervals.add(engine.addStatisticalInterval(customer, cache.remove(key)));
                 lastUpdated.remove(key);
@@ -186,7 +186,7 @@ public class CachedStatistics {
             StatisticsManager statisticsManager = new StatisticsManager(customer);
             statisticsManager.storeStatisticalIntervals(intervals);
 
-            System.out.println("Statistics cache includes " + cache.size() + " entries after Persist.");
+            System.out.println("Statistics cache (" + customer.getId() + ") includes " + cache.size() + " entries after Persist.");
         }
     }
 
