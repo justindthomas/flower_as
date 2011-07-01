@@ -25,10 +25,26 @@ public class StatisticalEngine {
 
     private static final Logger log = Logger.getLogger(StatisticalEngine.class.getName());
     private final Integer HISTORY = 1000;
-    private Map<String, Map<String, DescriptiveStatistics>> statistics = new ConcurrentHashMap();
+    private Map<String, Map<String, Map<Cube, DescriptiveStatistics>>> statistics = new ConcurrentHashMap();
+
+    public static enum Anomaly {
+
+        EWMA_INCREASE,
+        EWMA_DECREASE,
+        NEW_MAXIMUM,
+        NEW_MINIMUM,
+        NEW_FLOW
+    }
+
+    private enum Cube {
+
+        DETAIL,
+        MEAN,
+        EW_MEAN
+    }
 
     public StatisticalInterval addStatisticalInterval(Customer customer, StatisticalInterval interval) {
-        if ((interval != null) && (interval.key != null) && (interval.key.resolution == 1000000) && (interval.flows != null)) {
+        if ((interval != null) && (interval.key != null) && (interval.key.resolution == 100000) && (interval.flows != null)) {
             ManagedNetworks managedNetworks = new ManagedNetworks(customer);
 
             Map<String, Map<String, Long>> normalized = new HashMap();
@@ -79,48 +95,120 @@ public class StatisticalEngine {
                     }
                 }
 
-                if (size != 0) {
-                    normalized.get(source).put(destination, size);
-                }
+                normalized.get(source).put(destination, size);
             }
 
-            process(normalized);
-            this.add(normalized, interval.key.interval);
+            this.process(normalized);
+            this.add(normalized);
         }
 
         return interval;
     }
 
+    /**
+     * Performs statistical analysis of the data contained in the new interval
+     * as compared to the historical data in the statistics cube. This section
+     * is a work in progress.
+     * 
+     * @param normalized  the normalized interval
+     */
     private void process(Map<String, Map<String, Long>> normalized) {
         for (String source : normalized.keySet()) {
             for (String destination : normalized.get(source).keySet()) {
 
-                DescriptiveStatistics stats = statistics.get(source).get(destination);
-                if (stats.getValues().length >= 2) {
-                    log.debug("Data for: " + source + " -> " + destination);
-                    double mu = stats.getMean();
-                    double[] sValues = statistics.get(source).get(destination).getValues();
+                DescriptiveStatistics detail = statistics.get(source).get(destination).get(Cube.DETAIL);
+                if (detail.getValues().length >= 2) {
+                    log.debug("Detail data for: " + source + " -> " + destination);
+                    double[] sValues = detail.getValues();
                     StringBuilder builder = new StringBuilder();
                     for (double value : sValues) {
-                        builder.append(value);
+                        builder.append(new Double(value).intValue());
+                        builder.append(", ");
+                    }
+                    log.debug("\tvalues: " + builder.toString() + "\n");
+                    //log.debug(detail.toString());
+                }
+
+                DescriptiveStatistics mean = statistics.get(source).get(destination).get(Cube.MEAN);
+                if (mean.getValues().length >= 2) {
+                    log.debug("Mean data for: " + source + " -> " + destination);
+                    double[] sValues = mean.getValues();
+                    StringBuilder builder = new StringBuilder();
+                    for (double value : sValues) {
+                        builder.append(new Double(value).intValue());
                         builder.append(", ");
                     }
                     log.debug("\tvalues: " + builder.toString());
-                    log.debug(stats.toString());
+                    //log.debug(mean.toString());
+                }
+
+                DescriptiveStatistics ewma = statistics.get(source).get(destination).get(Cube.EW_MEAN);
+                if (ewma.getValues().length >= 2) {
+                    log.debug("EWMA data for: " + source + " -> " + destination);
+                    double[] sValues = ewma.getValues();
+                    StringBuilder builder = new StringBuilder();
+                    for (double value : sValues) {
+                        builder.append(new Double(value).intValue());
+                        builder.append(", ");
+                    }
+                    log.debug("\tvalues: " + builder.toString() + "\n");
+                    //log.debug(ewma.toString());
                 }
             }
         }
     }
 
-    private void add(Map<String, Map<String, Long>> normalized, Long interval) {
-        for (String source : normalized.keySet()) {
-            for (String destination : normalized.get(source).keySet()) {
-                Long size = normalized.get(source).get(destination);
-                statistics.get(source).get(destination).addValue(new Double(size).doubleValue());
+    /**
+     * Loops through the statistics cube, updating entries with data in the 
+     * normalized table. Assumes that empty entries exist as a function of the 
+     * addFile(source, destination) method being run previously. Adds 0-length
+     * entries for pairings not represented in the normalized table.
+     * 
+     * @param normalized  the normalized interval
+     */
+    private void add(Map<String, Map<String, Long>> normalized) {
+        for (String source : statistics.keySet()) {
+            for (String destination : statistics.get(source).keySet()) {
+                Long size = 0l;
+                if (normalized.containsKey(source) && normalized.get(source).containsKey(destination)) {
+                    size = normalized.get(source).get(destination);
+                }
+                DescriptiveStatistics detail = statistics.get(source).get(destination).get(Cube.DETAIL);
+                detail.addValue(new Double(size).doubleValue());
+
+                DescriptiveStatistics ewma = statistics.get(source).get(destination).get(Cube.EW_MEAN);
+
+                double alpha = 0.1;
+
+                if (detail.getN() > 0) {
+                    Long last_detail = detail.getN() - 1;
+                    double yt_neg1 = detail.getValues()[last_detail.intValue()];
+                    if (ewma.getN() == 0) {
+                        ewma.addValue(yt_neg1);
+                    } else {
+                        Long last_ewma = ewma.getN() - 1;
+                        double st_neg1 = ewma.getValues()[last_ewma.intValue()];
+                        ewma.addValue((alpha * yt_neg1) + ((1 - alpha) * st_neg1));
+                    }
+                } else {
+                    if (ewma.getN() == 0) {
+                        ewma.addValue(new Double(size).doubleValue());
+                    }
+                }
+
+                statistics.get(source).get(destination).get(Cube.MEAN).addValue(detail.getMean());
             }
         }
     }
 
+    /**
+     * Creates an entry in the statistics cube for a new source and destination.
+     * Initializes a new SynchronizedDescriptiveStatistics instance for the new
+     * source/destination pairing.
+     * 
+     * @param source  the source address string (e.g., 192.168.1.1 or fe80::1)
+     * @param destination  the destination address string
+     */
     private void addFile(String source, String destination) {
 
         if (!statistics.containsKey(source)) {
@@ -128,9 +216,25 @@ public class StatisticalEngine {
         }
 
         if (!statistics.get(source).containsKey(destination)) {
+            statistics.get(source).put(destination, new ConcurrentHashMap());
+        }
+
+        if (!statistics.get(source).get(destination).containsKey(Cube.DETAIL)) {
             DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics();
             descriptiveStatistics.setWindowSize(HISTORY);
-            statistics.get(source).put(destination, descriptiveStatistics);
+            statistics.get(source).get(destination).put(Cube.DETAIL, descriptiveStatistics);
+        }
+
+        if (!statistics.get(source).get(destination).containsKey(Cube.MEAN)) {
+            DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics();
+            descriptiveStatistics.setWindowSize(HISTORY);
+            statistics.get(source).get(destination).put(Cube.MEAN, descriptiveStatistics);
+        }
+
+        if (!statistics.get(source).get(destination).containsKey(Cube.EW_MEAN)) {
+            DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics();
+            descriptiveStatistics.setWindowSize(HISTORY);
+            statistics.get(source).get(destination).put(Cube.EW_MEAN, descriptiveStatistics);
         }
     }
 }
