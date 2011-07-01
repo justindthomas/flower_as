@@ -8,18 +8,13 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import name.justinthomas.flower.analysis.element.ManagedNetworks;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
-import org.apache.commons.math.MathException;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math.stat.descriptive.SynchronizedDescriptiveStatistics;
-import org.apache.commons.math.stat.inference.TTestImpl;
-import org.apache.commons.math.stat.inference.TestUtils;
 import org.apache.log4j.Logger;
 
 /**
@@ -29,13 +24,14 @@ import org.apache.log4j.Logger;
 public class StatisticalEngine {
 
     private static final Logger log = Logger.getLogger(StatisticalEngine.class.getName());
-    private final Integer history = 100;
-    private Map<String, Map<String, Map<Long, Long>>> cube = new ConcurrentHashMap();
+    private final Integer HISTORY = 1000;
     private Map<String, Map<String, DescriptiveStatistics>> statistics = new ConcurrentHashMap();
 
     public StatisticalInterval addStatisticalInterval(Customer customer, StatisticalInterval interval) {
-        if ((interval != null) && (interval.key != null) && (interval.key.resolution == 100000) && (interval.flows != null)) {
+        if ((interval != null) && (interval.key != null) && (interval.key.resolution == 1000000) && (interval.flows != null)) {
             ManagedNetworks managedNetworks = new ManagedNetworks(customer);
+
+            Map<String, Map<String, Long>> normalized = new HashMap();
 
             for (StatisticalFlowIdentifier flow : interval.flows.keySet()) {
                 String source = flow.source;
@@ -64,113 +60,77 @@ public class StatisticalEngine {
                     log.warn(e.getMessage());
                 }
 
+                if (!normalized.containsKey(source)) {
+                    normalized.put(source, new HashMap());
+                }
+
+                if (!normalized.get(source).containsKey(destination)) {
+                    normalized.get(source).put(destination, 0l);
+                }
+
                 if (!statistics.containsKey(source) || !statistics.get(source).containsKey(destination)) {
                     this.addFile(source, destination);
                 }
 
-                Long size = null;
+                Long size = 0l;
                 for (StatisticalFlowDetail detail : interval.flows.get(flow).count.keySet()) {
                     if (detail.type == StatisticalFlowDetail.Count.BYTE) {
-                        size = interval.flows.get(flow).count.get(detail);
+                        size += interval.flows.get(flow).count.get(detail);
                     }
-                }
-
-                List<Double> doubleObjs = new LinkedList();
-                for (Long value : cube.get(source).get(destination).values()) {
-                    doubleObjs.add(new Double(value));
-                }
-
-                double[] doubles = new double[doubleObjs.size()];
-
-                int i = 0;
-                for (Double d : doubleObjs) {
-                    doubles[i++] = d.doubleValue();
                 }
 
                 if (size != 0) {
-                    DescriptiveStatistics stats = statistics.get(source).get(destination);
-                    if (stats.getValues().length >= 2 && doubles.length >= 2) {
-                        log.debug("Data for: " + source + " -> " + destination);
-                        double mu = stats.getMean();
-                        log.debug("\tmu: " + mu + " " + statistics.size() + "x" + statistics.get(source).size() + "x" + statistics.get(source).get(destination).getValues().length);
-
-                        StringBuilder builder = new StringBuilder();
-                        for (double value : statistics.get(source).get(destination).getValues()) {
-                            builder.append(value);
-                            builder.append(", ");
-                        }
-                        log.debug("Values: " + builder.toString());
-
-                        TTestImpl ttest = new TTestImpl();
-                        try {
-                            log.debug("\tmanual tTest: " + ttest.tTest(mu, statistics.get(source).get(destination).getValues(), 0.25) + ", " + ttest.tTest(mu, statistics.get(source).get(destination).getValues()));
-                            log.debug("\tstatic tTest: " + TestUtils.tTest(mu, stats, 0.25));
-                            log.debug("\tmanual tTest on Cube: " + ttest.tTest(mu, doubles, 0.25) + ", " + ttest.tTest(mu, doubles));
-                            log.debug("\tstatic tTest on Cube: " + TestUtils.tTest(mu, doubles));
-                        } catch (MathException e) {
-                            log.warn(e.getMessage());
-                        }
-                        
-                        this.add(source, destination, interval.key.interval, size);
-                    }
+                    normalized.get(source).put(destination, size);
                 }
             }
+
+            process(normalized);
+            this.add(normalized, interval.key.interval);
         }
 
         return interval;
     }
 
-    private void add(String source, String destination, Long interval, Long size) {
-        statistics.get(source).get(destination).addValue(new Double(size).doubleValue());
-        
-        while(cube.get(source).get(destination).size() >= (history - 1)) {
-            Long earliest = null;
-            for(Long value : cube.get(source).get(destination).keySet()) {
-                if(earliest == null) {
-                    earliest = value;
-                } else {
-                    if(earliest > value) {
-                        earliest = value;
+    private void process(Map<String, Map<String, Long>> normalized) {
+        for (String source : normalized.keySet()) {
+            for (String destination : normalized.get(source).keySet()) {
+
+                DescriptiveStatistics stats = statistics.get(source).get(destination);
+                if (stats.getValues().length >= 2) {
+                    log.debug("Data for: " + source + " -> " + destination);
+                    double mu = stats.getMean();
+                    double[] sValues = statistics.get(source).get(destination).getValues();
+                    StringBuilder builder = new StringBuilder();
+                    for (double value : sValues) {
+                        builder.append(value);
+                        builder.append(", ");
                     }
+                    log.debug("\tvalues: " + builder.toString());
+                    log.debug(stats.toString());
                 }
             }
-            log.debug("Removing: " + earliest);
-            cube.get(source).get(destination).remove(earliest);
         }
-        cube.get(source).get(destination).put(interval, size);
     }
 
-    private Integer addFile(String source, String destination) {
-
-        List<Long> intervals = new ArrayList();
-
-        for (String existingSource : cube.keySet()) {
-            for (String existingDestination : cube.get(existingSource).keySet()) {
-                for (Long interval : cube.get(existingSource).get(existingDestination).keySet()) {
-                    intervals.add(interval);
-                }
+    private void add(Map<String, Map<String, Long>> normalized, Long interval) {
+        for (String source : normalized.keySet()) {
+            for (String destination : normalized.get(source).keySet()) {
+                Long size = normalized.get(source).get(destination);
+                statistics.get(source).get(destination).addValue(new Double(size).doubleValue());
             }
         }
+    }
 
-        if (!cube.containsKey(source)) {
-            cube.put(source, new ConcurrentHashMap());
+    private void addFile(String source, String destination) {
+
+        if (!statistics.containsKey(source)) {
             statistics.put(source, new ConcurrentHashMap());
         }
 
-        if (!cube.get(source).containsKey(destination)) {
-            cube.get(source).put(destination, new ConcurrentHashMap());
-            statistics.get(source).put(destination, new SynchronizedDescriptiveStatistics());
+        if (!statistics.get(source).containsKey(destination)) {
+            DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics();
+            descriptiveStatistics.setWindowSize(HISTORY);
+            statistics.get(source).put(destination, descriptiveStatistics);
         }
-
-        /*
-        for (Long interval : intervals) {
-            cube.get(source).get(destination).put(interval, 0l);
-            statistics.get(source).get(destination).addValue(0);
-        }
-         * 
-         */
-
-        return intervals.size();
-
     }
 }
