@@ -4,6 +4,7 @@
  */
 package name.justinthomas.flower.analysis.statistics;
 
+import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -11,11 +12,16 @@ import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import name.justinthomas.flower.analysis.element.ManagedNetworks;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math.stat.descriptive.SynchronizedDescriptiveStatistics;
+import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
+import org.apache.log4j.SimpleLayout;
 
 /**
  *
@@ -24,7 +30,10 @@ import org.apache.log4j.Logger;
 public class StatisticalEngine {
 
     private static final Logger log = Logger.getLogger(StatisticalEngine.class.getName());
+    private static GlobalConfigurationManager globalConfigurationManager;
+    private static FileAppender fileAppender;
     private final Integer HISTORY = 1000;
+    private Customer customer;
     private Map<String, Map<String, Map<Cube, DescriptiveStatistics>>> statistics = new ConcurrentHashMap();
 
     public static enum Anomaly {
@@ -43,8 +52,29 @@ public class StatisticalEngine {
         EW_MEAN
     }
 
-    public StatisticalInterval addStatisticalInterval(Customer customer, StatisticalInterval interval) {
-        if ((interval != null) && (interval.key != null) && (interval.key.resolution == 100000) && (interval.flows != null)) {
+    public StatisticalEngine(Customer customer) {
+        this.customer = customer;
+
+        if (globalConfigurationManager == null) {
+            try {
+                globalConfigurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+            } catch (NamingException e) {
+                log.error(e.getMessage());
+            }
+        }
+
+        if (fileAppender == null) {
+            try {
+                fileAppender = new FileAppender(new SimpleLayout(), globalConfigurationManager.getBaseDirectory() + "/statistics.log");
+                log.addAppender(fileAppender);
+            } catch (IOException e) {
+                log.error(e.getMessage());
+            }
+        }
+    }
+
+    public StatisticalInterval addStatisticalInterval(StatisticalInterval interval) {
+        if ((interval != null) && (interval.key != null) && (interval.key.resolution == 1000000) && (interval.flows != null)) {
             ManagedNetworks managedNetworks = new ManagedNetworks(customer);
 
             Map<String, Map<String, Long>> normalized = new HashMap();
@@ -98,7 +128,7 @@ public class StatisticalEngine {
                 normalized.get(source).put(destination, size);
             }
 
-            this.process(normalized);
+            this.process(normalized, interval);
             this.add(normalized);
         }
 
@@ -112,39 +142,45 @@ public class StatisticalEngine {
      * 
      * @param normalized  the normalized interval
      */
-    private void process(Map<String, Map<String, Long>> normalized) {
+    private void process(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
         for (String source : normalized.keySet()) {
             for (String destination : normalized.get(source).keySet()) {
-
+                /*
                 DescriptiveStatistics detail = statistics.get(source).get(destination).get(Cube.DETAIL);
                 if (detail.getValues().length >= 2) {
-                    log.debug("Detail data for: " + source + " -> " + destination);
-                    double[] sValues = detail.getValues();
-                    StringBuilder builder = new StringBuilder();
-                    for (double value : sValues) {
-                        builder.append(new Double(value).intValue());
-                        builder.append(", ");
-                    }
-                    log.debug("\tvalues: " + builder.toString() + "\n");
-                    //log.debug(detail.toString());
+                log.debug("Detail data for: " + source + " -> " + destination);
+                double[] sValues = detail.getValues();
+                StringBuilder builder = new StringBuilder();
+                for (double value : sValues) {
+                builder.append(new Double(value).intValue());
+                builder.append(", ");
                 }
+                log.debug("\tvalues: " + builder.toString() + "\n");
+                log.debug(detail.toString());
+                }
+                 * 
+                 */
 
+                /*
                 DescriptiveStatistics mean = statistics.get(source).get(destination).get(Cube.MEAN);
                 if (mean.getValues().length >= 2) {
-                    log.debug("Mean data for: " + source + " -> " + destination);
-                    double[] sValues = mean.getValues();
-                    StringBuilder builder = new StringBuilder();
-                    for (double value : sValues) {
-                        builder.append(new Double(value).intValue());
-                        builder.append(", ");
-                    }
-                    log.debug("\tvalues: " + builder.toString());
-                    //log.debug(mean.toString());
+                log.debug("Mean data for: " + source + " -> " + destination);
+                double[] sValues = mean.getValues();
+                StringBuilder builder = new StringBuilder();
+                for (double value : sValues) {
+                builder.append(new Double(value).intValue());
+                builder.append(", ");
                 }
+                log.debug("\tvalues: " + builder.toString());
+                log.debug(mean.toString());
+                }
+                 * 
+                 */
 
                 DescriptiveStatistics ewma = statistics.get(source).get(destination).get(Cube.EW_MEAN);
                 if (ewma.getValues().length >= 2) {
                     log.debug("EWMA data for: " + source + " -> " + destination);
+                    log.debug("Comparing: " + normalized.get(source).get(destination));
                     double[] sValues = ewma.getValues();
                     StringBuilder builder = new StringBuilder();
                     for (double value : sValues) {
@@ -152,7 +188,16 @@ public class StatisticalEngine {
                         builder.append(", ");
                     }
                     log.debug("\tvalues: " + builder.toString() + "\n");
-                    //log.debug(ewma.toString());
+                    log.debug(ewma.toString());
+
+                    StatisticalFlowIdentifier id = new StatisticalFlowIdentifier(source, destination);
+                    if (normalized.get(source).get(destination) > ewma.getMax()) {
+                        log.debug("EWMA increase");
+                        interval.getFlows().get(id).anomalies.add(Anomaly.EWMA_INCREASE);
+                    } else if(normalized.get(source).get(destination) < ewma.getMin()) {
+                        log.debug("EWMA decrease");
+                        interval.getFlows().get(id).anomalies.add(Anomaly.EWMA_DECREASE);
+                    }
                 }
             }
         }

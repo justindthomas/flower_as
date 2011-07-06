@@ -1,21 +1,36 @@
 package name.justinthomas.flower.analysis.statistics;
 
 import com.sleepycat.persist.model.Persistent;
+import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.xml.bind.annotation.XmlType;
 import name.justinthomas.flower.analysis.element.Flow;
+import name.justinthomas.flower.analysis.statistics.StatisticalEngine.Anomaly;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.Logger;
+import org.apache.log4j.SimpleLayout;
 
 /**
  *
  * @author justin
  */
-@Persistent(version = 022211)
+@Persistent(version = 022212)
 @XmlType
 public class StatisticalFlow {
 
+    private static GlobalConfigurationManager globalConfigurationManager;
+    private static final Logger log = Logger.getLogger(StatisticalFlow.class.getName());
+    private static FileAppender fileAppender;
+    
+    List<Anomaly> anomalies = new ArrayList();
     String source;
     String destination;
     HashMap<StatisticalFlowDetail, Long> count = new HashMap<StatisticalFlowDetail, Long>();
@@ -25,7 +40,22 @@ public class StatisticalFlow {
     }
 
     public StatisticalFlow() {
-
+        if (globalConfigurationManager == null) {
+            try {
+                globalConfigurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+            } catch (NamingException e) {
+                log.error(e.getMessage());
+            }
+        }
+        
+        if (fileAppender == null) {
+            try {
+                fileAppender = new FileAppender(new SimpleLayout(), globalConfigurationManager.getBaseDirectory() + "/statistics.log");
+                log.addAppender(fileAppender);
+            } catch (IOException e) {
+                log.error(e.getMessage());
+            }
+        }
     }
 
     public StatisticalFlow(Long spread, Flow flow) {  // Flow should be oriented to its original direction before it arrives here - I'M RETHINKING THIS
@@ -57,7 +87,7 @@ public class StatisticalFlow {
                 count.put(packets, (flow.packetsSent.longValue() / spread));
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error(e.getMessage());
         }
     }
 

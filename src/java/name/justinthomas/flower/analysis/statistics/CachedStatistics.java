@@ -20,11 +20,13 @@ public class CachedStatistics {
     private Map<IntervalKey, StatisticalInterval> cache;
     private Map<IntervalKey, Date> lastUpdated;
     private Map<AddressPair, Representation> sourceMap;
-    private StatisticalEngine engine = new StatisticalEngine();
+    private StatisticalEngine engine;
     public static final long MAX_WAIT = 300000;
 
     public CachedStatistics(Customer customer) {
         this.customer = customer;
+        
+        engine = new StatisticalEngine(customer);
         System.out.println("Setting CachedStatistics Persist to run every 60 seconds (" + customer.getId() + ").");
         //cache = Collections.synchronizedMap(new HashMap());
         cache = new ConcurrentHashMap();
@@ -179,7 +181,7 @@ public class CachedStatistics {
 
             System.out.println("Removing intervals from cache (" + customer.getId() + ").");
             for (IntervalKey key : keys) {
-                intervals.add(engine.addStatisticalInterval(customer, cache.remove(key)));
+                intervals.add(engine.addStatisticalInterval(cache.remove(key)));
                 lastUpdated.remove(key);
             }
 
