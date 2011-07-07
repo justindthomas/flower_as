@@ -2,11 +2,15 @@ package name.justinthomas.flower.analysis.statistics;
 
 import com.sleepycat.persist.model.Entity;
 import com.sleepycat.persist.model.PrimaryKey;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlType;
+import name.justinthomas.flower.analysis.statistics.StatisticalEngine.Anomaly;
 
 /**
  *
@@ -19,13 +23,26 @@ public class StatisticalInterval {
 
     @PrimaryKey
     public IntervalKey key;
-    public HashMap<StatisticalFlowIdentifier, StatisticalFlow> flows = new HashMap();
+    public Map<StatisticalFlowIdentifier, StatisticalFlow> flows = new HashMap();
     @XmlElement
     public LinkedList<Long> flowIDs = new LinkedList();
+    public Map<StatisticalFlowIdentifier, ArrayList<Anomaly>> anomalies = new HashMap();
 
     public void clear() {
         key = null;
         flows.clear();
+    }
+    
+    public StatisticalInterval addAnomaly(StatisticalFlowIdentifier id, Anomaly anomaly) {
+        if(anomalies.containsKey(id)) {
+            anomalies.get(id).add(anomaly);
+        } else {
+            ArrayList<Anomaly> anomalyList = new ArrayList();
+            anomalyList.add(anomaly);
+            anomalies.put(id, anomalyList);
+        }
+        
+        return this;
     }
 
     public StatisticalInterval addFlow(StatisticalFlow flow, Long flowID) {
@@ -64,7 +81,7 @@ public class StatisticalInterval {
         this.key = second;
     }
 
-    public HashMap<StatisticalFlowIdentifier, StatisticalFlow> getFlows() {
+    public Map<StatisticalFlowIdentifier, StatisticalFlow> getFlows() {
         return flows;
     }
 }

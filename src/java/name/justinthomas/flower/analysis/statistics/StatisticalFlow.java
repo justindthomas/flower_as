@@ -22,7 +22,7 @@ import org.apache.log4j.SimpleLayout;
  *
  * @author justin
  */
-@Persistent(version = 022212)
+@Persistent(version = 070611)
 @XmlType
 public class StatisticalFlow {
 
@@ -30,7 +30,6 @@ public class StatisticalFlow {
     private static final Logger log = Logger.getLogger(StatisticalFlow.class.getName());
     private static FileAppender fileAppender;
     
-    List<Anomaly> anomalies = new ArrayList();
     String source;
     String destination;
     HashMap<StatisticalFlowDetail, Long> count = new HashMap<StatisticalFlowDetail, Long>();

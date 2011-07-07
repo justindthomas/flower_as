@@ -129,7 +129,6 @@ public class StatisticalEngine {
             }
 
             this.process(normalized, interval);
-            this.add(normalized);
         }
 
         return interval;
@@ -143,6 +142,10 @@ public class StatisticalEngine {
      * @param normalized  the normalized interval
      */
     private void process(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
+        Map<String, Map<String, Map<Cube, DescriptiveStatistics>>> prior = new HashMap(statistics);
+        
+        this.add(normalized);
+        
         for (String source : normalized.keySet()) {
             for (String destination : normalized.get(source).keySet()) {
                 /*
@@ -191,12 +194,12 @@ public class StatisticalEngine {
                     log.debug(ewma.toString());
 
                     StatisticalFlowIdentifier id = new StatisticalFlowIdentifier(source, destination);
-                    if (normalized.get(source).get(destination) > ewma.getMax()) {
+                    if (prior.get(source).get(destination).get(Cube.EW_MEAN).getMean() > ewma.getMax()) {
                         log.debug("EWMA increase");
-                        interval.getFlows().get(id).anomalies.add(Anomaly.EWMA_INCREASE);
-                    } else if(normalized.get(source).get(destination) < ewma.getMin()) {
+                        interval.addAnomaly(id, Anomaly.EWMA_INCREASE);
+                    } else if(prior.get(source).get(destination).get(Cube.EW_MEAN).getMean() < ewma.getMin()) {
                         log.debug("EWMA decrease");
-                        interval.getFlows().get(id).anomalies.add(Anomaly.EWMA_DECREASE);
+                        interval.addAnomaly(id, Anomaly.EWMA_DECREASE);
                     }
                 }
             }
