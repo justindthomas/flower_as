@@ -128,7 +128,7 @@ public class StatisticalEngine {
                 normalized.get(source).put(destination, size);
             }
 
-            this.process(normalized, interval);
+            return this.process(normalized, interval);
         }
 
         return interval;
@@ -141,7 +141,7 @@ public class StatisticalEngine {
      * 
      * @param normalized  the normalized interval
      */
-    private void process(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
+    private StatisticalInterval process(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
         Map<String, Map<String, Map<Cube, DescriptiveStatistics>>> prior = new HashMap(statistics);
         
         this.add(normalized);
@@ -204,6 +204,8 @@ public class StatisticalEngine {
                 }
             }
         }
+        
+        return interval;
     }
 
     /**
