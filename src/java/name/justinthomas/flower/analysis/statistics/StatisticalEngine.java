@@ -142,10 +142,19 @@ public class StatisticalEngine {
      * @param normalized  the normalized interval
      */
     private StatisticalInterval process(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
-        Map<String, Map<String, Map<Cube, DescriptiveStatistics>>> prior = new HashMap(statistics);
-        
+        Map<String, Map<String, DescriptiveStatistics>> prior = new HashMap();
+        for (String source : statistics.keySet()) {
+            if (!prior.containsKey(source)) {
+                prior.put(source, new HashMap());
+            }
+
+            for (String destination : statistics.get(source).keySet()) {
+                prior.get(source).put(destination, new DescriptiveStatistics(statistics.get(source).get(destination).get(Cube.EW_MEAN)));
+            }
+        }
+
         this.add(normalized);
-        
+
         for (String source : normalized.keySet()) {
             for (String destination : normalized.get(source).keySet()) {
                 /*
@@ -183,7 +192,12 @@ public class StatisticalEngine {
                 DescriptiveStatistics ewma = statistics.get(source).get(destination).get(Cube.EW_MEAN);
                 if (ewma.getValues().length >= 2) {
                     log.debug("EWMA data for: " + source + " -> " + destination);
-                    log.debug("Comparing: " + normalized.get(source).get(destination));
+
+                    log.debug("Comparing current EWMA: "
+                            + prior.get(source).get(destination).getMean()
+                            + " to updated: "
+                            + ewma.getMax() + "/" + ewma.getMean() + "/" + ewma.getMin());
+
                     double[] sValues = ewma.getValues();
                     StringBuilder builder = new StringBuilder();
                     for (double value : sValues) {
@@ -191,20 +205,20 @@ public class StatisticalEngine {
                         builder.append(", ");
                     }
                     log.debug("\tvalues: " + builder.toString() + "\n");
-                    log.debug(ewma.toString());
+                    //log.debug(ewma.toString());
 
                     StatisticalFlowIdentifier id = new StatisticalFlowIdentifier(source, destination);
-                    if (prior.get(source).get(destination).get(Cube.EW_MEAN).getMean() > ewma.getMax()) {
+                    if (prior.get(source).get(destination).getMean() > ewma.getMax()) {
                         log.debug("EWMA increase");
                         interval.addAnomaly(id, Anomaly.EWMA_INCREASE);
-                    } else if(prior.get(source).get(destination).get(Cube.EW_MEAN).getMean() < ewma.getMin()) {
+                    } else if (prior.get(source).get(destination).getMean() < ewma.getMin()) {
                         log.debug("EWMA decrease");
                         interval.addAnomaly(id, Anomaly.EWMA_DECREASE);
                     }
                 }
             }
         }
-        
+
         return interval;
     }
 
