@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import name.justinthomas.flower.analysis.element.ManagedNetworks;
+import name.justinthomas.flower.analysis.statistics.AnomalyEvent.Anomaly;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
@@ -35,15 +36,6 @@ public class StatisticalEngine {
     private final Integer HISTORY = 1000;
     private Customer customer;
     private Map<String, Map<String, Map<Cube, DescriptiveStatistics>>> statistics = new ConcurrentHashMap();
-
-    public static enum Anomaly {
-
-        EWMA_INCREASE,
-        EWMA_DECREASE,
-        NEW_MAXIMUM,
-        NEW_MINIMUM,
-        NEW_FLOW
-    }
 
     private enum Cube {
 
@@ -194,9 +186,9 @@ public class StatisticalEngine {
                     log.debug("EWMA data for: " + source + " -> " + destination);
 
                     log.debug("Comparing current EWMA: "
-                            + prior.get(source).get(destination).getMean()
+                            + prior.get(source).get(destination).getValues()[prior.get(source).get(destination).getValues().length - 1]
                             + " to updated: "
-                            + ewma.getMax() + "/" + ewma.getMean() + "/" + ewma.getMin());
+                            + ewma.getMax() + "/" + ewma.getValues()[ewma.getValues().length - 1] + "/" + ewma.getMin());
 
                     double[] sValues = ewma.getValues();
                     StringBuilder builder = new StringBuilder();
@@ -208,10 +200,10 @@ public class StatisticalEngine {
                     //log.debug(ewma.toString());
 
                     StatisticalFlowIdentifier id = new StatisticalFlowIdentifier(source, destination);
-                    if (prior.get(source).get(destination).getMean() > ewma.getMax()) {
+                    if (ewma.getValues()[ewma.getValues().length - 1] > prior.get(source).get(destination).getMax()) {
                         log.debug("EWMA increase");
                         interval.addAnomaly(id, Anomaly.EWMA_INCREASE);
-                    } else if (prior.get(source).get(destination).getMean() < ewma.getMin()) {
+                    } else if (ewma.getValues()[ewma.getValues().length - 1] < prior.get(source).get(destination).getMin()) {
                         log.debug("EWMA decrease");
                         interval.addAnomaly(id, Anomaly.EWMA_DECREASE);
                     }

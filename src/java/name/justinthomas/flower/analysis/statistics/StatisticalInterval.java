@@ -4,29 +4,25 @@ import com.sleepycat.persist.model.Entity;
 import com.sleepycat.persist.model.PrimaryKey;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlType;
-import name.justinthomas.flower.analysis.statistics.StatisticalEngine.Anomaly;
+import name.justinthomas.flower.analysis.statistics.AnomalyEvent.Anomaly;
 
 /**
  *
  * @author justin
  */
 
-@Entity(version = 102)
+@Entity(version = 104)
 @XmlType
 public class StatisticalInterval {
 
     @PrimaryKey
     public IntervalKey key;
     public Map<StatisticalFlowIdentifier, StatisticalFlow> flows = new HashMap();
-    @XmlElement
-    public LinkedList<Long> flowIDs = new LinkedList();
-    public Map<StatisticalFlowIdentifier, ArrayList<Anomaly>> anomalies = new HashMap();
+    public ArrayList<Long> flowIDs = new ArrayList();
+    public ArrayList<AnomalyEvent> anomalies = new ArrayList();
 
     public void clear() {
         key = null;
@@ -34,14 +30,7 @@ public class StatisticalInterval {
     }
     
     public StatisticalInterval addAnomaly(StatisticalFlowIdentifier id, Anomaly anomaly) {
-        if(anomalies.containsKey(id)) {
-            anomalies.get(id).add(anomaly);
-        } else {
-            ArrayList<Anomaly> anomalyList = new ArrayList();
-            anomalyList.add(anomaly);
-            anomalies.put(id, anomalyList);
-        }
-        
+        anomalies.add(new AnomalyEvent(id.getSource(), id.getDestination(), anomaly));
         return this;
     }
 
