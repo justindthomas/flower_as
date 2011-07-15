@@ -8,15 +8,20 @@ import com.sleepycat.persist.EntityStore;
 import com.sleepycat.persist.ForwardCursor;
 import com.sleepycat.persist.StoreConfig;
 import java.io.File;
+import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Security;
 import java.util.ArrayList;
+import java.util.Random;
 import java.util.TimeZone;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.Logger;
+import org.apache.log4j.SimpleLayout;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 /**
@@ -25,42 +30,64 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
  */
 public class UserManager {
 
+    private static final Logger log = Logger.getLogger(UserManager.class.getName());
+    private static FileAppender fileAppender;
     private Customer customer;
     private static Integer DEBUG = 1;
     private Environment environment;
-    private static GlobalConfigurationManager configurationManager;
+    private static GlobalConfigurationManager globalConfigurationManager;
 
     public UserManager(Customer customer) {
         this.customer = customer;
-        
-        if(configurationManager == null) {
+
+        if (globalConfigurationManager == null) {
             try {
-                configurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+                globalConfigurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
             } catch (NamingException e) {
-                e.printStackTrace();
+                log.error(e.getMessage());
+            }
+        }
+
+        if (fileAppender == null) {
+            try {
+                fileAppender = new FileAppender(new SimpleLayout(), globalConfigurationManager.getBaseDirectory() + "/authentication.log");
+                log.addAppender(fileAppender);
+            } catch (IOException e) {
+                log.error(e.getMessage());
             }
         }
     }
-    
+
     private void createFirstUser() {
         Security.addProvider(new BouncyCastleProvider());
         MessageDigest hash = null;
-
+        StringBuilder builder = new StringBuilder();
+        
         try {
+            Random r = new Random();
+            
+            for (int i = 0; i < 8; i++) {
+                int c;
+                c = r.nextInt(126);
+                while (c < 33) {
+                    c = r.nextInt(126);
+                }
+                builder.append((char) c);
+            }
+
             hash = MessageDigest.getInstance("SHA-256", "BC");
-            hash.update("flower".getBytes());
+            hash.update(builder.toString().getBytes());
         } catch (NoSuchAlgorithmException nsae) {
-            nsae.printStackTrace();
+            log.error(nsae.getMessage());
         } catch (NoSuchProviderException nspe) {
-            nspe.printStackTrace();
+            log.error(nspe.getMessage());
         }
 
         try {
-            System.out.println("Creating first user (flower)");
-            TimeZone PST = TimeZone.getTimeZone("PST");
+            log.debug("Creating first user: flower, " + builder.toString());
             updateUser(new User("flower", new String(hash.digest()), "Administrator", true, "PST"));
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error(e.getMessage());
         }
     }
 
@@ -78,7 +105,7 @@ public class UserManager {
 
             entityStore.close();
         } catch (DatabaseException e) {
-            System.err.println("DatabaseException in UserManager: " + e.getMessage());
+            log.error(e.getMessage());
         } finally {
             closeEnvironment();
         }
@@ -92,8 +119,8 @@ public class UserManager {
 
         try {
             StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
+            storeConfig.setAllowCreate(false);
+            storeConfig.setReadOnly(true);
             EntityStore entityStore = new EntityStore(environment, "User", storeConfig);
             UserAccessor accessor = new UserAccessor(entityStore);
 
@@ -101,7 +128,7 @@ public class UserManager {
 
             entityStore.close();
         } catch (Throwable t) {
-            System.err.println("Exception in UserManager: " + t.getMessage());
+            log.error(t.getMessage());
         } finally {
             closeEnvironment();
         }
@@ -118,22 +145,22 @@ public class UserManager {
             hash = MessageDigest.getInstance("SHA-256", "BC");
             hash.update(password.getBytes());
         } catch (NoSuchAlgorithmException nsae) {
-            nsae.printStackTrace();
+            log.error(nsae.getMessage());
         } catch (NoSuchProviderException nspe) {
-            nspe.printStackTrace();
+            log.error(nspe.getMessage());
         }
 
         try {
             updateUser(new User(user, new String(hash.digest()), fullName, administrator, timeZone));
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error(e.getMessage());
             return false;
         }
         return true;
     }
 
     private void updateUser(User user) {
-        System.out.println("Updating User: " + user.username);
+        log.debug("Updating User: " + user.username);
 
         setupEnvironment();
         try {
@@ -146,7 +173,7 @@ public class UserManager {
             accessor.userById.put(user);
             entityStore.close();
         } catch (DatabaseException e) {
-            System.err.println("DatabaseException in UserManager: " + e.getMessage());
+            log.error(e.getMessage());
         } finally {
             closeEnvironment();
         }
@@ -158,21 +185,21 @@ public class UserManager {
 
         try {
             StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
+            storeConfig.setAllowCreate(false);
+            storeConfig.setReadOnly(true);
             EntityStore entityStore = new EntityStore(environment, "User", storeConfig);
             UserAccessor accessor = new UserAccessor(entityStore);
 
             ForwardCursor<User> cursor = accessor.userById.entities();
 
-            for(User user : cursor) {
+            for (User user : cursor) {
                 users.add(user);
             }
 
             cursor.close();
             entityStore.close();
         } catch (DatabaseException e) {
-            System.err.println("DatabaseException in UserManager: " + e.getMessage());
+            log.error(e.getMessage());
         } finally {
             closeEnvironment();
         }
@@ -180,22 +207,21 @@ public class UserManager {
         return users;
     }
 
-    private void setupEnvironment() {        
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/users");
+    private void setupEnvironment() {
+        File environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/users");
 
         if (!environmentHome.exists()) {
             if (environmentHome.mkdirs()) {
-                System.out.println("Created user directory: " + environmentHome);
+                log.debug("Created user directory: " + environmentHome);
                 createFirstUser();
             } else {
-                System.err.println("User directory '" + environmentHome + "' does not exist and could not be created (permissions?)");
+                log.error("User directory '" + environmentHome + "' does not exist and could not be created (permissions?)");
             }
         }
 
         EnvironmentConfig environmentConfig = new EnvironmentConfig();
         environmentConfig.setAllowCreate(true);
         environmentConfig.setReadOnly(false);
-        //environmentConfig.setConfigParam(EnvironmentConfig.CLEANER_EXPUNGE, "false");
         environment = new Environment(environmentHome, environmentConfig);
     }
 
@@ -204,7 +230,7 @@ public class UserManager {
             try {
                 environment.close();
             } catch (DatabaseException e) {
-                System.err.println("Error closing environment: " + e.toString());
+                log.error(e.getMessage());
             }
         }
     }

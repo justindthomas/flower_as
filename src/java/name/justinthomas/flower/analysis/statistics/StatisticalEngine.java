@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package name.justinthomas.flower.analysis.statistics;
 
 import java.io.IOException;
@@ -12,6 +8,8 @@ import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import name.justinthomas.flower.analysis.element.ManagedNetworks;
@@ -33,11 +31,14 @@ public class StatisticalEngine {
     private static final Logger log = Logger.getLogger(StatisticalEngine.class.getName());
     private static GlobalConfigurationManager globalConfigurationManager;
     private static FileAppender fileAppender;
+    private static ScheduledThreadPoolExecutor executor;
     private final Integer HISTORY = 1000;
     private Customer customer;
-    private Map<String, Map<String, Map<Cube, DescriptiveStatistics>>> statistics = new ConcurrentHashMap();
+    private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics;
+    
+    //private Map<String, Map<String, Map<Cube, DescriptiveStatistics>>> statistics = new ConcurrentHashMap();
 
-    private enum Cube {
+    protected enum Cube {
 
         DETAIL,
         MEAN,
@@ -62,6 +63,38 @@ public class StatisticalEngine {
             } catch (IOException e) {
                 log.error(e.getMessage());
             }
+        }
+        
+        StatisticsManager statisticsManager = new StatisticsManager(customer);
+        StatisticalCube storedCube = statisticsManager.getCube();
+        
+        if(storedCube != null) {
+            statistics = storedCube.getConcurrentStatistics();
+        } else {
+            statistics = new ConcurrentHashMap();
+        }
+
+        if(executor == null) {
+            executor = new ScheduledThreadPoolExecutor(3);
+        }
+        
+        executor.scheduleAtFixedRate(new Task(customer, statistics), 5, 5, TimeUnit.MINUTES);
+    }
+
+    class Task implements Runnable {
+        private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics;
+        private Customer customer;
+        
+        public Task(Customer customer, ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics) {
+            this.statistics = statistics;
+            this.customer = customer;
+        }
+        
+        @Override
+        public void run() {
+            StatisticalCube cube = new StatisticalCube(customer.getId(), statistics);
+            StatisticsManager statisticsManager = new StatisticsManager(customer);
+            statisticsManager.storeCube(cube);
         }
     }
 
@@ -107,6 +140,8 @@ public class StatisticalEngine {
                 }
 
                 if (!statistics.containsKey(source) || !statistics.get(source).containsKey(destination)) {
+                    StatisticalFlowIdentifier id = new StatisticalFlowIdentifier(source, destination);
+                    interval.addAnomaly(id, Anomaly.NEW_FLOW);
                     this.addFile(source, destination);
                 }
 
@@ -149,38 +184,6 @@ public class StatisticalEngine {
 
         for (String source : normalized.keySet()) {
             for (String destination : normalized.get(source).keySet()) {
-                /*
-                DescriptiveStatistics detail = statistics.get(source).get(destination).get(Cube.DETAIL);
-                if (detail.getValues().length >= 2) {
-                log.debug("Detail data for: " + source + " -> " + destination);
-                double[] sValues = detail.getValues();
-                StringBuilder builder = new StringBuilder();
-                for (double value : sValues) {
-                builder.append(new Double(value).intValue());
-                builder.append(", ");
-                }
-                log.debug("\tvalues: " + builder.toString() + "\n");
-                log.debug(detail.toString());
-                }
-                 * 
-                 */
-
-                /*
-                DescriptiveStatistics mean = statistics.get(source).get(destination).get(Cube.MEAN);
-                if (mean.getValues().length >= 2) {
-                log.debug("Mean data for: " + source + " -> " + destination);
-                double[] sValues = mean.getValues();
-                StringBuilder builder = new StringBuilder();
-                for (double value : sValues) {
-                builder.append(new Double(value).intValue());
-                builder.append(", ");
-                }
-                log.debug("\tvalues: " + builder.toString());
-                log.debug(mean.toString());
-                }
-                 * 
-                 */
-
                 DescriptiveStatistics ewma = statistics.get(source).get(destination).get(Cube.EW_MEAN);
                 if (ewma.getValues().length >= 2) {
                     log.debug("EWMA data for: " + source + " -> " + destination);
@@ -196,7 +199,7 @@ public class StatisticalEngine {
                         builder.append(new Double(value).intValue());
                         builder.append(", ");
                     }
-                    log.debug("\tvalues: " + builder.toString() + "\n");
+                    log.debug("values: " + builder.toString());
                     //log.debug(ewma.toString());
 
                     StatisticalFlowIdentifier id = new StatisticalFlowIdentifier(source, destination);
@@ -207,6 +210,7 @@ public class StatisticalEngine {
                         log.debug("EWMA decrease");
                         interval.addAnomaly(id, Anomaly.EWMA_DECREASE);
                     }
+                    log.debug("\n");
                 }
             }
         }
@@ -266,7 +270,6 @@ public class StatisticalEngine {
      * @param destination  the destination address string
      */
     private void addFile(String source, String destination) {
-
         if (!statistics.containsKey(source)) {
             statistics.put(source, new ConcurrentHashMap());
         }

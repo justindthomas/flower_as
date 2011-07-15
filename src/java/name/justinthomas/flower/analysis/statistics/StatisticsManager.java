@@ -37,6 +37,9 @@ import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.analysis.persistence.Constraints;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import name.justinthomas.flower.utility.AddressAnalysis;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.Logger;
+import org.apache.log4j.SimpleLayout;
 
 /**
  *
@@ -44,24 +47,36 @@ import name.justinthomas.flower.utility.AddressAnalysis;
  */
 public class StatisticsManager {
 
-    private static GlobalConfigurationManager configurationManager;
+    private static final Logger log = Logger.getLogger(StatisticsManager.class.getName());
+    private static FileAppender fileAppender;
+    private static GlobalConfigurationManager globalConfigurationManager;
     private static final Integer DEBUG = 1;
     private Customer customer;
 
     public StatisticsManager(Customer customer) {
         this.customer = customer;
-        
-        try {
-            if (configurationManager == null) {
-                StatisticsManager.configurationManager = InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+
+        if (globalConfigurationManager == null) {
+            try {
+
+                StatisticsManager.globalConfigurationManager = InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+            } catch (NamingException e) {
+                log.error(e.getMessage());
             }
-        } catch (NamingException e) {
-            e.printStackTrace();
+        }
+
+        if (fileAppender == null) {
+            try {
+                fileAppender = new FileAppender(new SimpleLayout(), globalConfigurationManager.getBaseDirectory() + "/statistics.log");
+                log.addAppender(fileAppender);
+            } catch (IOException e) {
+                log.error(e.getMessage());
+            }
         }
     }
 
-    private Environment setupEnvironment() {        
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/statistics");
+    private Environment setupEnvironment() {
+        File environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/statistics");
 
         try {
             if (!environmentHome.exists()) {
@@ -204,7 +219,7 @@ public class StatisticsManager {
     }
 
     public void addStatisticalSeconds(Flow flow, Long flowID, InetAddress collector) {
-        CachedStatistics cachedStatistics = configurationManager.getCachedStatistics(customer.getId());
+        CachedStatistics cachedStatistics = globalConfigurationManager.getCachedStatistics(customer.getId());
 
         if (cachedStatistics == null) {
             cachedStatistics = new CachedStatistics(customer);
@@ -217,10 +232,10 @@ public class StatisticsManager {
                 return;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error(e.getMessage());
         }
 
-        for (Long resolution : configurationManager.getResolutionMap().keySet()) {
+        for (Long resolution : globalConfigurationManager.getResolutionMap().keySet()) {
             HashMap<IntervalKey, StatisticalInterval> normalized = flowToInterval(flow, resolution, flowID);
 
             for (Entry<IntervalKey, StatisticalInterval> entry : normalized.entrySet()) {
@@ -229,11 +244,11 @@ public class StatisticsManager {
             //System.out.println("Adding " + normalized.size() + " intervals to resolution " + resolution);
         }
 
-        configurationManager.setCachedStatistics(customer.getId(), cachedStatistics);
+        globalConfigurationManager.setCachedStatistics(customer.getId(), cachedStatistics);
     }
 
     private Long getResolution(long duration, Integer bins) {
-        List<Long> resolutions = new ArrayList(configurationManager.getResolutionMap().keySet());
+        List<Long> resolutions = new ArrayList(globalConfigurationManager.getResolutionMap().keySet());
 
         // This sorts the resolutions from highest to lowest (smallest number to largest number)
         Collections.sort(resolutions);
@@ -264,8 +279,47 @@ public class StatisticsManager {
             }
         }
 
-        System.out.println("Setting resolution to: " + returnValue);
+        log.debug("Setting resolution to: " + returnValue);
         return returnValue;
+    }
+
+    public StatisticalCube getCube() {
+        Environment environment;
+        EntityStore store = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(false));
+
+        try {
+            StatisticsAccessor accessor = new StatisticsAccessor(store);
+            StatisticalCube cube = accessor.cubesByCustomer.get(customer.getId());
+            if (cube != null) {
+                log.debug("Retrieved cubes for customer: " + customer.getId() + " with " + cube.getStatistics().size() + " mappings");
+            }
+            return cube;
+        } finally {
+            closeStore(store);
+            closeEnvironment(environment);
+        }
+    }
+
+    public void storeCube(StatisticalCube cube) {
+        Environment environment;
+        EntityStore store = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(false));
+
+        log.debug("Beginning cube storage routine");
+        if (cube.getStatistics() != null) {
+            try {
+                StatisticsAccessor accessor = new StatisticsAccessor(store);
+                log.debug("Storing cubes for customer: " + customer.getId() + " with " + cube.getStatistics().size() + " mappings");
+                accessor.cubesByCustomer.put(cube);
+            } catch (Throwable t) {
+                log.error(t.toString());
+            } finally {
+                closeStore(store);
+                closeEnvironment(environment);
+            }
+        } else {
+            log.debug("Cube has no statistics yet.");
+        }
+        log.debug("Cube storage complete.");
     }
 
     public LinkedList<StatisticalInterval> getStatisticalIntervals(HttpSession session, Constraints constraints, Integer resolution) {
@@ -689,7 +743,7 @@ public class StatisticsManager {
 
         HashMap<IntervalKey, Boolean> expiredIntervals = new HashMap();
 
-        for (Entry<Long, Boolean> resolution : configurationManager.getResolutionMap().entrySet()) {
+        for (Entry<Long, Boolean> resolution : globalConfigurationManager.getResolutionMap().entrySet()) {
             IntervalKey startKey = new IntervalKey();
             startKey.resolution = resolution.getKey();
             startKey.interval = start.getTime() / resolution.getKey();

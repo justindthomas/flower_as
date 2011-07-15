@@ -17,7 +17,9 @@ public class StatisticsAccessor {
 
     public StatisticsAccessor(EntityStore store) throws DatabaseException {
         intervalByKey = store.getPrimaryIndex(IntervalKey.class, StatisticalInterval.class);
+        cubesByCustomer = store.getPrimaryIndex(String.class, StatisticalCube.class);
     }
 
     public PrimaryIndex<IntervalKey, StatisticalInterval> intervalByKey;
+    public PrimaryIndex<String, StatisticalCube> cubesByCustomer;
 }
