@@ -35,9 +35,8 @@ public class StatisticalEngine {
     private final Integer HISTORY = 1000;
     private Customer customer;
     private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics;
-    
-    //private Map<String, Map<String, Map<Cube, DescriptiveStatistics>>> statistics = new ConcurrentHashMap();
 
+    //private Map<String, Map<String, Map<Cube, DescriptiveStatistics>>> statistics = new ConcurrentHashMap();
     protected enum Cube {
 
         DETAIL,
@@ -64,37 +63,45 @@ public class StatisticalEngine {
                 log.error(e.getMessage());
             }
         }
-        
+
         StatisticsManager statisticsManager = new StatisticsManager(customer);
         StatisticalCube storedCube = statisticsManager.getCube();
-        
-        if(storedCube != null) {
+
+        if (storedCube != null) {
             statistics = storedCube.getConcurrentStatistics();
         } else {
             statistics = new ConcurrentHashMap();
         }
 
-        if(executor == null) {
+        if (executor == null) {
             executor = new ScheduledThreadPoolExecutor(3);
         }
-        
+
         executor.scheduleAtFixedRate(new Task(customer, statistics), 5, 5, TimeUnit.MINUTES);
     }
 
     class Task implements Runnable {
+
         private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics;
         private Customer customer;
-        
+
         public Task(Customer customer, ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics) {
             this.statistics = statistics;
             this.customer = customer;
         }
-        
+
         @Override
         public void run() {
-            StatisticalCube cube = new StatisticalCube(customer.getId(), statistics);
-            StatisticsManager statisticsManager = new StatisticsManager(customer);
-            statisticsManager.storeCube(cube);
+            try {
+                StatisticalCube cube = new StatisticalCube(customer.getId(), statistics);
+                StatisticsManager statisticsManager = new StatisticsManager(customer);
+                statisticsManager.storeCube(cube);
+            } catch (Throwable t) {
+                log.error("Scheduled Task Failed: " + t.toString());
+                for(StackTraceElement element : t.getStackTrace()) {
+                    log.error(element.getClassName() + ", line: " + element.getLineNumber());
+                }
+            }
         }
     }
 

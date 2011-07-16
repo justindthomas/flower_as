@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import name.justinthomas.flower.analysis.statistics.StatisticalEngine.Cube;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
+import org.apache.commons.math.stat.descriptive.SynchronizedDescriptiveStatistics;
 
 /**
  *
@@ -15,13 +16,15 @@ import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 public class StatisticalCube {
     @PrimaryKey
     private String customerID;
-    private HashMap<String, HashMap<String, HashMap<Cube, DescriptiveStatistics>>> statistics;
+    private HashMap<String, HashMap<String, HashMap<Cube, double[]>>> statistics;
     
     public StatisticalCube() {
         statistics = new HashMap();
     }
 
     public StatisticalCube(String customerID, ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics) {
+        this();
+        
         this.customerID = customerID;
         
         for(String source : statistics.keySet()) {
@@ -35,7 +38,7 @@ public class StatisticalCube {
                 }
                 
                 for(Cube cube : statistics.get(source).get(destination).keySet()) {
-                    this.statistics.get(source).get(destination).put(cube, statistics.get(source).get(destination).get(cube));
+                    this.statistics.get(source).get(destination).put(cube, statistics.get(source).get(destination).get(cube).getValues());
                 }
             }
         }
@@ -56,7 +59,7 @@ public class StatisticalCube {
         this.customerID = customerID;
     }
 
-    public HashMap<String, HashMap<String, HashMap<Cube, DescriptiveStatistics>>> getStatistics() {
+    public HashMap<String, HashMap<String, HashMap<Cube, double[]>>> getStatistics() {
         return statistics;
     }
     
@@ -74,7 +77,11 @@ public class StatisticalCube {
                 }
                 
                 for(Cube cube : statistics.get(source).get(destination).keySet()) {
-                    map.get(source).get(destination).put(cube, statistics.get(source).get(destination).get(cube));
+                    DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics();
+                    for(double d : statistics.get(source).get(destination).get(cube)) {
+                        descriptiveStatistics.addValue(d);
+                    }
+                    map.get(source).get(destination).put(cube, descriptiveStatistics);
                 }
             }
         }
@@ -82,7 +89,7 @@ public class StatisticalCube {
         return map;
     }
 
-    public void setStatistics(HashMap<String, HashMap<String, HashMap<Cube, DescriptiveStatistics>>> statistics) {
+    public void setStatistics(HashMap<String, HashMap<String, HashMap<Cube, double[]>>> statistics) {
         this.statistics = statistics;
     }
 }
