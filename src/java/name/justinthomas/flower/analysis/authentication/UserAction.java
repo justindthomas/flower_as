@@ -186,8 +186,9 @@ public class UserAction {
 
         if (customer != null) {
             UserManager userManager = new UserManager(customer);
+            User user = userManager.getUser(authUser);
             if (token.authorized && token.internal && (userManager.getUser(authUser) != null)) {
-                if (!userManager.updateUser(authUser, updatedPassword, fullName, false, timeZone)) {
+                if (!userManager.updateUser(authUser, updatedPassword, fullName, user.administrator, timeZone)) {
                     return false;
                 }
             } else {

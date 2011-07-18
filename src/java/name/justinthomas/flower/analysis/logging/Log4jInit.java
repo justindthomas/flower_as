@@ -15,7 +15,7 @@ import javax.servlet.http.HttpServletResponse;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.FileAppender;
-import org.apache.log4j.SimpleLayout;
+import org.apache.log4j.PatternLayout;
 
 /**
  *
@@ -26,26 +26,29 @@ import org.apache.log4j.SimpleLayout;
 public class Log4jInit extends HttpServlet {
 
     private static GlobalConfigurationManager globalConfigurationManager;
-    
+
     @Override
     public void init() {
-        
-        if(globalConfigurationManager == null) {
+
+        if (globalConfigurationManager == null) {
             try {
                 globalConfigurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
             } catch (NamingException e) {
                 e.printStackTrace();
             }
         }
-        
+
         try {
-            BasicConfigurator.configure(new FileAppender(new SimpleLayout(), globalConfigurationManager.getBaseDirectory() + "/server.log"));
+            String pattern = "%d{HH:mm:ss.SSS} - %p - %m %n";
+            PatternLayout layout = new PatternLayout(pattern);
+            
+            BasicConfigurator.configure(new FileAppender(layout, globalConfigurationManager.getBaseDirectory() + "/server.log"));
         } catch (IOException e) {
             e.printStackTrace();
         }
-        
+
     }
-    
+
     @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response) {
     }

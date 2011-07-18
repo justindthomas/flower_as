@@ -39,7 +39,7 @@ import name.justinthomas.flower.manager.services.CustomerAdministration.Customer
 import name.justinthomas.flower.utility.AddressAnalysis;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
-import org.apache.log4j.SimpleLayout;
+import org.apache.log4j.PatternLayout;
 
 /**
  *
@@ -67,7 +67,9 @@ public class StatisticsManager {
 
         if (fileAppender == null) {
             try {
-                fileAppender = new FileAppender(new SimpleLayout(), globalConfigurationManager.getBaseDirectory() + "/statistics.log");
+                String pattern = "%d{HH:mm:ss.SSS} - %p - %m %n";
+                PatternLayout layout = new PatternLayout(pattern);
+                fileAppender = new FileAppender(layout, globalConfigurationManager.getBaseDirectory() + "/statistics.log");
                 log.addAppender(fileAppender);
             } catch (IOException e) {
                 log.error(e.getMessage());
@@ -85,7 +87,7 @@ public class StatisticsManager {
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
+            log.error(e.getMessage());
         }
 
         EnvironmentConfig environmentConfig = new EnvironmentConfig();
@@ -103,9 +105,9 @@ public class StatisticsManager {
             try {
                 environment.close();
             } catch (DatabaseException e) {
-                System.err.println("Error closing environment: " + e.toString());
+                log.error("Error closing environment: " + e.toString());
             } catch (IllegalStateException e) {
-                System.err.println("Error closing environment: " + e.toString());
+                log.error("Error closing environment: " + e.toString());
             }
         }
     }
@@ -127,14 +129,14 @@ public class StatisticsManager {
         try {
             store.close();
         } catch (DatabaseException e) {
-            System.err.println("Error closing EntityStore: " + e.getMessage());
+            log.error("Error closing EntityStore: " + e.getMessage());
         }
     }
 
     public ArrayList<Long> cleanStatisticalIntervals() {
         HashMap<IntervalKey, Boolean> keys = identifyExpiredIntervals();
 
-        System.out.println("Deleting expired intervals...");
+        log.debug("Deleting expired intervals...");
 
         Environment environment;
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(false));
@@ -154,7 +156,7 @@ public class StatisticsManager {
             dataAccessor.intervalByKey.delete(key.getKey());
         }
 
-        System.out.println("Null flow IDs found in StatisticalIntervals: " + nullIDs);
+        log.error("Null flow IDs found in StatisticalIntervals: " + nullIDs);
 
         closeStore(entityStore);
         //recordEnvironmentStatistics(environment);
@@ -182,7 +184,7 @@ public class StatisticsManager {
     }
 
     public void storeStatisticalIntervals(ArrayList<StatisticalInterval> intervals) {
-        //System.out.println("Persisting " + intervals.size() + " intervals to long-term storage.");
+        //log.debug("Persisting " + intervals.size() + " intervals to long-term storage.");
         EntityStore entityStore = null;
         Environment environment = null;
 
@@ -205,14 +207,14 @@ public class StatisticsManager {
                 }
 
             } catch (DatabaseException e1) {
-                System.err.println("storeStatisticalInterval Failed: " + e1.getMessage());
+                log.error("storeStatisticalInterval Failed: " + e1.getMessage());
             } catch (ArrayIndexOutOfBoundsException e2) {
-                System.err.println("storeStatisticalInterval Failed: " + e2.getMessage());
+                log.error("storeStatisticalInterval Failed: " + e2.getMessage());
             } finally {
                 closeStore(entityStore);
             }
         } catch (DatabaseException e) {
-            System.err.println("Database Error: " + e.getMessage());
+            log.error("Database Error: " + e.getMessage());
         } finally {
             closeEnvironment(environment);
         }
@@ -227,7 +229,7 @@ public class StatisticsManager {
 
         try {
             if (cachedStatistics.hasOtherRepresentation(flow.getSourceAddress(), flow.getDestinationAddress(), collector)) {
-                System.out.println("Ignoring duplicate flow from: " + collector.getHostAddress()
+                log.debug("Ignoring duplicate flow from: " + collector.getHostAddress()
                         + ", already represented by: " + cachedStatistics.getRepresentation(flow.getSourceAddress(), flow.getDestinationAddress()).getHostAddress());
                 return;
             }
@@ -241,7 +243,7 @@ public class StatisticsManager {
             for (Entry<IntervalKey, StatisticalInterval> entry : normalized.entrySet()) {
                 cachedStatistics.put(entry.getKey(), entry.getValue());
             }
-            //System.out.println("Adding " + normalized.size() + " intervals to resolution " + resolution);
+            //log.debug("Adding " + normalized.size() + " intervals to resolution " + resolution);
         }
 
         globalConfigurationManager.setCachedStatistics(customer.getId(), cachedStatistics);
@@ -360,14 +362,14 @@ public class StatisticsManager {
 
         DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
         if (StatisticsManager.DEBUG >= 1) {
-            System.out.println("Requesting volume data from " + dateFormat.format(constraints.startTime) + " to " + dateFormat.format(constraints.endTime));
+            log.debug("Requesting volume data from " + dateFormat.format(constraints.startTime) + " to " + dateFormat.format(constraints.endTime));
         }
 
         if (StatisticsManager.DEBUG >= 1) {
-            System.out.println("Populating consolidated map");
+            log.debug("Populating consolidated map");
         }
         Long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
-        System.out.println("Duration: " + duration);
+        log.debug("Duration: " + duration);
 
         Long interval = duration / bins;
 
@@ -384,7 +386,7 @@ public class StatisticsManager {
         }
 
         if (StatisticsManager.DEBUG >= 1) {
-            System.out.println("Iterating over flow volumes in database");
+            log.debug("Iterating over flow volumes in database");
         }
 
         Environment environment;
@@ -396,12 +398,12 @@ public class StatisticsManager {
         IntervalKey startKey = new IntervalKey(start, resolution);
         Long end = constraints.endTime.getTime() / resolution;
         IntervalKey endKey = new IntervalKey(end, resolution);
-        //System.out.println("Start: " + start + ", End: " + end);
+        //log.debug("Start: " + start + ", End: " + end);
         EntityCursor<StatisticalInterval> cursor = accessor.intervalByKey.entities(startKey, true, endKey, true);
 
         // We only want to do this query once, so make it count.
         if (StatisticsManager.DEBUG >= 1) {
-            System.out.println("Iterating over query results.");
+            log.debug("Iterating over query results.");
         }
 
         Integer flowsProcessed = 0;
@@ -458,7 +460,7 @@ public class StatisticsManager {
 
                                 }
                             } catch (NullPointerException e) {
-                                System.err.println("Unexpected NULL field encountered.  This is probably a result of bad data in the database (perhaps an interrupted insert?)");
+                                log.error("Unexpected NULL field encountered.  This is probably a result of bad data in the database (perhaps an interrupted insert?)");
                                 continue;
                             }
                         }
@@ -514,32 +516,32 @@ public class StatisticsManager {
 
                         if (DEBUG > 0) {
                             if (++flowsProcessed % 1000 == 0) {
-                                System.out.println("StatisticalSeconds processed: " + flowsProcessed);
+                                log.debug("StatisticalSeconds processed: " + flowsProcessed);
                             }
                         }
 
                         if (Thread.currentThread().isInterrupted()) {
-                            System.out.println("StatisticsManager was interrupted");
+                            log.debug("StatisticsManager was interrupted");
                             throw new InterruptedException();
                         }
                     }
                 } catch (DatabaseException e) {
-                    System.err.println("Database error: " + e.getMessage());
+                    log.error("Database error: " + e.getMessage());
                 } finally {
                     cursor.close();
                 }
             } catch (DatabaseException e) {
-                System.err.println("Database error: " + e.getMessage());
+                log.error("Database error: " + e.getMessage());
             } finally {
                 closeStore(store);
             }
         } catch (InterruptedException ie) {
-            System.err.println("Stopping StatisticsManager during Volume build...");
+            log.error("Stopping StatisticsManager during Volume build...");
         } finally {
             closeEnvironment(environment);
         }
 
-        //System.out.println("Returning from FlowManager:getVolumeByTime");
+        //log.debug("Returning from FlowManager:getVolumeByTime");
         return consolidated;
     }
 
@@ -586,7 +588,7 @@ public class StatisticsManager {
         try {
             defaultNetwork = new Network(InetAddress.getByName("0.0.0.0"), 0, "DEFAULT");
         } catch (UnknownHostException uhe) {
-            System.err.println("Could not parse network for DEFAULT: " + uhe.getMessage());
+            log.error("Could not parse network for DEFAULT: " + uhe.getMessage());
         }
 
         DefaultNode defaultNode = new DefaultNode();
@@ -602,7 +604,7 @@ public class StatisticsManager {
 
         // We only want to do this query once, so make it count.
 
-        System.out.println("Iterating over query results.");
+        log.debug("Iterating over query results.");
 
         Integer secondsProcessed = 0;
         try {
@@ -621,7 +623,7 @@ public class StatisticsManager {
                                 Node sourceNode = new Node(flow.getSource());
                                 Node destinationNode = new Node(flow.getDestination());
 
-                                //System.out.println(".");
+                                //log.debug(".");
                                 // Associate the flow with the source (flows are never associated with the destination)
                                 sourceNode.addFlow(customer, flow);
                                 // On that last point, just kidding
@@ -666,38 +668,38 @@ public class StatisticsManager {
                             }
 
                             if (Thread.currentThread().isInterrupted()) {
-                                //System.out.println("Stopping FlowManager...");
+                                //log.debug("Stopping FlowManager...");
                                 throw new InterruptedException();
                             }
                         }
 
                         if (++secondsProcessed % 10000 == 0) {
-                            System.out.println(secondsProcessed + " StatisticalSeconds processed.");
+                            log.debug(secondsProcessed + " StatisticalSeconds processed.");
                         }
                     }
                 } catch (DatabaseException e) {
-                    System.err.println("Database error: " + e.getMessage());
+                    log.error("Database error: " + e.getMessage());
                 } finally {
                     cursor.close();
                 }
             } catch (DatabaseException e) {
-                System.err.println("Database error: " + e.getMessage());
+                log.error("Database error: " + e.getMessage());
             } finally {
                 closeStore(readOnlyEntityStore);
             }
         } catch (UnknownHostException e) {
-            System.err.println("UnknownHostException caught in " + e.getStackTrace()[0].getMethodName() + ": " + e.getMessage());
+            log.error("UnknownHostException caught in " + e.getStackTrace()[0].getMethodName() + ": " + e.getMessage());
         } catch (InterruptedException ie) {
-            System.err.println("Stopped FlowManager during network build");
+            log.error("Stopped FlowManager during network build");
         } catch (Exception e) {
-            System.err.println("Exception caught in " + e.getStackTrace()[0].getMethodName() + ": " + e.getMessage());
+            log.error("Exception caught in " + e.getStackTrace()[0].getMethodName() + ": " + e.getMessage());
         } finally {
             closeEnvironment(environment);
         }
 
-        System.out.println(secondsProcessed + " total StatisticalSeconds analyzed.");
-        System.out.println("Found " + n + " null flows.");
-        System.out.println("Found " + g + " non-IP flows.");
+        log.debug(secondsProcessed + " total StatisticalSeconds analyzed.");
+        log.debug("Found " + n + " null flows.");
+        log.debug("Found " + g + " non-IP flows.");
         defaultNetwork.addNode(defaultNode);
 
         // Add the default network to the bottom of the network list
@@ -726,12 +728,12 @@ public class StatisticsManager {
             }        // Add the default node (with newly acquired flows) to the default network
             writer.close();
         } catch (IOException ioe) {
-            System.err.println("Error creating trace file: " + ioe.getMessage());
+            log.error("Error creating trace file: " + ioe.getMessage());
         }
     }
 
     private HashMap<IntervalKey, Boolean> identifyExpiredIntervals() {
-        System.out.println("Identifying expired intervals...");
+        log.debug("Identifying expired intervals...");
 
         Environment environment;
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
@@ -762,11 +764,11 @@ public class StatisticsManager {
                 expiredIntervals.put(statisticalInterval.key, resolution.getValue());
 
                 if (++intervalsDeleted % 1000 == 0) {
-                    System.out.println(intervalsDeleted + " intervals marked for deletion at a resolution of " + resolution + " milliseconds...");
+                    log.debug(intervalsDeleted + " intervals marked for deletion at a resolution of " + resolution + " milliseconds...");
                 }
             }
 
-            System.out.println(intervalsDeleted + " total seconds marked for deletion at a resolution of " + resolution + " milliseconds...");
+            log.debug(intervalsDeleted + " total seconds marked for deletion at a resolution of " + resolution + " milliseconds...");
             cursor.close();
         }
 
@@ -780,7 +782,7 @@ public class StatisticsManager {
         try {
             environment.cleanLog();
         } catch (DatabaseException e) {
-            System.err.println("Database error running cleanLog: " + e.getMessage());
+            log.error("Database error running cleanLog: " + e.getMessage());
         }
     }
 
@@ -789,7 +791,7 @@ public class StatisticsManager {
         try {
             environment.checkpoint(checkpointConfig);
         } catch (DatabaseException e) {
-            System.err.println("Database error running checkpoint: " + e.getMessage());
+            log.error("Database error running checkpoint: " + e.getMessage());
         }
     }
 
@@ -802,7 +804,7 @@ public class StatisticsManager {
             writer.append(environment.getStats(config).toStringVerbose());
             writer.close();
         } catch (IOException ioe) {
-            System.err.println("Error recording environment statistics: " + ioe.getMessage());
+            log.error("Error recording environment statistics: " + ioe.getMessage());
         }
     }
 }

@@ -20,7 +20,7 @@ import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math.stat.descriptive.SynchronizedDescriptiveStatistics;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
-import org.apache.log4j.SimpleLayout;
+import org.apache.log4j.PatternLayout;
 
 /**
  *
@@ -36,7 +36,6 @@ public class StatisticalEngine {
     private Customer customer;
     private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics;
 
-    //private Map<String, Map<String, Map<Cube, DescriptiveStatistics>>> statistics = new ConcurrentHashMap();
     protected enum Cube {
 
         DETAIL,
@@ -57,7 +56,9 @@ public class StatisticalEngine {
 
         if (fileAppender == null) {
             try {
-                fileAppender = new FileAppender(new SimpleLayout(), globalConfigurationManager.getBaseDirectory() + "/statistics.log");
+                String pattern = "%d{HH:mm:ss.SSS} - %p - %m %n";
+                PatternLayout layout = new PatternLayout(pattern);
+                fileAppender = new FileAppender(layout, globalConfigurationManager.getBaseDirectory() + "/statistics.log");
                 log.addAppender(fileAppender);
             } catch (IOException e) {
                 log.error(e.getMessage());
@@ -77,15 +78,15 @@ public class StatisticalEngine {
             executor = new ScheduledThreadPoolExecutor(3);
         }
 
-        executor.scheduleAtFixedRate(new Task(customer, statistics), 5, 5, TimeUnit.MINUTES);
+        executor.scheduleAtFixedRate(new Persist(customer, statistics), 5, 5, TimeUnit.MINUTES);
     }
 
-    class Task implements Runnable {
+    class Persist implements Runnable {
 
         private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics;
         private Customer customer;
 
-        public Task(Customer customer, ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics) {
+        public Persist(Customer customer, ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics) {
             this.statistics = statistics;
             this.customer = customer;
         }
@@ -98,7 +99,7 @@ public class StatisticalEngine {
                 statisticsManager.storeCube(cube);
             } catch (Throwable t) {
                 log.error("Scheduled Task Failed: " + t.toString());
-                for(StackTraceElement element : t.getStackTrace()) {
+                for (StackTraceElement element : t.getStackTrace()) {
                     log.error(element.getClassName() + ", line: " + element.getLineNumber());
                 }
             }
@@ -162,7 +163,7 @@ public class StatisticalEngine {
                 normalized.get(source).put(destination, size);
             }
 
-            return this.process(normalized, interval);
+            this.process(normalized, interval);
         }
 
         return interval;
@@ -175,7 +176,11 @@ public class StatisticalEngine {
      * 
      * @param normalized  the normalized interval
      */
-    private StatisticalInterval process(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
+    private void process(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
+        this.ewma(normalized, interval);
+    }
+    
+    private void ewma(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
         Map<String, Map<String, DescriptiveStatistics>> prior = new HashMap();
         for (String source : statistics.keySet()) {
             if (!prior.containsKey(source)) {
@@ -207,8 +212,7 @@ public class StatisticalEngine {
                         builder.append(", ");
                     }
                     log.debug("values: " + builder.toString());
-                    //log.debug(ewma.toString());
-
+                    
                     StatisticalFlowIdentifier id = new StatisticalFlowIdentifier(source, destination);
                     if (ewma.getValues()[ewma.getValues().length - 1] > prior.get(source).get(destination).getMax()) {
                         log.debug("EWMA increase");
@@ -217,12 +221,9 @@ public class StatisticalEngine {
                         log.debug("EWMA decrease");
                         interval.addAnomaly(id, Anomaly.EWMA_DECREASE);
                     }
-                    log.debug("\n");
                 }
             }
         }
-
-        return interval;
     }
 
     /**
