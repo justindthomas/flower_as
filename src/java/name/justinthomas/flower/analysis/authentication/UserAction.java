@@ -1,5 +1,6 @@
 package name.justinthomas.flower.analysis.authentication;
 
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.security.MessageDigest;
@@ -16,6 +17,9 @@ import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import name.justinthomas.flower.manager.services.CustomerAdministration.CustomerAdministration;
 import name.justinthomas.flower.manager.services.CustomerAdministration.CustomerAdministrationService;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.Logger;
+import org.apache.log4j.PatternLayout;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 /**
@@ -24,9 +28,22 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
  */
 @WebService()
 public class UserAction {
-
-    @EJB
-    GlobalConfigurationManager globalConfigurationManager;
+    private static final Logger log = Logger.getLogger(UserAction.class.getName());
+    private static FileAppender fileAppender;
+    private static GlobalConfigurationManager globalConfigurationManager;
+    
+    public UserAction() {
+        if (fileAppender == null) {
+            try {
+                String pattern = "%d{dd MMM yyyy HH:mm:ss.SSS} - %p - %m %n";
+                PatternLayout layout = new PatternLayout(pattern);
+                fileAppender = new FileAppender(layout, this.getGlobalConfigurationManager().getBaseDirectory() + "/authentication.log");
+                log.addAppender(fileAppender);
+            } catch (IOException e) {
+                log.error(e.getMessage());
+            }
+        }
+    }
 
     /**
      * Web service operation
@@ -53,11 +70,11 @@ public class UserAction {
         }
 
         if (token.authenticated) {
-            System.out.println("Successfully authenticated against Active Directory");
+            log.debug("Successfully authenticated against Active Directory");
         }
 
         if (token.authorized) {
-            System.out.println("Successfully authorized against Active Directory");
+            log.debug("Successfully authorized against Active Directory");
         }
 
         return token;
@@ -75,7 +92,7 @@ public class UserAction {
             CustomerAdministration port = admin.getCustomerAdministrationPort();
             customer = port.getCustomer(null, null, customerID);
         } catch (MalformedURLException e) {
-            System.err.println("Could not access Customer Administration service at: " + this.getGlobalConfigurationManager().getManager());
+            log.error("Could not access Customer Administration service at: " + this.getGlobalConfigurationManager().getManager());
             return token;
         }
 
@@ -85,7 +102,7 @@ public class UserAction {
             if ((username != null) && (password != null) && (userManager != null)) {
                 User user = userManager.getUser(username);
                 if (user == null) {
-                    System.out.println("Invalid User: " + username);
+                    log.debug("Invalid User: " + username);
                     return token;
                 }
 
@@ -110,12 +127,12 @@ public class UserAction {
                     }
                     token.fullName = user.fullName;
                     token.timeZone = user.timeZone;
-                    System.out.println("Authenticated successfully against internal database: " + username);
+                    log.debug("Authenticated successfully against internal database: " + username);
                     return token;
                 }
             }
         }
-        System.out.println("Failed Authentication: " + username);
+        log.debug("Failed Authentication: " + username);
         return token;
     }
 
@@ -180,7 +197,7 @@ public class UserAction {
             CustomerAdministration port = admin.getCustomerAdministrationPort();
             customer = port.getCustomer(null, null, customerID);
         } catch (MalformedURLException e) {
-            System.err.println("Could not access Customer Administration service at: " + this.getGlobalConfigurationManager().getManager());
+            log.error("Could not access Customer Administration service at: " + this.getGlobalConfigurationManager().getManager());
             return false;
         }
 
@@ -205,12 +222,12 @@ public class UserAction {
         Customer customer = null;
 
         try {
-            CustomerAdministrationService admin = new CustomerAdministrationService(new URL(globalConfigurationManager.getManager() + "/CustomerAdministrationService?wsdl"));
+            CustomerAdministrationService admin = new CustomerAdministrationService(new URL(this.getGlobalConfigurationManager().getManager() + "/CustomerAdministrationService?wsdl"));
 
             CustomerAdministration port = admin.getCustomerAdministrationPort();
             customer = port.getCustomer(null, null, customerID);
         } catch (MalformedURLException e) {
-            System.err.println("Could not access Customer Administration service at: " + globalConfigurationManager.getManager());
+            log.error("Could not access Customer Administration service at: " + this.getGlobalConfigurationManager().getManager());
             return null;
         }
 
@@ -222,7 +239,7 @@ public class UserAction {
             try {
                 globalConfigurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
             } catch (NamingException e) {
-                e.printStackTrace();
+                log.error("Could not locate GlobalConfigurationManager: " + e.getExplanation());
             }
         }
         

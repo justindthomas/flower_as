@@ -29,8 +29,8 @@ public class StatisticalInterval {
         flows.clear();
     }
     
-    public StatisticalInterval addAnomaly(StatisticalFlowIdentifier id, Anomaly anomaly) {
-        anomalies.add(new AnomalyEvent(id.getSource(), id.getDestination(), anomaly));
+    public StatisticalInterval addAnomaly(StatisticalFlowIdentifier id, Anomaly anomaly, Integer basis) {
+        anomalies.add(new AnomalyEvent(id.getSource(), id.getDestination(), anomaly, basis));
         return this;
     }
 

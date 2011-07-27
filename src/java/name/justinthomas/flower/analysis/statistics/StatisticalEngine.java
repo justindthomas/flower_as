@@ -56,7 +56,7 @@ public class StatisticalEngine {
 
         if (fileAppender == null) {
             try {
-                String pattern = "%d{HH:mm:ss.SSS} - %p - %m %n";
+                String pattern = "%d{dd MMM yyyy HH:mm:ss.SSS} - %p - %m %n";
                 PatternLayout layout = new PatternLayout(pattern);
                 fileAppender = new FileAppender(layout, globalConfigurationManager.getBaseDirectory() + "/statistics.log");
                 log.addAppender(fileAppender);
@@ -149,7 +149,7 @@ public class StatisticalEngine {
 
                 if (!statistics.containsKey(source) || !statistics.get(source).containsKey(destination)) {
                     StatisticalFlowIdentifier id = new StatisticalFlowIdentifier(source, destination);
-                    interval.addAnomaly(id, Anomaly.NEW_FLOW);
+                    interval.addAnomaly(id, Anomaly.NEW_FLOW, 0);
                     this.addFile(source, destination);
                 }
 
@@ -216,10 +216,10 @@ public class StatisticalEngine {
                     StatisticalFlowIdentifier id = new StatisticalFlowIdentifier(source, destination);
                     if (ewma.getValues()[ewma.getValues().length - 1] > prior.get(source).get(destination).getMax()) {
                         log.debug("EWMA increase");
-                        interval.addAnomaly(id, Anomaly.EWMA_INCREASE);
+                        interval.addAnomaly(id, Anomaly.EWMA_INCREASE, sValues.length);
                     } else if (ewma.getValues()[ewma.getValues().length - 1] < prior.get(source).get(destination).getMin()) {
                         log.debug("EWMA decrease");
-                        interval.addAnomaly(id, Anomaly.EWMA_DECREASE);
+                        interval.addAnomaly(id, Anomaly.EWMA_DECREASE, sValues.length);
                     }
                 }
             }

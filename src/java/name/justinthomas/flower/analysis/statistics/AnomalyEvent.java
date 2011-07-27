@@ -14,7 +14,8 @@ public class AnomalyEvent {
     public String source;
     public String destination;
     public Anomaly anomaly;
-
+    public Integer basis;
+    
     @XmlEnum
     public static enum Anomaly {
 
@@ -29,9 +30,10 @@ public class AnomalyEvent {
         
     }
     
-    public AnomalyEvent(String source, String destination, Anomaly anomaly) {
+    public AnomalyEvent(String source, String destination, Anomaly anomaly, Integer basis) {
         this.source = source;
         this.destination = destination;
         this.anomaly = anomaly;
+        this.basis = basis;
     }
 }
