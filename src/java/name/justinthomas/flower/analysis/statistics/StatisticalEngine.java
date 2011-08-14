@@ -97,10 +97,24 @@ public class StatisticalEngine {
                 StatisticalCube cube = new StatisticalCube(customer.getId(), statistics);
                 StatisticsManager statisticsManager = new StatisticsManager(customer);
                 statisticsManager.storeCube(cube);
+                
+                log.debug("Running statistics purge routine...");
+                this.purge();
             } catch (Throwable t) {
                 log.error("Scheduled Task Failed: " + t.toString());
                 for (StackTraceElement element : t.getStackTrace()) {
                     log.error(element.getClassName() + ", line: " + element.getLineNumber());
+                }
+            }
+        }
+
+        private void purge() {
+            for (String source : statistics.keySet()) {
+                for (String destination : statistics.get(source).keySet()) {
+                    if (statistics.get(source).get(destination).get(Cube.DETAIL).getMax() == 0d) {
+                        statistics.get(source).remove(destination);
+                        log.debug("Removed stale cubes for: " + source + " to " + destination);
+                    }
                 }
             }
         }
@@ -179,7 +193,7 @@ public class StatisticalEngine {
     private void process(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
         this.ewma(normalized, interval);
     }
-    
+
     private void ewma(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
         Map<String, Map<String, DescriptiveStatistics>> prior = new HashMap();
         for (String source : statistics.keySet()) {
@@ -205,21 +219,16 @@ public class StatisticalEngine {
                             + " to updated: "
                             + ewma.getMax() + "/" + ewma.getValues()[ewma.getValues().length - 1] + "/" + ewma.getMin());
 
-                    double[] sValues = ewma.getValues();
-                    StringBuilder builder = new StringBuilder();
-                    for (double value : sValues) {
-                        builder.append(new Double(value).intValue());
-                        builder.append(", ");
-                    }
-                    log.debug("values: " + builder.toString());
-                    
+                    int length = ewma.getValues().length;
+                    log.debug("includes " + length + " values");
+
                     StatisticalFlowIdentifier id = new StatisticalFlowIdentifier(source, destination);
                     if (ewma.getValues()[ewma.getValues().length - 1] > prior.get(source).get(destination).getMax()) {
                         log.debug("EWMA increase");
-                        interval.addAnomaly(id, Anomaly.EWMA_INCREASE, sValues.length);
+                        interval.addAnomaly(id, Anomaly.EWMA_INCREASE, length);
                     } else if (ewma.getValues()[ewma.getValues().length - 1] < prior.get(source).get(destination).getMin()) {
                         log.debug("EWMA decrease");
-                        interval.addAnomaly(id, Anomaly.EWMA_DECREASE, sValues.length);
+                        interval.addAnomaly(id, Anomaly.EWMA_DECREASE, length);
                     }
                 }
             }
@@ -287,20 +296,17 @@ public class StatisticalEngine {
         }
 
         if (!statistics.get(source).get(destination).containsKey(Cube.DETAIL)) {
-            DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics();
-            descriptiveStatistics.setWindowSize(HISTORY);
+            DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics(HISTORY);
             statistics.get(source).get(destination).put(Cube.DETAIL, descriptiveStatistics);
         }
 
         if (!statistics.get(source).get(destination).containsKey(Cube.MEAN)) {
-            DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics();
-            descriptiveStatistics.setWindowSize(HISTORY);
+            DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics(HISTORY);
             statistics.get(source).get(destination).put(Cube.MEAN, descriptiveStatistics);
         }
 
         if (!statistics.get(source).get(destination).containsKey(Cube.EW_MEAN)) {
-            DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics();
-            descriptiveStatistics.setWindowSize(HISTORY);
+            DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics(HISTORY);
             statistics.get(source).get(destination).put(Cube.EW_MEAN, descriptiveStatistics);
         }
     }

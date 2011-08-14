@@ -22,19 +22,19 @@ public class CachedStatistics {
     private Map<AddressPair, Representation> sourceMap;
     private StatisticalEngine engine;
     public static final long MAX_WAIT = 300000;
+    
+    public CachedStatistics(Customer customer) {    
+        this.initialize(customer);
+    }
 
-    public CachedStatistics(Customer customer) {
+    public final void initialize(Customer customer) {
         this.customer = customer;
         
         engine = new StatisticalEngine(customer);
         System.out.println("Setting CachedStatistics Persist to run every 60 seconds (" + customer.getId() + ").");
-        //cache = Collections.synchronizedMap(new HashMap());
+
         cache = new ConcurrentHashMap();
-        
-        //lastUpdated = Collections.synchronizedMap(new HashMap());
         lastUpdated = new ConcurrentHashMap();
-        
-        //sourceMap = Collections.synchronizedMap(new HashMap());
         sourceMap = new ConcurrentHashMap();
         
         executor = new ScheduledThreadPoolExecutor(3);

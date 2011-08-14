@@ -49,25 +49,27 @@ public class StatisticsManager {
 
     private static final Logger log = Logger.getLogger(StatisticsManager.class.getName());
     private static FileAppender fileAppender;
-    private static GlobalConfigurationManager globalConfigurationManager;
+    private static final GlobalConfigurationManager globalConfigurationManager = StatisticsManager.getGlobalConfigurationManager();
     private static final Integer DEBUG = 1;
     private Customer customer;
+
+    private static GlobalConfigurationManager getGlobalConfigurationManager() {
+        try {
+
+            return (InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager"));
+        } catch (NamingException e) {
+            log.error(e.getMessage());
+        }
+
+        return null;
+    }
 
     public StatisticsManager(Customer customer) {
         this.customer = customer;
 
-        if (globalConfigurationManager == null) {
-            try {
-
-                StatisticsManager.globalConfigurationManager = InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
-            } catch (NamingException e) {
-                log.error(e.getMessage());
-            }
-        }
-
         if (fileAppender == null) {
             try {
-                String pattern = "%d{HH:mm:ss.SSS} - %p - %m %n";
+                String pattern = "%d{dd MMM yyyy HH:mm:ss.SSS} - %p - %m %n";
                 PatternLayout layout = new PatternLayout(pattern);
                 fileAppender = new FileAppender(layout, globalConfigurationManager.getBaseDirectory() + "/statistics.log");
                 log.addAppender(fileAppender);
@@ -221,10 +223,15 @@ public class StatisticsManager {
     }
 
     public void addStatisticalSeconds(Flow flow, Long flowID, InetAddress collector) {
-        CachedStatistics cachedStatistics = globalConfigurationManager.getCachedStatistics(customer.getId());
+        CachedStatistics cachedStatistics = null;
 
-        if (cachedStatistics == null) {
-            cachedStatistics = new CachedStatistics(customer);
+        synchronized (globalConfigurationManager) {
+            cachedStatistics = globalConfigurationManager.getCachedStatistics(customer.getId());
+
+            if (cachedStatistics == null) {
+                globalConfigurationManager.setCachedStatistics(customer.getId(), new CachedStatistics(customer));
+                cachedStatistics = globalConfigurationManager.getCachedStatistics(customer.getId());
+            }
         }
 
         try {
@@ -246,7 +253,7 @@ public class StatisticsManager {
             //log.debug("Adding " + normalized.size() + " intervals to resolution " + resolution);
         }
 
-        globalConfigurationManager.setCachedStatistics(customer.getId(), cachedStatistics);
+        //globalConfigurationManager.setCachedStatistics(customer.getId(), cachedStatistics);
     }
 
     private Long getResolution(long duration, Integer bins) {
