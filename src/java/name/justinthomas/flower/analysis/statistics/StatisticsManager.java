@@ -11,6 +11,8 @@ import com.sleepycat.persist.StoreConfig;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.DateFormat;
@@ -35,6 +37,7 @@ import name.justinthomas.flower.analysis.element.Network;
 import name.justinthomas.flower.analysis.element.Node;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.analysis.persistence.Constraints;
+import name.justinthomas.flower.analysis.services.MapDataResponse;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import name.justinthomas.flower.utility.AddressAnalysis;
 import org.apache.log4j.FileAppender;
@@ -551,16 +554,25 @@ public class StatisticsManager {
         //log.debug("Returning from FlowManager:getVolumeByTime");
         return consolidated;
     }
-
+    
     public StatisticalFlow setDefault(ArrayList<Network> networks, StatisticalFlow flow) throws UnknownHostException {
+        ArrayList<InetNetwork> iNetworks = new ArrayList();
+        for(Network network : networks) {
+            iNetworks.add(network.getNetwork());
+        }
+        
+        return setDefault(iNetworks, flow, "0.0.0.0");
+    }
+
+    public StatisticalFlow setDefault(ArrayList<InetNetwork> networks, StatisticalFlow flow, String untracked) throws UnknownHostException {
         Boolean sourceManaged = false;
         Boolean destinationManaged = false;
 
-        for (Network network : networks) {
-            if (!sourceManaged && AddressAnalysis.isMember(InetAddress.getByName(flow.getSource()), network.getNetwork())) {
+        for (InetNetwork network : networks) {
+            if (!sourceManaged && AddressAnalysis.isMember(InetAddress.getByName(flow.getSource()), network)) {
                 sourceManaged = true;
             }
-            if (!destinationManaged && AddressAnalysis.isMember(InetAddress.getByName(flow.getDestination()), network.getNetwork())) {
+            if (!destinationManaged && AddressAnalysis.isMember(InetAddress.getByName(flow.getDestination()), network)) {
                 destinationManaged = true;
             }
             if (sourceManaged && destinationManaged) {
@@ -569,14 +581,142 @@ public class StatisticsManager {
         }
 
         if (!sourceManaged) {
-            flow.setSource("0.0.0.0");
+            flow.setSource(untracked);
         }
 
         if (!destinationManaged) {
-            flow.setDestination("0.0.0.0");
+            flow.setDestination(untracked);
         }
 
         return flow;
+    }
+
+    public MapDataResponse getMapData(HttpSession session, Constraints constraints) {
+        LinkedHashMap<String, InetNetwork> managedNetworks = new ManagedNetworks(customer).getNetworks();
+
+        String untracked = "untracked";
+        MapDataResponse response = new MapDataResponse(untracked);
+        ArrayList<InetNetwork> networks = new ArrayList();
+
+        for (Entry<String, InetNetwork> entry : managedNetworks.entrySet()) {
+            String version = null;
+            if (entry.getValue().getAddress() instanceof Inet4Address) {
+                version = "ipv4";
+            } else if (entry.getValue().getAddress() instanceof Inet6Address) {
+                version = "ipv6";
+            }
+            response.networks.add(new MapDataResponse.Network(entry.getKey(), version, entry.getValue().getAddress().getHostAddress() + "/" + entry.getValue().getMask()));
+            networks.add(entry.getValue());
+        }
+
+        long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
+        long resolution = getResolution(duration, null);
+        Environment environment;
+        EntityStore readOnlyEntityStore = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
+        StatisticsAccessor accessor = new StatisticsAccessor(readOnlyEntityStore);
+        IntervalKey startKey = new IntervalKey(constraints.startTime.getTime() / resolution, resolution);
+        IntervalKey endKey = new IntervalKey(constraints.endTime.getTime() / resolution, resolution);
+        EntityCursor<StatisticalInterval> cursor = accessor.intervalByKey.entities(startKey, true, endKey, true);
+
+        // We only want to do this query once, so make it count.
+
+        log.debug("Iterating over query results.");
+
+        Integer secondsProcessed = 0;
+        try {
+            try {
+                try {
+                    for (StatisticalInterval second : cursor) {
+                        for (StatisticalFlow flow : second.flows.values()) {
+                            flow = setDefault(networks, flow, untracked);
+
+                            if (flow.getSource() != null) {
+                                InetAddress sourceAddress = InetAddress.getByName(flow.getSource());
+                                InetAddress destinationAddress = InetAddress.getByName(flow.getDestination());
+
+                                Boolean sourceCaptured = false;
+                                Boolean destinationCaptured = false;
+                                // Iterate through managed networks and add the Nodes (complete with Flows)
+                                // as they are encountered
+                                for (MapDataResponse.Network network : response.networks) {
+                                    //for (InetNetwork network : networks) {
+                                    InetNetwork iNetwork = new InetNetwork();
+                                    iNetwork.setAddress(InetAddress.getByName(network.address.split("/")[0]));
+                                    iNetwork.setMask(Integer.parseInt(network.address.split("/")[1]));
+                                    if (!sourceCaptured || !destinationCaptured) {
+                                        // If the source address belongs to a managed network, add it to the map
+                                        // De-duplication is handled by the "addNode" method in the Network object
+                                        if (AddressAnalysis.isMember(sourceAddress, iNetwork)) {
+                                            network.nodes.add(new MapDataResponse.Node(sourceAddress.getHostAddress()));
+                                            sourceCaptured = true;
+                                        }
+
+                                        if (AddressAnalysis.isMember(destinationAddress, iNetwork)) {
+                                            network.nodes.add(new MapDataResponse.Node(destinationAddress.getHostAddress()));
+                                            destinationCaptured = true;
+                                        }
+
+                                        if (Thread.currentThread().isInterrupted()) {
+                                            throw new InterruptedException();
+                                        }
+                                    }
+                                }
+
+                                for (Entry<StatisticalFlowDetail, Long> entry : flow.getCount().entrySet()) {
+                                    StatisticalFlowDetail detail = entry.getKey();
+                                    if (detail.getType() == StatisticalFlowDetail.Count.BYTE) {
+                                        Boolean reversed = false;
+                                        if (detail.getSource() > 0 && detail.getDestination() > 0) {
+                                            if (globalConfigurationManager.getFrequency(customer, detail.getProtocol(), detail.getSource())
+                                                    > globalConfigurationManager.getFrequency(customer, detail.getProtocol(), detail.getDestination())) {
+                                                reversed = true;
+                                            }
+                                        }
+                                        
+                                        MapDataResponse.Flow responseFlow = null;
+                                        if(!reversed) {
+                                            responseFlow = new MapDataResponse.Flow(flow.getSource(), flow.getDestination(), String.valueOf(detail.getProtocol()), String.valueOf(detail.getDestination()), String.valueOf(entry.getValue()), "0");           
+                                        } else {
+                                            responseFlow = new MapDataResponse.Flow(flow.getDestination(), flow.getSource(), String.valueOf(detail.getProtocol()), String.valueOf(detail.getSource()), "0", String.valueOf(entry.getValue()));
+                                        }
+                                        
+                                        response.addFlow(responseFlow);
+                                    }
+                                }
+                            }
+
+                            if (Thread.currentThread().isInterrupted()) {
+                                //log.debug("Stopping FlowManager...");
+                                throw new InterruptedException();
+                            }
+                        }
+
+                        if (++secondsProcessed % 10000 == 0) {
+                            log.debug(secondsProcessed + " StatisticalSeconds processed.");
+                        }
+                    }
+                } catch (DatabaseException e) {
+                    log.error("Database error: " + e.getMessage());
+                } finally {
+                    cursor.close();
+                }
+            } catch (DatabaseException e) {
+                log.error("Database error: " + e.getMessage());
+            } finally {
+                closeStore(readOnlyEntityStore);
+            }
+        } catch (UnknownHostException e) {
+            log.error("UnknownHostException caught in " + e.getStackTrace()[0].getMethodName() + ": " + e.getMessage());
+        } catch (InterruptedException ie) {
+            log.error("Stopped FlowManager during network build");
+        } catch (Exception e) {
+            log.error("Exception caught in " + e.getStackTrace()[0].getMethodName() + ": " + e.getMessage());
+        } finally {
+            closeEnvironment(environment);
+        }
+
+        response.ready = true;
+        return response;
     }
 
     public ArrayList<Network> getNetworks(HttpSession session, Constraints constraints) {

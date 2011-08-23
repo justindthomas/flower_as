@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.servlet.http.HttpSession;
 import name.justinthomas.flower.analysis.element.Flow;
+import name.justinthomas.flower.analysis.services.MapDataResponse;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
 
@@ -217,6 +218,38 @@ public abstract class SessionManager {
             return (String) session.getAttribute("basePath");
         } else {
             return "";
+        }
+    }
+    
+    public static void setMapDataThread(HttpSession session, TimedThread thread) {
+        if (thread != null) {
+            session.setAttribute("mapdatathread", thread);
+        } else {
+            session.removeAttribute("mapdatathread");
+        }
+    }
+    
+    public static TimedThread getMapDataThread(HttpSession session) {
+        if (session.getAttribute("mapdatathread") != null) {
+            return (TimedThread) session.getAttribute("mapdatathread");
+        } else {
+            return null;
+        }
+    }
+    
+    public static void setMapDataResponse(HttpSession session, MapDataResponse response) {
+        if (response != null) {
+            session.setAttribute("mapdataresponse", response);
+        } else {
+            session.removeAttribute("mapdataresponse");
+        }
+    }
+    
+    public static MapDataResponse getMapDataResponse(HttpSession session) {
+        if (session.getAttribute("mapdataresponse") != null) {
+            return (MapDataResponse) session.getAttribute("mapdataresponse");
+        } else {
+            return null;
         }
     }
 
