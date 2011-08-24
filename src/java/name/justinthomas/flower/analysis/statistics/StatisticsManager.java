@@ -554,13 +554,13 @@ public class StatisticsManager {
         //log.debug("Returning from FlowManager:getVolumeByTime");
         return consolidated;
     }
-    
+
     public StatisticalFlow setDefault(ArrayList<Network> networks, StatisticalFlow flow) throws UnknownHostException {
         ArrayList<InetNetwork> iNetworks = new ArrayList();
-        for(Network network : networks) {
+        for (Network network : networks) {
             iNetworks.add(network.getNetwork());
         }
-        
+
         return setDefault(iNetworks, flow, "0.0.0.0");
     }
 
@@ -591,7 +591,7 @@ public class StatisticsManager {
         return flow;
     }
 
-    public MapDataResponse getMapData(HttpSession session, Constraints constraints) {
+    public MapDataResponse getMapData(HttpSession session, Constraints constraints) throws InterruptedException {
         LinkedHashMap<String, InetNetwork> managedNetworks = new ManagedNetworks(customer).getNetworks();
 
         String untracked = "untracked";
@@ -624,98 +624,114 @@ public class StatisticsManager {
 
         Integer secondsProcessed = 0;
         try {
-            try {
-                try {
-                    for (StatisticalInterval second : cursor) {
-                        for (StatisticalFlow flow : second.flows.values()) {
-                            flow = setDefault(networks, flow, untracked);
+            for (StatisticalInterval second : cursor) {
+                for (StatisticalFlow flow : second.flows.values()) {
+                    try {
+                        flow = setDefault(networks, flow, untracked);
+                    } catch (UnknownHostException e) {
+                        log.error("UnknownHostException while attempting to setDefault: " + e.getMessage());
+                    }
 
-                            if (flow.getSource() != null) {
-                                InetAddress sourceAddress = InetAddress.getByName(flow.getSource());
-                                InetAddress destinationAddress = InetAddress.getByName(flow.getDestination());
+                    if (flow.getSource() != null) {
+                        try {
+                            Boolean sourceCaptured = false;
+                            Boolean destinationCaptured = false;
 
-                                Boolean sourceCaptured = false;
-                                Boolean destinationCaptured = false;
-                                // Iterate through managed networks and add the Nodes (complete with Flows)
-                                // as they are encountered
-                                for (MapDataResponse.Network network : response.networks) {
-                                    //for (InetNetwork network : networks) {
-                                    InetNetwork iNetwork = new InetNetwork();
-                                    iNetwork.setAddress(InetAddress.getByName(network.address.split("/")[0]));
-                                    iNetwork.setMask(Integer.parseInt(network.address.split("/")[1]));
-                                    if (!sourceCaptured || !destinationCaptured) {
-                                        // If the source address belongs to a managed network, add it to the map
-                                        // De-duplication is handled by the "addNode" method in the Network object
+                            if (flow.getSource().equals(untracked)) {
+                                sourceCaptured = true;
+                            }
+
+                            if (flow.getDestination().equals(untracked)) {
+                                destinationCaptured = true;
+                            }
+
+                            InetAddress sourceAddress = null;
+                            InetAddress destinationAddress = null;
+
+                            if (!sourceCaptured) {
+                                sourceAddress = InetAddress.getByName(flow.getSource());
+                            }
+
+                            if (!destinationCaptured) {
+                                destinationAddress = InetAddress.getByName(flow.getDestination());
+                            }
+
+
+                            // Iterate through managed networks and add the Nodes (complete with Flows)
+                            // as they are encountered
+                            for (MapDataResponse.Network network : response.networks) {
+                                //for (InetNetwork network : networks) {
+                                InetNetwork iNetwork = new InetNetwork();
+                                iNetwork.setAddress(InetAddress.getByName(network.address.split("/")[0]));
+                                iNetwork.setMask(Integer.parseInt(network.address.split("/")[1]));
+                                if (!sourceCaptured || !destinationCaptured) {
+                                    // If the source address belongs to a managed network, add it to the map
+                                    // De-duplication is handled by the "addNode" method in the Network object
+                                    if (!sourceCaptured) {
                                         if (AddressAnalysis.isMember(sourceAddress, iNetwork)) {
                                             network.nodes.add(new MapDataResponse.Node(sourceAddress.getHostAddress()));
                                             sourceCaptured = true;
                                         }
+                                    }
 
+                                    if (!destinationCaptured) {
                                         if (AddressAnalysis.isMember(destinationAddress, iNetwork)) {
                                             network.nodes.add(new MapDataResponse.Node(destinationAddress.getHostAddress()));
                                             destinationCaptured = true;
                                         }
-
-                                        if (Thread.currentThread().isInterrupted()) {
-                                            throw new InterruptedException();
-                                        }
                                     }
-                                }
 
-                                for (Entry<StatisticalFlowDetail, Long> entry : flow.getCount().entrySet()) {
-                                    StatisticalFlowDetail detail = entry.getKey();
-                                    if (detail.getType() == StatisticalFlowDetail.Count.BYTE) {
-                                        Boolean reversed = false;
-                                        if (detail.getSource() > 0 && detail.getDestination() > 0) {
-                                            if (globalConfigurationManager.getFrequency(customer, detail.getProtocol(), detail.getSource())
-                                                    > globalConfigurationManager.getFrequency(customer, detail.getProtocol(), detail.getDestination())) {
-                                                reversed = true;
-                                            }
-                                        }
-                                        
-                                        MapDataResponse.Flow responseFlow = null;
-                                        if(!reversed) {
-                                            responseFlow = new MapDataResponse.Flow(flow.getSource(), flow.getDestination(), String.valueOf(detail.getProtocol()), String.valueOf(detail.getDestination()), String.valueOf(entry.getValue()), "0");           
-                                        } else {
-                                            responseFlow = new MapDataResponse.Flow(flow.getDestination(), flow.getSource(), String.valueOf(detail.getProtocol()), String.valueOf(detail.getSource()), "0", String.valueOf(entry.getValue()));
-                                        }
-                                        
-                                        response.addFlow(responseFlow);
+                                    if (Thread.currentThread().isInterrupted()) {
+                                        throw new InterruptedException();
                                     }
                                 }
                             }
-
-                            if (Thread.currentThread().isInterrupted()) {
-                                //log.debug("Stopping FlowManager...");
-                                throw new InterruptedException();
-                            }
+                        } catch (UnknownHostException e) {
+                            log.error("UnknownHostException while setting networks: " + e.getMessage());
                         }
 
-                        if (++secondsProcessed % 10000 == 0) {
-                            log.debug(secondsProcessed + " StatisticalSeconds processed.");
+
+                        for (Entry<StatisticalFlowDetail, Long> entry : flow.getCount().entrySet()) {
+                            StatisticalFlowDetail detail = entry.getKey();
+                            if (detail.getType() == StatisticalFlowDetail.Count.BYTE) {
+                                Boolean reversed = false;
+                                if (detail.getSource() > 0 && detail.getDestination() > 0) {
+                                    if (globalConfigurationManager.getFrequency(customer, detail.getProtocol(), detail.getSource())
+                                            > globalConfigurationManager.getFrequency(customer, detail.getProtocol(), detail.getDestination())) {
+                                        reversed = true;
+                                    }
+                                }
+
+                                MapDataResponse.Flow responseFlow = null;
+                                if (!reversed) {
+                                    responseFlow = new MapDataResponse.Flow(flow.getSource(), flow.getDestination(), String.valueOf(detail.getProtocol()), String.valueOf(detail.getDestination()), String.valueOf(entry.getValue()), "0");
+                                } else {
+                                    responseFlow = new MapDataResponse.Flow(flow.getDestination(), flow.getSource(), String.valueOf(detail.getProtocol()), String.valueOf(detail.getSource()), "0", String.valueOf(entry.getValue()));
+                                }
+
+                                response.addFlow(responseFlow);
+                            }
                         }
                     }
-                } catch (DatabaseException e) {
-                    log.error("Database error: " + e.getMessage());
-                } finally {
-                    cursor.close();
+
+                    if (Thread.currentThread().isInterrupted()) {
+                        //log.debug("Stopping FlowManager...");
+                        throw new InterruptedException();
+                    }
                 }
-            } catch (DatabaseException e) {
-                log.error("Database error: " + e.getMessage());
-            } finally {
-                closeStore(readOnlyEntityStore);
+
+                if (++secondsProcessed % 10000 == 0) {
+                    log.debug(secondsProcessed + " StatisticalSeconds processed.");
+                }
             }
-        } catch (UnknownHostException e) {
-            log.error("UnknownHostException caught in " + e.getStackTrace()[0].getMethodName() + ": " + e.getMessage());
-        } catch (InterruptedException ie) {
-            log.error("Stopped FlowManager during network build");
-        } catch (Exception e) {
-            log.error("Exception caught in " + e.getStackTrace()[0].getMethodName() + ": " + e.getMessage());
+        } catch (DatabaseException e) {
+            log.error("Database error: " + e.getMessage());
         } finally {
-            closeEnvironment(environment);
+            cursor.close();
         }
 
         response.ready = true;
+
         return response;
     }
 

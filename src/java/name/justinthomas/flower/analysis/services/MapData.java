@@ -79,23 +79,26 @@ public class MapData {
                         System.err.println("Thread: " + thread.getName() + " was interrupted.");
                     }
                     return response;
-                }              
-            } else if (SessionManager.getMapDataThread(session).isExpired()) {
+                }
+                
+                response = new MapDataResponse("untracked");
+            } else if (response == null && SessionManager.getMapDataThread(session).isExpired()) {
                 System.err.println("MapData build thread expired.");
                 SessionManager.getMapDataThread(session).interrupt();
                 response = new MapDataResponse("untracked");
                 response.ready = true;
                 return response;
+            } else if (response == null) {
+                response = new MapDataResponse("untracked");
+            } else {
+                SessionManager.setMapDataResponse(session, null);
+                SessionManager.setMapDataThread(session, null);
             }
-            
-            if(response == null) {
-                response = new MapDataResponse();
-            }
-            
+
             return response;
         }
 
-        
+
         return new MapDataResponse("untracked");
     }
 
@@ -115,8 +118,12 @@ public class MapData {
         public void run() {
             System.out.println("Calling StatisticsManager to build map data...");
             StatisticsManager statisticsManager = new StatisticsManager(customer);
-            SessionManager.setMapDataResponse(session, statisticsManager.getMapData(session, new Constraints(constraints)));
-            System.out.println("StatisticsManager appears to be complete.");
+            try {
+                SessionManager.setMapDataResponse(session, statisticsManager.getMapData(session, new Constraints(constraints)));
+                System.out.println("StatisticsManager appears to be complete.");
+            } catch (InterruptedException e) {
+                System.err.println("MapData build thread was interrupted.");
+            }
         }
     }
 }

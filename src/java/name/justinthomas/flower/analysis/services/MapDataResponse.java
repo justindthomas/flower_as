@@ -32,7 +32,7 @@ public class MapDataResponse {
     public void addFlow(Flow flow) {
         if(flows.contains(flow)) {
             for(Flow storedFlow : flows) {
-                if(storedFlow == flow) {
+                if(storedFlow.equals(flow)) {
                     storedFlow.bytesReceived = String.valueOf(Long.parseLong(storedFlow.bytesReceived) + Long.parseLong(flow.bytesReceived));
                     storedFlow.bytesSent = String.valueOf(Long.parseLong(storedFlow.bytesSent) + Long.parseLong(flow.bytesSent));
                 }
