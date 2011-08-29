@@ -32,7 +32,7 @@ public class StatisticalEngine {
     private static GlobalConfigurationManager globalConfigurationManager;
     private static FileAppender fileAppender;
     private static ScheduledThreadPoolExecutor executor;
-    private final Integer HISTORY = 1000;
+    private final Integer HISTORY = 250;
     private Customer customer;
     private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics;
 
@@ -97,7 +97,7 @@ public class StatisticalEngine {
                 StatisticalCube cube = new StatisticalCube(customer.getId(), statistics);
                 StatisticsManager statisticsManager = new StatisticsManager(customer);
                 statisticsManager.storeCube(cube);
-                
+
                 log.debug("Running statistics purge routine...");
                 this.purge();
             } catch (Throwable t) {
@@ -222,13 +222,17 @@ public class StatisticalEngine {
                     int length = ewma.getValues().length;
                     log.debug("includes " + length + " values");
 
-                    StatisticalFlowIdentifier id = new StatisticalFlowIdentifier(source, destination);
-                    if (ewma.getValues()[ewma.getValues().length - 1] > prior.get(source).get(destination).getMax()) {
-                        log.debug("EWMA increase");
-                        interval.addAnomaly(id, Anomaly.EWMA_INCREASE, length);
-                    } else if (ewma.getValues()[ewma.getValues().length - 1] < prior.get(source).get(destination).getMin()) {
-                        log.debug("EWMA decrease");
-                        interval.addAnomaly(id, Anomaly.EWMA_DECREASE, length);
+                    try {
+                        StatisticalFlowIdentifier id = new StatisticalFlowIdentifier(source, destination);
+                        if (ewma.getValues()[ewma.getValues().length - 1] > prior.get(source).get(destination).getMax()) {
+                            log.debug("EWMA increase");
+                            interval.addAnomaly(id, Anomaly.EWMA_INCREASE, length);
+                        } else if (ewma.getValues()[ewma.getValues().length - 1] < prior.get(source).get(destination).getMin()) {
+                            log.debug("EWMA decrease");
+                            interval.addAnomaly(id, Anomaly.EWMA_DECREASE, length);
+                        }
+                    } catch (ArrayIndexOutOfBoundsException e) {
+                        log.error("array length error: " + e.getMessage());
                     }
                 }
             }

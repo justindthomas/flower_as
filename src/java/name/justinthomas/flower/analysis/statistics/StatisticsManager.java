@@ -220,6 +220,8 @@ public class StatisticsManager {
             }
         } catch (DatabaseException e) {
             log.error("Database Error: " + e.getMessage());
+        } catch (NullPointerException ne) {
+            log.error("Null pointer exception in StatisticsManager.storeStatisticalIntervals: " + ne.getMessage());
         } finally {
             closeEnvironment(environment);
         }

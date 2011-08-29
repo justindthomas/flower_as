@@ -37,9 +37,9 @@ public class CachedStatistics {
         lastUpdated = new ConcurrentHashMap();
         sourceMap = new ConcurrentHashMap();
         
-        executor = new ScheduledThreadPoolExecutor(3);
+        executor = new ScheduledThreadPoolExecutor(1);
 
-        executor.scheduleAtFixedRate(new Task(customer), 60, 60, TimeUnit.SECONDS);
+        executor.scheduleWithFixedDelay(new Task(customer), 60, 60, TimeUnit.SECONDS);
     }
 
     static class Representation {
@@ -49,7 +49,7 @@ public class CachedStatistics {
 
         public Representation(InetAddress collector) {
             this.collector = collector;
-            expiration.setTime(expiration.getTime() + 300000);
+            expiration.setTime(expiration.getTime() + MAX_WAIT);
         }
 
         @Override

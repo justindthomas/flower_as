@@ -8,6 +8,7 @@ import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
 import com.sleepycat.je.StatsConfig;
 import com.sleepycat.persist.EntityStore;
+import com.sleepycat.persist.ForwardCursor;
 import com.sleepycat.persist.StoreConfig;
 import java.io.File;
 import java.io.FileWriter;
@@ -40,7 +41,7 @@ public class FlowManager {
 
     public FlowManager(Customer customer) {
         this.customer = customer;
-        
+
         try {
             configurationManager = InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
         } catch (NamingException e) {
@@ -162,6 +163,39 @@ public class FlowManager {
             System.err.println("FlowManager interrupted during getFlows: " + ie.getMessage());
         } catch (UnknownHostException uhe) {
             System.err.println("FlowManager interrupted during getFlows: " + uhe.getMessage());
+        } finally {
+            closeStore(readOnlyEntityStore);
+            closeEnvironment(environment);
+        }
+    }
+
+    public void rebuildStatistics(String collector) {
+
+        StatisticsManager statisticsManager = new StatisticsManager(customer);
+
+        Environment environment;
+        EntityStore readOnlyEntityStore = new EntityStore(environment = setupEnvironment(), "Flow", this.getStoreConfig(true));
+        FlowAccessor dataAccessor = new FlowAccessor(readOnlyEntityStore);
+
+        try {
+            System.out.println("beginning to build statistics from flows...");
+            ForwardCursor<PersistentFlow> flowCursor = dataAccessor.flowById.entities();
+
+            int flowsProcessed = 0;
+            PersistentFlow flow = null;
+            while ((flow = flowCursor.next()) != null) {      
+                statisticsManager.addStatisticalSeconds(new Flow(customer, flow), flow.id, InetAddress.getByName(collector));
+                if(++flowsProcessed % 10000 == 0) {
+                    System.out.println("processed " + flowsProcessed + " flows to statistics - sleeping for 60 seconds");
+                    Thread.sleep(60000);
+                }
+            }
+         
+            System.out.println("completed building statistics from flows.");
+        } catch (UnknownHostException uhe) {
+            System.err.println("Error in rebuildStatistics: " + uhe.getMessage());
+        } catch (InterruptedException ie) {
+            System.err.println("rebuild interrupted: " + ie.getMessage());
         } finally {
             closeStore(readOnlyEntityStore);
             closeEnvironment(environment);

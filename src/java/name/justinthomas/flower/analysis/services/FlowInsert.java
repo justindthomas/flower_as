@@ -14,7 +14,9 @@ import javax.jws.WebService;
 import javax.servlet.http.HttpServletRequest;
 import javax.xml.ws.WebServiceContext;
 import javax.xml.ws.handler.MessageContext;
+import name.justinthomas.flower.analysis.authentication.UserAction;
 import name.justinthomas.flower.analysis.element.Flow;
+import name.justinthomas.flower.analysis.persistence.FlowManager;
 import name.justinthomas.flower.analysis.persistence.FlowReceiver;
 import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
@@ -30,6 +32,32 @@ public class FlowInsert {
 
     @Resource
     WebServiceContext context;
+    
+    @WebMethod(operationName = "rebuildStatistics")
+    public Boolean rebuidStatistics(
+            @WebParam(name = "customerID") String customerID,
+            @WebParam(name = "username") String username,
+            @WebParam(name = "password") String password) {
+        
+        UserAction userAction = new UserAction();
+
+        if (!userAction.authenticate(customerID, username, password).administrator) {
+            return false;
+        }
+        
+        MessageContext messageContext = context.getMessageContext();
+        HttpServletRequest request = (HttpServletRequest) messageContext.get(MessageContext.SERVLET_REQUEST);
+        
+        String address = request.getRemoteAddr();
+        System.out.println("Rebuild request received from: " + address);
+        
+        Customer customer = Utility.getCustomer(customerID);
+        
+        Thread thread = new Thread(new RebuildThread(customer, address));
+        thread.start();
+        
+        return true;
+    }
 
     @WebMethod(operationName = "addFlows")
     public Integer addFlows(
@@ -71,6 +99,22 @@ public class FlowInsert {
         }
 
         return 0;
+    }
+    
+    class RebuildThread implements Runnable {
+        Customer customer;
+        String collector;
+        
+        public RebuildThread(Customer customer, String collector) {
+            this.customer = customer;
+            this.collector = collector;
+        }
+        
+        @Override
+        public void run() {
+            FlowManager flowManager = new FlowManager(customer);
+            flowManager.rebuildStatistics(collector);
+        }       
     }
 
     class InsertThread implements Runnable {
