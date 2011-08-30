@@ -34,24 +34,24 @@ import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 
 public class FlowManager {
-
+    
     private Customer customer;
     private static final Integer DEBUG = 2;
     private GlobalConfigurationManager configurationManager;
-
+    
     public FlowManager(Customer customer) {
         this.customer = customer;
-
+        
         try {
             configurationManager = InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
         } catch (NamingException e) {
             e.printStackTrace();
         }
     }
-
+    
     private Environment setupEnvironment() {
         File environmentHome = new File(configurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/flows");
-
+        
         try {
             if (!environmentHome.exists()) {
                 if (!environmentHome.mkdirs()) {
@@ -61,17 +61,17 @@ public class FlowManager {
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
         }
-
+        
         EnvironmentConfig environmentConfig = new EnvironmentConfig();
-
+        
         environmentConfig.setAllowCreate(true);
         environmentConfig.setReadOnly(false);
         environmentConfig.setLockTimeout(15, TimeUnit.SECONDS);
-
+        
         Environment environment = new Environment(environmentHome, environmentConfig);
         return environment;
     }
-
+    
     private void closeEnvironment(Environment environment) {
         if (environment != null) {
             try {
@@ -83,7 +83,7 @@ public class FlowManager {
             }
         }
     }
-
+    
     private StoreConfig getStoreConfig(Boolean readOnly) {
         StoreConfig storeConfig = new StoreConfig();
         storeConfig.setAllowCreate(true);
@@ -96,7 +96,7 @@ public class FlowManager {
 
         return storeConfig;
     }
-
+    
     private void closeStore(EntityStore store) {
         try {
             store.close();
@@ -104,33 +104,33 @@ public class FlowManager {
             System.err.println("Error closing EntityStore: " + e.getMessage());
         }
     }
-
+    
     public void getFlows(HttpSession session, String constraintsString, String tracker) {
-
+        
         System.out.println("getFlows called.");
         Constraints constraints = new Constraints(constraintsString);
         SessionManager.getFlows(session, tracker).clear();
-
+        
         StatisticsManager statisticsManager = new StatisticsManager(customer);
         LinkedList<StatisticalInterval> intervals = statisticsManager.getStatisticalIntervals(session, constraints, null);
-
+        
         LinkedHashMap<Long, Long> flowIDs = new LinkedHashMap();
-
+        
         for (StatisticalInterval interval : intervals) {
             for (Long id : interval.flowIDs) {
                 flowIDs.put(id, null);
             }
         }
-
+        
         System.out.println("Total flagged IDs: " + flowIDs.size());
         Environment environment;
         EntityStore readOnlyEntityStore = new EntityStore(environment = setupEnvironment(), "Flow", this.getStoreConfig(true));
         FlowAccessor dataAccessor = new FlowAccessor(readOnlyEntityStore);
-
+        
         if (DEBUG >= 1) {
             System.out.println("Iterating over query results.");
         }
-
+        
         Integer flowsProcessed = 0;
         try {
             for (Long id : flowIDs.keySet()) {
@@ -142,23 +142,23 @@ public class FlowManager {
                     } else if (constraints.destinationAddressList.isEmpty() || constraints.destinationAddressList.contains(InetAddress.getByName(pflow.destination))) {
                         select = true;
                     }
-
+                    
                     if (select) {
                         SessionManager.getFlows(session, tracker).add(new Flow(customer, pflow));
                     }
-
+                    
                     if (DEBUG > 0) {
                         if (++flowsProcessed % 10000 == 0) {
                             System.out.println("Flows processed: " + flowsProcessed);
                         }
                     }
-
+                    
                     if (Thread.currentThread().isInterrupted()) {
                         throw new InterruptedException();
                     }
                 }
             }
-
+            
         } catch (InterruptedException ie) {
             System.err.println("FlowManager interrupted during getFlows: " + ie.getMessage());
         } catch (UnknownHostException uhe) {
@@ -168,55 +168,74 @@ public class FlowManager {
             closeEnvironment(environment);
         }
     }
-
-    public void rebuildStatistics(String collector) {
-
+    
+    public Long rebuildStatistics(String collector, Long start) {
+        
         StatisticsManager statisticsManager = new StatisticsManager(customer);
-
+        
         Environment environment;
         EntityStore readOnlyEntityStore = new EntityStore(environment = setupEnvironment(), "Flow", this.getStoreConfig(true));
         FlowAccessor dataAccessor = new FlowAccessor(readOnlyEntityStore);
-
+        
+        Long id = null;
+        
         try {
             System.out.println("beginning to build statistics from flows...");
             ForwardCursor<PersistentFlow> flowCursor = dataAccessor.flowById.entities();
-
+            
             int flowsProcessed = 0;
             PersistentFlow flow = null;
-            while ((flow = flowCursor.next()) != null) {      
-                statisticsManager.addStatisticalSeconds(new Flow(customer, flow), flow.id, InetAddress.getByName(collector));
-                if(++flowsProcessed % 10000 == 0) {
-                    System.out.println("processed " + flowsProcessed + " flows to statistics - sleeping for 60 seconds");
-                    Thread.sleep(60000);
+            
+            Boolean capture = false;
+            if (start == null) {
+                capture = true;
+            }
+            
+            while ((flow = flowCursor.next()) != null) {                
+                if (capture) {
+                    statisticsManager.addStatisticalSeconds(new Flow(customer, flow), flow.id, InetAddress.getByName(collector));
+                    
+                    id = flow.id;
+                    if (++flowsProcessed % 10000 == 0) {
+                        System.out.println("processed " + flowsProcessed + " flows to statistics - pausing at: " + id);
+                        break;
+                    }
+                }
+                
+                if(capture == false && flow.id == start) {
+                    capture = true;
                 }
             }
-         
-            System.out.println("completed building statistics from flows.");
+            
+            if(flow == null) {
+                System.out.println("completed building statistics from flows.");
+                id = null;
+            }
         } catch (UnknownHostException uhe) {
             System.err.println("Error in rebuildStatistics: " + uhe.getMessage());
-        } catch (InterruptedException ie) {
-            System.err.println("rebuild interrupted: " + ie.getMessage());
         } finally {
             closeStore(readOnlyEntityStore);
             closeEnvironment(environment);
         }
+        
+        return id;
     }
-
+    
     public XMLDataVolumeList getXMLDataVolumes(HttpSession session, String constr, Integer nmb_bins) {
         XMLDataVolumeList volumeList = new XMLDataVolumeList();
-
+        
         Boolean cancelVolume = false;
         StatisticsManager statisticsManager = new StatisticsManager(customer);
-
+        
         Constraints constraints = new Constraints(constr);
         Long intervalDuration = (constraints.endTime.getTime() - constraints.startTime.getTime()) / nmb_bins;
-
+        
         try {
             LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> bins = statisticsManager.getVolumeByTime(constraints, nmb_bins);
-
+            
             for (Date date : bins.keySet()) {
                 XMLDataVolume volume = new XMLDataVolume();
-
+                
                 volume.date = date;
                 volume.duration = intervalDuration;
                 volume.total = 0l;
@@ -228,49 +247,49 @@ public class FlowManager {
                 volume.ipv6 = 0l;
                 volume.ipsec = 0l;
                 volume.sixinfour = 0l;
-
+                
                 for (Integer version : bins.get(date).get("versions").keySet()) {
                     volume.total += bins.get(date).get("versions").get(version);
                 }
-
+                
                 if (bins.get(date).get("types").containsKey(6)) {
                     volume.tcp = bins.get(date).get("types").get(6);
                 }
-
+                
                 if (bins.get(date).get("types").containsKey(17)) {
                     volume.udp = bins.get(date).get("types").get(17);
                 }
-
+                
                 if (bins.get(date).get("types").containsKey(1)) {
                     volume.icmp = bins.get(date).get("types").get(1);
                 }
-
+                
                 if (bins.get(date).get("types").containsKey(58)) {
                     volume.icmpv6 = bins.get(date).get("types").get(58);
                 }
-
+                
                 if (bins.get(date).get("types").containsKey(41)) {
                     volume.sixinfour = bins.get(date).get("types").get(41);
                 }
-
+                
                 if (bins.get(date).get("types").containsKey(50)) {
                     volume.ipsec += bins.get(date).get("types").get(50);
                 }
-
+                
                 if (bins.get(date).get("types").containsKey(51)) {
                     volume.ipsec += bins.get(date).get("types").get(51);
                 }
-
+                
                 if (bins.get(date).get("versions").containsKey(4)) {
                     volume.ipv4 += bins.get(date).get("versions").get(4);
                 }
-
+                
                 if (bins.get(date).get("versions").containsKey(6)) {
                     volume.ipv6 += bins.get(date).get("versions").get(6);
                 }
-
+                
                 volumeList.bins.add(volume);
-
+                
                 if (cancelVolume) {
                     break;
                 }
@@ -278,7 +297,7 @@ public class FlowManager {
         } catch (ClassNotFoundException cnfe) {
             System.err.println("ClassNotFoundException caught: " + cnfe.getMessage());
         }
-
+        
         if (!cancelVolume) {
             volumeList.ready = true;
             SessionManager.setVolumes(session, volumeList);
@@ -286,25 +305,25 @@ public class FlowManager {
         } else {
             System.out.println("Canceled volume build");
         }
-
+        
         return volumeList;
     }
-
+    
     public XMLNetworkList getXMLNetworks(HttpSession session, String constraints) {
         XMLNetworkList networkList = new XMLNetworkList();
         StatisticsManager statisticsManager = new StatisticsManager(customer);
         ArrayList<Network> networks = statisticsManager.getNetworks(session, new Constraints(constraints));
-
+        
         Boolean cancelNetworks = false;
-
+        
         for (Network network : networks) {
             networkList.networks.add(network.toXMLNetwork());
-
+            
             if (cancelNetworks) {
                 break;
             }
         }
-
+        
         if (!cancelNetworks) {
             System.out.println("Completed XMLNetworkList creation and writing to session...");
             networkList.ready = true;
@@ -313,38 +332,38 @@ public class FlowManager {
         } else {
             System.out.println("Canceled map build");
         }
-
+        
         System.out.println("Returning XMLNetworkList to caller...");
         return networkList;
     }
-
+    
     public void cleanFlows(ArrayList<Long> flowIDs) {
         System.out.println("Deleting expired flows...");
-
+        
         Environment environment;
         EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Flow", this.getStoreConfig(false));
         FlowAccessor dataAccessor = new FlowAccessor(entityStore);
-
+        
         int deletedCount = 0;
         for (Long flowID : flowIDs) {
             if ((flowID != null) && dataAccessor.flowById.contains(flowID)) {
                 dataAccessor.flowById.delete(flowID);
-
+                
                 if (++deletedCount % 1000 == 0) {
                     System.out.println("Flows deleted: " + deletedCount);
                 }
             }
         }
-
+        
         System.out.println("Total flows deleted: " + deletedCount);
-
+        
         closeStore(entityStore);
         //recordEnvironmentStatistics(environment);
         cleanLog(environment);
         checkpoint(environment);
         closeEnvironment(environment);
     }
-
+    
     private void cleanLog(Environment environment) {
         try {
             environment.cleanLog();
@@ -352,7 +371,7 @@ public class FlowManager {
             System.err.println("Error running cleanLog: " + e.getMessage());
         }
     }
-
+    
     private void checkpoint(Environment environment) {
         CheckpointConfig checkpointConfig = new CheckpointConfig();
         try {
@@ -361,7 +380,7 @@ public class FlowManager {
             System.err.println("Error running checkpoint: " + e.getMessage());
         }
     }
-
+    
     private void recordEnvironmentStatistics(Environment environment) {
         try {
             FileWriter writer = new FileWriter("/traces/databasestatistics.txt", true);
