@@ -39,7 +39,7 @@ public class CachedStatistics {
         
         executor = new ScheduledThreadPoolExecutor(1);
 
-        executor.scheduleWithFixedDelay(new Task(customer), 60, 60, TimeUnit.SECONDS);
+        executor.scheduleWithFixedDelay(new Persist(customer, false), 60, 60, TimeUnit.SECONDS);
     }
 
     static class Representation {

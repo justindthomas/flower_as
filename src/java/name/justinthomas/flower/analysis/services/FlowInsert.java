@@ -34,8 +34,16 @@ public class FlowInsert {
     WebServiceContext context;
     
     @WebMethod(operationName = "rebuildStatistics")
-    public Boolean rebuidStatistics(
-            @WebParam(name = "customerID") String customerID) {
+    public Boolean rebuildStatistics(
+            @WebParam(name = "customerID") String customerID,
+            @WebParam(name = "username") String username,
+            @WebParam(name = "password") String password) {
+        
+        UserAction userAction = new UserAction();
+
+        if (!userAction.authenticate(customerID, username, password).administrator) {
+            return (null);
+        }
         
         MessageContext messageContext = context.getMessageContext();
         HttpServletRequest request = (HttpServletRequest) messageContext.get(MessageContext.SERVLET_REQUEST);
@@ -108,10 +116,12 @@ public class FlowInsert {
             Long end = 0l;
             
             while(end != null) {
-                end = flowManager.rebuildStatistics(collector, null);
+                end = flowManager.rebuildStatistics(collector, end);
                 
                 try {
-                    Thread.sleep(30000);
+                    flowManager = new FlowManager(customer);
+                    System.gc();
+                    Thread.sleep(60000);          
                 } catch (InterruptedException ie) {
                     System.err.println("RebuildThread interrupted.");
                     return;
