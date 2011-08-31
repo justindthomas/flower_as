@@ -13,7 +13,7 @@ import java.util.Date;
 public class TimedThread extends Thread {
 
     private long start;
-    private static final long TIMEOUT = 60000;
+    private static final long TIMEOUT = 600000;
 
     public TimedThread(Runnable runnable) {
         super(runnable);

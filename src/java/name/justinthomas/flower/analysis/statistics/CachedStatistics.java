@@ -142,21 +142,6 @@ public class CachedStatistics {
         return this.sourceMap.size();
     }
 
-    class Task implements Runnable {
-
-        private Customer customer;
-
-        public Task(Customer customer) {
-            this.customer = customer;
-        }
-
-        @Override
-        public void run() {
-            Thread thread = new Thread(new Persist(customer, false));
-            thread.start();
-        }
-    }
-
     class Persist implements Runnable {
 
         private Boolean flush;

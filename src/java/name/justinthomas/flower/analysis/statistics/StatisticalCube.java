@@ -77,7 +77,7 @@ public class StatisticalCube {
                 }
                 
                 for(Cube cube : statistics.get(source).get(destination).keySet()) {
-                    DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics();
+                    DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics(StatisticalEngine.HISTORY);
                     for(double d : statistics.get(source).get(destination).get(cube)) {
                         descriptiveStatistics.addValue(d);
                     }

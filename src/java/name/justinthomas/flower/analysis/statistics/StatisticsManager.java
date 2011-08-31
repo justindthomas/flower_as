@@ -373,13 +373,8 @@ public class StatisticsManager {
         }
 
         DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-        if (StatisticsManager.DEBUG >= 1) {
-            log.debug("Requesting volume data from " + dateFormat.format(constraints.startTime) + " to " + dateFormat.format(constraints.endTime));
-        }
-
-        if (StatisticsManager.DEBUG >= 1) {
-            log.debug("Populating consolidated map");
-        }
+        log.debug("Requesting volume data from " + dateFormat.format(constraints.startTime) + " to " + dateFormat.format(constraints.endTime));
+        log.debug("Populating consolidated map");
         Long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
         log.debug("Duration: " + duration);
 
@@ -397,163 +392,178 @@ public class StatisticsManager {
             consolidated.put(new Date(constraints.startTime.getTime() + (j++ * interval)), interim);
         }
 
-        if (StatisticsManager.DEBUG >= 1) {
-            log.debug("Iterating over flow volumes in database");
-        }
+        log.debug("Iterating over flow volumes in database");
 
-        Environment environment;
         Long resolution = getResolution(duration, bins);
-
-        EntityStore store = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
-        StatisticsAccessor accessor = new StatisticsAccessor(store);
         Long start = constraints.startTime.getTime() / resolution;
         IntervalKey startKey = new IntervalKey(start, resolution);
         Long end = constraints.endTime.getTime() / resolution;
         IntervalKey endKey = new IntervalKey(end, resolution);
         //log.debug("Start: " + start + ", End: " + end);
-        EntityCursor<StatisticalInterval> cursor = accessor.intervalByKey.entities(startKey, true, endKey, true);
-
-        // We only want to do this query once, so make it count.
-        if (StatisticsManager.DEBUG >= 1) {
-            log.debug("Iterating over query results.");
-        }
-
         Integer flowsProcessed = 0;
-        try {
+
+        while (startKey.interval.longValue() < endKey.interval.longValue()) {
+            log.debug("start: " + startKey.interval + ", end: " + endKey.interval);
+            Environment environment;
+            EntityStore store = new EntityStore(environment = setupEnvironment(), "Statistics", this.getStoreConfig(true));
+            StatisticsAccessor accessor = new StatisticsAccessor(store);
+
+            EntityCursor<StatisticalInterval> cursor = accessor.intervalByKey.entities(startKey, true, endKey, true);
+
+            log.debug("Iterating over volume query results.");
+
+            boolean stopped = false;
+            
             try {
                 try {
-                    for (StatisticalInterval second : cursor) {
-                        HashMap<Integer, Long> versions = new HashMap();
-                        HashMap<Integer, Long> types = new HashMap();
-                        HashMap<Integer, Long> tcp = new HashMap();
-                        HashMap<Integer, Long> udp = new HashMap();
+                    try {
+                        for (StatisticalInterval second : cursor) {
+                            startKey = second.key;
+                            
+                            if (second.key.resolution.longValue() != resolution.longValue()) {
+                                log.debug("skipping resolution: " + second.key.resolution);
+                                continue;
+                            }      
 
-                        for (StatisticalFlow entry : second.flows.values()) {
-                            try {
-                                for (Entry<StatisticalFlowDetail, Long> volume : entry.getCount().entrySet()) {
-                                    if (volume.getKey().getType().equals(StatisticalFlowDetail.Count.BYTE)) {
+                            if (++flowsProcessed % 500 == 0) {
+                                log.debug("StatisticalSeconds processed: " + flowsProcessed);
+                                stopped = true;
+                                break;
+                            }
+                            
+                            stopped = false;
 
-                                        if (types.containsKey(volume.getKey().getProtocol())) {
-                                            types.put(volume.getKey().getProtocol(), types.get(volume.getKey().getProtocol()) + volume.getValue());
-                                        } else {
-                                            types.put(volume.getKey().getProtocol(), volume.getValue());
-                                        }
+                            HashMap<Integer, Long> versions = new HashMap();
+                            HashMap<Integer, Long> types = new HashMap();
+                            HashMap<Integer, Long> tcp = new HashMap();
+                            HashMap<Integer, Long> udp = new HashMap();
 
-                                        if (volume.getKey().getProtocol() == 6) {
-                                            if (tcp.containsKey(volume.getKey().getDestination())) {
-                                                tcp.put(volume.getKey().getDestination(), tcp.get(volume.getKey().getDestination()) + volume.getValue());
+                            for (StatisticalFlow entry : second.flows.values()) {
+                                try {
+                                    for (Entry<StatisticalFlowDetail, Long> volume : entry.getCount().entrySet()) {
+                                        if (volume.getKey().getType().equals(StatisticalFlowDetail.Count.BYTE)) {
+
+                                            if (types.containsKey(volume.getKey().getProtocol())) {
+                                                types.put(volume.getKey().getProtocol(), types.get(volume.getKey().getProtocol()) + volume.getValue());
                                             } else {
-                                                tcp.put(volume.getKey().getDestination(), volume.getValue());
+                                                types.put(volume.getKey().getProtocol(), volume.getValue());
+                                            }
+
+                                            if (volume.getKey().getProtocol() == 6) {
+                                                if (tcp.containsKey(volume.getKey().getDestination())) {
+                                                    tcp.put(volume.getKey().getDestination(), tcp.get(volume.getKey().getDestination()) + volume.getValue());
+                                                } else {
+                                                    tcp.put(volume.getKey().getDestination(), volume.getValue());
+                                                }
+                                            }
+
+                                            if (volume.getKey().getProtocol() == 17) {
+                                                if (udp.containsKey(volume.getKey().getDestination())) {
+                                                    udp.put(volume.getKey().getDestination(), udp.get(volume.getKey().getDestination()) + volume.getValue());
+                                                } else {
+                                                    udp.put(volume.getKey().getDestination(), volume.getValue());
+                                                }
+                                            }
+
+                                            if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV4)) {
+                                                if (versions.containsKey(4)) {
+                                                    versions.put(4, versions.get(4) + volume.getValue());
+                                                } else {
+                                                    versions.put(4, volume.getValue());
+                                                }
+                                            } else if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV6)) {
+                                                if (versions.containsKey(6)) {
+                                                    versions.put(6, versions.get(6) + volume.getValue());
+                                                } else {
+                                                    versions.put(6, volume.getValue());
+                                                }
                                             }
                                         }
 
-                                        if (volume.getKey().getProtocol() == 17) {
-                                            if (udp.containsKey(volume.getKey().getDestination())) {
-                                                udp.put(volume.getKey().getDestination(), udp.get(volume.getKey().getDestination()) + volume.getValue());
-                                            } else {
-                                                udp.put(volume.getKey().getDestination(), volume.getValue());
-                                            }
-                                        }
+                                    }
+                                } catch (NullPointerException e) {
+                                    log.error("Unexpected NULL field encountered.  This is probably a result of bad data in the database (perhaps an interrupted insert?)");
+                                    continue;
+                                }
+                            }
 
-                                        if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV4)) {
-                                            if (versions.containsKey(4)) {
-                                                versions.put(4, versions.get(4) + volume.getValue());
+                            // Iterate over the bins in consolidated
+                            for (Date bin : consolidated.keySet()) {
+                                if (Thread.currentThread().isInterrupted()) {
+                                    throw new InterruptedException();
+                                }
+
+                                if (new Date(second.getSecond().interval * resolution).after(new Date(bin.getTime())) && new Date(second.getSecond().interval * resolution).before(new Date(bin.getTime() + interval))) {
+                                    if (!types.isEmpty()) {
+                                        for (Integer type : types.keySet()) {
+                                            if (consolidated.get(bin).get("types").containsKey(type)) {
+                                                consolidated.get(bin).get("types").put(type, consolidated.get(bin).get("types").get(type) + types.get(type));
                                             } else {
-                                                versions.put(4, volume.getValue());
-                                            }
-                                        } else if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV6)) {
-                                            if (versions.containsKey(6)) {
-                                                versions.put(6, versions.get(6) + volume.getValue());
-                                            } else {
-                                                versions.put(6, volume.getValue());
+                                                consolidated.get(bin).get("types").put(type, types.get(type));
                                             }
                                         }
                                     }
 
-                                }
-                            } catch (NullPointerException e) {
-                                log.error("Unexpected NULL field encountered.  This is probably a result of bad data in the database (perhaps an interrupted insert?)");
-                                continue;
-                            }
-                        }
+                                    if (!tcp.isEmpty()) {
+                                        for (Integer destination : tcp.keySet()) {
+                                            if (consolidated.get(bin).get("tcp").containsKey(destination)) {
+                                                consolidated.get(bin).get("tcp").put(destination, consolidated.get(bin).get("tcp").get(destination) + tcp.get(destination));
+                                            } else {
+                                                consolidated.get(bin).get("tcp").put(destination, tcp.get(destination));
+                                            }
+                                        }
+                                    }
 
-                        // Iterate over the bins in consolidated
-                        for (Date bin : consolidated.keySet()) {
+                                    if (!udp.isEmpty()) {
+                                        for (Integer destination : udp.keySet()) {
+                                            if (consolidated.get(bin).get("udp").containsKey(destination)) {
+                                                consolidated.get(bin).get("udp").put(destination, consolidated.get(bin).get("udp").get(destination) + udp.get(destination));
+                                            } else {
+                                                consolidated.get(bin).get("udp").put(destination, udp.get(destination));
+                                            }
+                                        }
+                                    }
+
+                                    if (!versions.isEmpty()) {
+                                        for (Integer version : versions.keySet()) {
+                                            if (consolidated.get(bin).get("versions").containsKey(version)) {
+                                                consolidated.get(bin).get("versions").put(version, consolidated.get(bin).get("versions").get(version) + versions.get(version));
+                                            } else {
+                                                consolidated.get(bin).get("versions").put(version, versions.get(version));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             if (Thread.currentThread().isInterrupted()) {
+                                log.debug("StatisticsManager was interrupted");
                                 throw new InterruptedException();
                             }
-
-                            if (new Date(second.getSecond().interval * resolution).after(new Date(bin.getTime())) && new Date(second.getSecond().interval * resolution).before(new Date(bin.getTime() + interval))) {
-                                if (!types.isEmpty()) {
-                                    for (Integer type : types.keySet()) {
-                                        if (consolidated.get(bin).get("types").containsKey(type)) {
-                                            consolidated.get(bin).get("types").put(type, consolidated.get(bin).get("types").get(type) + types.get(type));
-                                        } else {
-                                            consolidated.get(bin).get("types").put(type, types.get(type));
-                                        }
-                                    }
-                                }
-
-                                if (!tcp.isEmpty()) {
-                                    for (Integer destination : tcp.keySet()) {
-                                        if (consolidated.get(bin).get("tcp").containsKey(destination)) {
-                                            consolidated.get(bin).get("tcp").put(destination, consolidated.get(bin).get("tcp").get(destination) + tcp.get(destination));
-                                        } else {
-                                            consolidated.get(bin).get("tcp").put(destination, tcp.get(destination));
-                                        }
-                                    }
-                                }
-
-                                if (!udp.isEmpty()) {
-                                    for (Integer destination : udp.keySet()) {
-                                        if (consolidated.get(bin).get("udp").containsKey(destination)) {
-                                            consolidated.get(bin).get("udp").put(destination, consolidated.get(bin).get("udp").get(destination) + udp.get(destination));
-                                        } else {
-                                            consolidated.get(bin).get("udp").put(destination, udp.get(destination));
-                                        }
-                                    }
-                                }
-
-                                if (!versions.isEmpty()) {
-                                    for (Integer version : versions.keySet()) {
-                                        if (consolidated.get(bin).get("versions").containsKey(version)) {
-                                            consolidated.get(bin).get("versions").put(version, consolidated.get(bin).get("versions").get(version) + versions.get(version));
-                                        } else {
-                                            consolidated.get(bin).get("versions").put(version, versions.get(version));
-                                        }
-                                    }
-                                }
-                            }
                         }
-
-                        if (DEBUG > 0) {
-                            if (++flowsProcessed % 1000 == 0) {
-                                log.debug("StatisticalSeconds processed: " + flowsProcessed);
-                            }
+                        
+                        if(!stopped) {
+                            endKey = startKey;
                         }
-
-                        if (Thread.currentThread().isInterrupted()) {
-                            log.debug("StatisticsManager was interrupted");
-                            throw new InterruptedException();
-                        }
+                    } catch (DatabaseException e) {
+                        log.error("Database error: " + e.getMessage());
+                    } finally {
+                        cursor.close();
                     }
                 } catch (DatabaseException e) {
                     log.error("Database error: " + e.getMessage());
                 } finally {
-                    cursor.close();
+                    closeStore(store);
                 }
-            } catch (DatabaseException e) {
-                log.error("Database error: " + e.getMessage());
+            } catch (InterruptedException ie) {
+                log.error("Stopping StatisticsManager during Volume build...");
             } finally {
-                closeStore(store);
+                closeEnvironment(environment);
             }
-        } catch (InterruptedException ie) {
-            log.error("Stopping StatisticsManager during Volume build...");
-        } finally {
-            closeEnvironment(environment);
+            System.gc();
         }
 
-        //log.debug("Returning from FlowManager:getVolumeByTime");
+        log.debug("Returning from FlowManager:getVolumeByTime");
         return consolidated;
     }
 

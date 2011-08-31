@@ -5,6 +5,9 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,15 +35,15 @@ public class StatisticalEngine {
     private static GlobalConfigurationManager globalConfigurationManager;
     private static FileAppender fileAppender;
     private static ScheduledThreadPoolExecutor executor;
-    private final Integer HISTORY = 250;
+    public static final Integer HISTORY = 250;
     private Customer customer;
     private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics;
 
     protected enum Cube {
 
         DETAIL,
-        MEAN,
-        EW_MEAN
+        EW_MEAN_WKDY,
+        EW_MEAN_WKND
     }
 
     public StatisticalEngine(Customer customer) {
@@ -195,6 +198,11 @@ public class StatisticalEngine {
     }
 
     private void ewma(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
+        Cube type = this.getCubeTypeByTime(interval.key.interval * interval.key.resolution);
+        Date now = new Date();
+        now.setTime(interval.key.interval * interval.key.resolution);
+        log.debug("interval date: " + now.toString() + ", selected: " + type);
+        
         Map<String, Map<String, DescriptiveStatistics>> prior = new HashMap();
         for (String source : statistics.keySet()) {
             if (!prior.containsKey(source)) {
@@ -202,15 +210,15 @@ public class StatisticalEngine {
             }
 
             for (String destination : statistics.get(source).keySet()) {
-                prior.get(source).put(destination, new DescriptiveStatistics(statistics.get(source).get(destination).get(Cube.EW_MEAN)));
+                prior.get(source).put(destination, new DescriptiveStatistics(statistics.get(source).get(destination).get(type)));
             }
         }
 
-        this.add(normalized);
+        this.add(normalized, type);
 
         for (String source : normalized.keySet()) {
             for (String destination : normalized.get(source).keySet()) {
-                DescriptiveStatistics ewma = statistics.get(source).get(destination).get(Cube.EW_MEAN);
+                DescriptiveStatistics ewma = statistics.get(source).get(destination).get(type);
                 if (ewma.getValues().length >= 2) {
                     log.debug("EWMA data for: " + source + " -> " + destination);
 
@@ -247,7 +255,7 @@ public class StatisticalEngine {
      * 
      * @param normalized  the normalized interval
      */
-    private void add(Map<String, Map<String, Long>> normalized) {
+    private void add(Map<String, Map<String, Long>> normalized, Cube type) {
         for (String source : statistics.keySet()) {
             for (String destination : statistics.get(source).keySet()) {
                 Long size = 0l;
@@ -257,7 +265,7 @@ public class StatisticalEngine {
                 DescriptiveStatistics detail = statistics.get(source).get(destination).get(Cube.DETAIL);
                 detail.addValue(new Double(size).doubleValue());
 
-                DescriptiveStatistics ewma = statistics.get(source).get(destination).get(Cube.EW_MEAN);
+                DescriptiveStatistics ewma = statistics.get(source).get(destination).get(type);
 
                 double alpha = 0.1;
 
@@ -276,8 +284,6 @@ public class StatisticalEngine {
                         ewma.addValue(new Double(size).doubleValue());
                     }
                 }
-
-                statistics.get(source).get(destination).get(Cube.MEAN).addValue(detail.getMean());
             }
         }
     }
@@ -304,14 +310,46 @@ public class StatisticalEngine {
             statistics.get(source).get(destination).put(Cube.DETAIL, descriptiveStatistics);
         }
 
-        if (!statistics.get(source).get(destination).containsKey(Cube.MEAN)) {
+        if (!statistics.get(source).get(destination).containsKey(Cube.EW_MEAN_WKDY)) {
             DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics(HISTORY);
-            statistics.get(source).get(destination).put(Cube.MEAN, descriptiveStatistics);
+            statistics.get(source).get(destination).put(Cube.EW_MEAN_WKDY, descriptiveStatistics);
         }
 
-        if (!statistics.get(source).get(destination).containsKey(Cube.EW_MEAN)) {
+        if (!statistics.get(source).get(destination).containsKey(Cube.EW_MEAN_WKND)) {
             DescriptiveStatistics descriptiveStatistics = new SynchronizedDescriptiveStatistics(HISTORY);
-            statistics.get(source).get(destination).put(Cube.EW_MEAN, descriptiveStatistics);
+            statistics.get(source).get(destination).put(Cube.EW_MEAN_WKND, descriptiveStatistics);
         }
+    }
+
+    private Cube getCubeTypeByTime(long millis) {
+        Calendar calendar = new GregorianCalendar();
+        calendar.setTimeInMillis(millis);
+
+        Cube type = null;
+        switch (calendar.get(Calendar.DAY_OF_WEEK)) {
+            case Calendar.MONDAY:
+                type = Cube.EW_MEAN_WKDY;
+                break;
+            case Calendar.TUESDAY:
+                type = Cube.EW_MEAN_WKDY;
+                break;
+            case Calendar.WEDNESDAY:
+                type = Cube.EW_MEAN_WKDY;
+                break;
+            case Calendar.THURSDAY:
+                type = Cube.EW_MEAN_WKDY;
+                break;
+            case Calendar.FRIDAY:
+                type = Cube.EW_MEAN_WKDY;
+                break;
+            case Calendar.SATURDAY:
+                type = Cube.EW_MEAN_WKND;
+                break;
+            case Calendar.SUNDAY:
+                type = Cube.EW_MEAN_WKND;
+                break;
+        }
+        
+        return type;
     }
 }
