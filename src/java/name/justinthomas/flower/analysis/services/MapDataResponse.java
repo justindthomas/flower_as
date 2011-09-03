@@ -44,13 +44,15 @@ public class MapDataResponse {
     
     public static class Node {
         public String address;
+        public String resolvedName;
     
         public Node() {
             
         }
         
-        public Node(String address) {
+        public Node(String address, String resolvedName) {
             this.address = address;
+            this.resolvedName = resolvedName;
         }
 
         @Override

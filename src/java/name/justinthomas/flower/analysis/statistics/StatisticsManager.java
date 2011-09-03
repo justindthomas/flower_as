@@ -413,24 +413,24 @@ public class StatisticsManager {
             log.debug("Iterating over volume query results.");
 
             boolean stopped = false;
-            
+
             try {
                 try {
                     try {
                         for (StatisticalInterval second : cursor) {
                             startKey = second.key;
-                            
+
                             if (second.key.resolution.longValue() != resolution.longValue()) {
                                 log.debug("skipping resolution: " + second.key.resolution);
                                 continue;
-                            }      
+                            }
 
                             if (++flowsProcessed % 500 == 0) {
                                 log.debug("StatisticalSeconds processed: " + flowsProcessed);
                                 stopped = true;
                                 break;
                             }
-                            
+
                             stopped = false;
 
                             HashMap<Integer, Long> versions = new HashMap();
@@ -541,8 +541,8 @@ public class StatisticsManager {
                                 throw new InterruptedException();
                             }
                         }
-                        
-                        if(!stopped) {
+
+                        if (!stopped) {
                             endKey = startKey;
                         }
                     } catch (DatabaseException e) {
@@ -672,23 +672,24 @@ public class StatisticsManager {
                             // Iterate through managed networks and add the Nodes (complete with Flows)
                             // as they are encountered
                             for (MapDataResponse.Network network : response.networks) {
-                                //for (InetNetwork network : networks) {
                                 InetNetwork iNetwork = new InetNetwork();
                                 iNetwork.setAddress(InetAddress.getByName(network.address.split("/")[0]));
                                 iNetwork.setMask(Integer.parseInt(network.address.split("/")[1]));
                                 if (!sourceCaptured || !destinationCaptured) {
-                                    // If the source address belongs to a managed network, add it to the map
-                                    // De-duplication is handled by the "addNode" method in the Network object
                                     if (!sourceCaptured) {
                                         if (AddressAnalysis.isMember(sourceAddress, iNetwork)) {
-                                            network.nodes.add(new MapDataResponse.Node(sourceAddress.getHostAddress()));
+                                            if (!AddressAnalysis.isBroadcast(sourceAddress, iNetwork)) {
+                                                network.nodes.add(new MapDataResponse.Node(sourceAddress.getHostAddress(), sourceAddress.getCanonicalHostName()));
+                                            }
                                             sourceCaptured = true;
                                         }
                                     }
 
                                     if (!destinationCaptured) {
                                         if (AddressAnalysis.isMember(destinationAddress, iNetwork)) {
-                                            network.nodes.add(new MapDataResponse.Node(destinationAddress.getHostAddress()));
+                                            if (!AddressAnalysis.isBroadcast(destinationAddress, iNetwork)) {
+                                                network.nodes.add(new MapDataResponse.Node(destinationAddress.getHostAddress(), destinationAddress.getCanonicalHostName()));
+                                            }
                                             destinationCaptured = true;
                                         }
                                     }
