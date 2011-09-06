@@ -54,7 +54,9 @@ public class StatisticsManager {
     private static FileAppender fileAppender;
     private static final GlobalConfigurationManager globalConfigurationManager = StatisticsManager.getGlobalConfigurationManager();
     private static final Integer DEBUG = 1;
+    
     private Customer customer;
+    private HashMap<String, NameResolution> resolver = new HashMap();
 
     private static GlobalConfigurationManager getGlobalConfigurationManager() {
         try {
@@ -678,18 +680,22 @@ public class StatisticsManager {
                                 if (!sourceCaptured || !destinationCaptured) {
                                     if (!sourceCaptured) {
                                         if (AddressAnalysis.isMember(sourceAddress, iNetwork)) {
-                                            if (!AddressAnalysis.isBroadcast(sourceAddress, iNetwork)) {
-                                                network.nodes.add(new MapDataResponse.Node(sourceAddress.getHostAddress(), sourceAddress.getCanonicalHostName()));
+                                            if(!resolver.containsKey(sourceAddress.getHostAddress())) {
+                                                resolver.put(sourceAddress.getHostAddress(), new NameResolution(sourceAddress.getHostName()));     
                                             }
+                                            
+                                            network.nodes.add(new MapDataResponse.Node(sourceAddress.getHostAddress(), resolver.get(sourceAddress.getHostAddress()).name));
                                             sourceCaptured = true;
                                         }
                                     }
 
                                     if (!destinationCaptured) {
                                         if (AddressAnalysis.isMember(destinationAddress, iNetwork)) {
-                                            if (!AddressAnalysis.isBroadcast(destinationAddress, iNetwork)) {
-                                                network.nodes.add(new MapDataResponse.Node(destinationAddress.getHostAddress(), destinationAddress.getCanonicalHostName()));
+                                            if(!resolver.containsKey(destinationAddress.getHostAddress())) {
+                                                resolver.put(destinationAddress.getHostAddress(), new NameResolution(destinationAddress.getHostName()));     
                                             }
+                                            
+                                            network.nodes.add(new MapDataResponse.Node(destinationAddress.getHostAddress(), resolver.get(destinationAddress.getHostAddress()).name));
                                             destinationCaptured = true;
                                         }
                                     }
@@ -981,6 +987,15 @@ public class StatisticsManager {
             writer.close();
         } catch (IOException ioe) {
             log.error("Error recording environment statistics: " + ioe.getMessage());
+        }
+    }
+    
+    class NameResolution {
+        public String name;
+        public Date created = new Date();
+        
+        public NameResolution(String name) {
+            this.name = name;
         }
     }
 }
