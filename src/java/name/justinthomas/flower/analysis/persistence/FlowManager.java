@@ -182,7 +182,7 @@ public class FlowManager {
 
         try {
             System.out.println("beginning to build statistics from flows, starting at: " + start + "...");
-            
+
 
             int flowsProcessed = 0;
             PersistentFlow flow = null;
@@ -231,6 +231,14 @@ public class FlowManager {
 
         try {
             LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> bins = statisticsManager.getVolumeByTime(constraints, nmb_bins);
+
+            if (bins == null) {
+                volumeList.errors.add(XMLDataVolumeList.Error.INSUFFICIENT_DATA);
+                volumeList.ready = true;
+                SessionManager.setVolumes(session, volumeList);
+                SessionManager.isHistogramBuilding(session, null);
+                return volumeList;
+            }
 
             for (Date date : bins.keySet()) {
                 XMLDataVolume volume = new XMLDataVolume();

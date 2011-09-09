@@ -397,6 +397,12 @@ public class StatisticsManager {
         log.debug("Iterating over flow volumes in database");
 
         Long resolution = getResolution(duration, bins);
+        
+        if(resolution == null) {
+            log.error("automatically selected resolution is null; no resolution is granular enough to support the number of bins selected over the selected time period");
+            return null;
+        }
+        
         Long start = constraints.startTime.getTime() / resolution;
         IntervalKey startKey = new IntervalKey(start, resolution);
         Long end = constraints.endTime.getTime() / resolution;
