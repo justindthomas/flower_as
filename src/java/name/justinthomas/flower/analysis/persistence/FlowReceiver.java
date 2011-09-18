@@ -134,7 +134,7 @@ public class FlowReceiver {
 
         if (success) {
             System.out.println("Charging " + flows.size() + " to: " + customer.getId());
-            accountingManager.addFlows(customer.getId(), sender, flows.size());
+            //accountingManager.addFlows(customer.getId(), sender, flows.size());
         }
 
         return ids;
