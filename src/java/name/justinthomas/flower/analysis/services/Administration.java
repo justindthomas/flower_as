@@ -18,6 +18,7 @@ import name.justinthomas.flower.analysis.persistence.ManagedNetwork;
 import name.justinthomas.flower.analysis.persistence.ManagedNetworkManager;
 import name.justinthomas.flower.analysis.authentication.UserManager;
 import name.justinthomas.flower.analysis.authentication.User;
+import name.justinthomas.flower.analysis.persistence.FrequencyManager;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryDomain;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryGroup;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
@@ -32,10 +33,9 @@ import org.apache.log4j.Logger;
 public class Administration {
 
     private static Logger log = Logger.getLogger(Administration.class.getName());
-    
     @EJB
     GlobalConfigurationManager globalConfigurationManager;
-    
+
     @WebMethod(operationName = "addManagedNetwork")
     public Boolean addManagedNetwork(
             @WebParam(name = "customer") String customerID,
@@ -249,7 +249,25 @@ public class Administration {
         }
         return xdomains;
     }
-    
+
+    @WebMethod(operationName = "getFrequency")
+    public Integer getFrequency(
+            @WebParam(name = "customer") String customerID,
+            @WebParam(name = "user") String user,
+            @WebParam(name = "password") String password,
+            @WebParam(name = "protocol") Integer protocol,
+            @WebParam(name = "port") Integer port) {
+
+        UserAction userAction = new UserAction();
+        AuthenticationToken token = userAction.authenticate(customerID, user, password);
+        if (token.authenticated && token.authorized && token.administrator) {
+            FrequencyManager frequencyManager = globalConfigurationManager.getFrequencyManager(Utility.getCustomer(customerID));
+            return frequencyManager.getFrequency(protocol, port);
+        }
+        
+        return null;
+    }
+
     @WebMethod(operationName = "getOperatingStatistics")
     public OperatingStatistics getStatistics(
             @WebParam(name = "customer") String customerID,
