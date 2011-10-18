@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.servlet.http.HttpSession;
 import name.justinthomas.flower.analysis.element.Flow;
+import name.justinthomas.flower.analysis.services.ChartData;
 import name.justinthomas.flower.analysis.services.MapDataResponse;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
@@ -23,42 +24,9 @@ import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
  */
 public abstract class SessionManager {
 
-    public static void clearMap(HttpSession session) {
-        session.removeAttribute("map");
-    }
-
-    public static void clearHistogram(HttpSession session) {
-        session.removeAttribute("histogram");
-    }
-
-    public static void clearPattern(HttpSession session) {
-        session.removeAttribute("pattern");
-    }
-
-    public static Boolean isMapReady(HttpSession session) {
-        if (getMap(session) != null) {
-            return true;
-        }
-        return false;
-    }
-
-    public static Boolean isHistogramReady(HttpSession session) {
-        if (getHistogram(session) != null) {
-            return true;
-        }
-        return false;
-    }
-
     @SuppressWarnings("unchecked")
     public static List<Flow> getFlows(HttpSession session, String tracker) {
-        Map<String, List<Flow>> map;
-        if (session.getAttribute("flows") == null) {
-            //map = Collections.synchronizedMap(new HashMap<String, List<Flow>>());
-            map = new ConcurrentHashMap();
-            session.setAttribute("flows", map);
-        } else {
-            map = (Map) session.getAttribute("flows");
-        }
+        Map<String, List<Flow>> map = getFlowMap(session);
 
         if (!map.containsKey(tracker)) {
             map.put(tracker, Collections.synchronizedList(new LinkedList<Flow>()));
@@ -67,97 +35,19 @@ public abstract class SessionManager {
         List<Flow> flows = ((Map<String, List<Flow>>) session.getAttribute("flows")).get(tracker);
         return flows;
     }
-
-    public static void clearPackets(HttpSession session) {
-        session.removeAttribute("packets");
-    }
-
-    public static void setMap(HttpSession session, String content) {
-        session.setAttribute("map", content);
-    }
-
-    public static String getMap(HttpSession session) {
-        if (session.getAttribute("map") != null) {
-            return (String) session.getAttribute("map");
+    
+    public static Map<String, List<Flow>> getFlowMap(HttpSession session) {
+        Map<String, List<Flow>> map = null;
+        
+        if (session.getAttribute("flows") == null) {
+            //map = Collections.synchronizedMap(new HashMap<String, List<Flow>>());
+            map = new ConcurrentHashMap();
+            session.setAttribute("flows", map);
         } else {
-            return null;
+            map = (Map) session.getAttribute("flows");
         }
-    }
-
-    public static void setMapBuildStage(HttpSession session, Integer stage) {
-        if (stage != null) {
-            session.setAttribute("map_build_stage", stage);
-        } else {
-            session.removeAttribute("map_build_stage");
-        }
-    }
-
-    public static int getMapBuildStage(HttpSession session) {
-        if (session.getAttribute("map_build_stage") != null) {
-            return (Integer) session.getAttribute("map_build_stage");
-        } else {
-            return 0;
-        }
-    }
-
-    public static void setHistogram(HttpSession session, String content) {
-        session.setAttribute("histogram", content);
-    }
-
-    public static String getHistogram(HttpSession session) {
-        if (session.getAttribute("histogram") != null) {
-            return (String) session.getAttribute("histogram");
-        } else {
-            return null;
-        }
-    }
-
-    public static void setHistogramBuildStage(HttpSession session, Integer stage) {
-        if (stage != null) {
-            session.setAttribute("histogram_build_stage", stage);
-        } else {
-            session.removeAttribute("histogram_build_stage");
-        }
-    }
-
-    public static int getHistogramBuildStage(HttpSession session) {
-        if (session.getAttribute("histogram_build_stage") != null) {
-            return (Integer) session.getAttribute("map_build_stage");
-        } else {
-            return 0;
-        }
-    }
-
-    public static void isMapBuilding(HttpSession session, Boolean status) {
-        if (status != null) {
-            session.setAttribute("map_building", status);
-        } else {
-            session.removeAttribute("map_building");
-        }
-    }
-
-    public static Boolean isMapBuilding(HttpSession session) {
-        if (session.getAttribute("map_building") != null) {
-            return (Boolean) session.getAttribute("map_building");
-        } else {
-            return false;
-        }
-    }
-
-    public static void isProcessingPackets(HttpSession session, Boolean status) {
-        if (status != null) {
-            session.setAttribute("processing_packets", status);
-        } else {
-            session.removeAttribute("processing_packets");
-        }
-    }
-
-    public static Boolean isProcessingPackets(HttpSession session) {
-        if (session.getAttribute("processing_packets") != null) {
-            return (Boolean) session.getAttribute("processing_packets");
-        } else {
-            return false;
-        }
+        
+        return map;
     }
 
     public static void isProcessingPacketsComplete(HttpSession session, String tracker, Boolean status) {
@@ -179,18 +69,6 @@ public abstract class SessionManager {
             }
         }
         return false;
-    }
-
-    public static void isHistogramBuilding(HttpSession session, Boolean status) {
-        session.setAttribute("histogram_building", status);
-    }
-
-    public static Boolean isHistogramBuilding(HttpSession session) {
-        if (session.getAttribute("histogram_building") != null) {
-            return (Boolean) session.getAttribute("histogram_building");
-        } else {
-            return false;
-        }
     }
 
     public static void errorStatus(HttpSession session, Boolean error) {
@@ -219,6 +97,28 @@ public abstract class SessionManager {
         } else {
             return "";
         }
+    }
+    
+    public static ChartData.BuildDataVolumeList getVolumeTask(HttpSession session, String nonce) {
+        return getVolumeTaskMap(session).get(nonce);
+    }
+    
+    public static void addVolumeTask(HttpSession session, ChartData.BuildDataVolumeList task) throws Exception {
+        HashMap<String, ChartData.BuildDataVolumeList> volumeTaskMap = getVolumeTaskMap(session);
+        
+        if(volumeTaskMap.containsKey(task.tracker)) {
+            throw new Exception("Task: " + task.tracker + " is already registered.");
+        } else {
+            volumeTaskMap.put(task.tracker, task);
+        }
+    }
+    
+    public static HashMap<String, ChartData.BuildDataVolumeList> getVolumeTaskMap(HttpSession session) {
+        if (session.getAttribute("volumetaskmap") == null) {
+            session.setAttribute("volumetaskmap", new HashMap<String, ChartData.BuildDataVolumeList>()); 
+        }
+        
+        return (HashMap<String, ChartData.BuildDataVolumeList>)session.getAttribute("volumetaskmap");
     }
     
     public static void setMapDataThread(HttpSession session, TimedThread thread) {
@@ -265,22 +165,6 @@ public abstract class SessionManager {
 
         if (session.getAttribute("networks") != null) {
             return (XMLNetworkList) session.getAttribute("networks");
-        } else {
-            return null;
-        }
-    }
-
-    public static void setVolumes(HttpSession session, XMLDataVolumeList volumes) {
-        if (volumes != null) {
-            session.setAttribute("volumes", volumes);
-        } else {
-            session.removeAttribute("volumes");
-        }
-    }
-
-    public static XMLDataVolumeList getVolumes(HttpSession session) {
-        if (session.getAttribute("volumes") != null) {
-            return (XMLDataVolumeList) session.getAttribute("volumes");
         } else {
             return null;
         }

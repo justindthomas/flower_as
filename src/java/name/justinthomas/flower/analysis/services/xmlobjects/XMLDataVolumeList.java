@@ -19,7 +19,9 @@ public class XMLDataVolumeList {
 
         INSUFFICIENT_DATA
     }
+    
+    public String tracker;
     public List<Error> errors = new ArrayList();
-    public List<XMLDataVolume> bins = new ArrayList();
+    public List<XMLDataVolume> bins = new ArrayList();  
     public Boolean ready = false;
 }

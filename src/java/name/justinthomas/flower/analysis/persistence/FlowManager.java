@@ -235,8 +235,6 @@ public class FlowManager {
             if (bins == null) {
                 volumeList.errors.add(XMLDataVolumeList.Error.INSUFFICIENT_DATA);
                 volumeList.ready = true;
-                SessionManager.setVolumes(session, volumeList);
-                SessionManager.isHistogramBuilding(session, null);
                 return volumeList;
             }
 
@@ -307,8 +305,6 @@ public class FlowManager {
 
         if (!cancelVolume) {
             volumeList.ready = true;
-            SessionManager.setVolumes(session, volumeList);
-            SessionManager.isHistogramBuilding(session, null);
         } else {
             System.out.println("Canceled volume build");
         }
@@ -335,7 +331,6 @@ public class FlowManager {
             System.out.println("Completed XMLNetworkList creation and writing to session...");
             networkList.ready = true;
             SessionManager.setNetworks(session, networkList);
-            SessionManager.isMapBuilding(session, null);
         } else {
             System.out.println("Canceled map build");
         }
