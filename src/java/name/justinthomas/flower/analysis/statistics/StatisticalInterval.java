@@ -1,11 +1,12 @@
 package name.justinthomas.flower.analysis.statistics;
 
-import com.sleepycat.persist.model.Entity;
-import com.sleepycat.persist.model.PrimaryKey;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Map.Entry;
+import javax.persistence.EmbeddedId;
+import javax.persistence.Entity;
+import javax.persistence.Transient;
 import javax.xml.bind.annotation.XmlType;
 import name.justinthomas.flower.analysis.statistics.AnomalyEvent.Anomaly;
 
@@ -14,15 +15,15 @@ import name.justinthomas.flower.analysis.statistics.AnomalyEvent.Anomaly;
  * @author justin
  */
 
-@Entity(version = 104)
+@Entity
 @XmlType
-public class StatisticalInterval {
+public class StatisticalInterval implements Serializable {
 
-    @PrimaryKey
-    public IntervalKey key;
-    public Map<StatisticalFlowIdentifier, StatisticalFlow> flows = new HashMap();
-    public ArrayList<Long> flowIDs = new ArrayList();
-    public ArrayList<AnomalyEvent> anomalies = new ArrayList();
+    @EmbeddedId
+    protected IntervalKey key;
+    private HashMap<StatisticalFlowIdentifier, StatisticalFlow> flows = new HashMap();
+    private ArrayList<Long> flowIDs = new ArrayList();
+    private ArrayList<AnomalyEvent> anomalies = new ArrayList();
 
     public void clear() {
         key = null;
@@ -62,15 +63,35 @@ public class StatisticalInterval {
         return this;
     }
 
-    public IntervalKey getSecond() {
+    public ArrayList<AnomalyEvent> getAnomalies() {
+        return anomalies;
+    }
+
+    public void setAnomalies(ArrayList<AnomalyEvent> anomalies) {
+        this.anomalies = anomalies;
+    }
+
+    public ArrayList<Long> getFlowIDs() {
+        return flowIDs;
+    }
+
+    public void setFlowIDs(ArrayList<Long> flowIDs) {
+        this.flowIDs = flowIDs;
+    }
+
+    public HashMap<StatisticalFlowIdentifier, StatisticalFlow> getFlows() {
+        return flows;
+    }
+
+    public void setFlows(HashMap<StatisticalFlowIdentifier, StatisticalFlow> flows) {
+        this.flows = flows;
+    }
+
+    public IntervalKey getKey() {
         return key;
     }
 
-    public void setSecond(IntervalKey second) {
-        this.key = second;
-    }
-
-    public Map<StatisticalFlowIdentifier, StatisticalFlow> getFlows() {
-        return flows;
+    public void setKey(IntervalKey key) {
+        this.key = key;
     }
 }

@@ -1,6 +1,6 @@
 package name.justinthomas.flower.analysis.statistics;
 
-import com.sleepycat.persist.model.Persistent;
+import java.io.Serializable;
 import javax.xml.bind.annotation.XmlEnum;
 import javax.xml.bind.annotation.XmlType;
 
@@ -8,9 +8,8 @@ import javax.xml.bind.annotation.XmlType;
  *
  * @author justin
  */
-@Persistent
 @XmlType
-public class StatisticalFlowDetail {
+public class StatisticalFlowDetail implements Serializable {
     @XmlEnum
     public static enum Count {
         PACKET, BYTE;

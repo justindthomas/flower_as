@@ -1,13 +1,13 @@
 package name.justinthomas.flower.analysis.statistics;
 
-import com.sleepycat.persist.model.Persistent;
+import java.io.Serializable;
 
 /**
  *
  * @author justin
  */
-@Persistent
-public class StatisticalFlowIdentifier {
+
+public class StatisticalFlowIdentifier implements Serializable {
     String source;
     String destination;
 

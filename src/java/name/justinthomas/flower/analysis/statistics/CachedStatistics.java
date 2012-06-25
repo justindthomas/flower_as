@@ -22,21 +22,21 @@ public class CachedStatistics {
     private Map<AddressPair, Representation> sourceMap;
     private StatisticalEngine engine;
     public static final long MAX_WAIT = 300000;
-    
-    public CachedStatistics(Customer customer) {    
+
+    public CachedStatistics(Customer customer) {
         this.initialize(customer);
     }
 
     public final void initialize(Customer customer) {
         this.customer = customer;
-        
+
         engine = new StatisticalEngine(customer);
         System.out.println("Setting CachedStatistics Persist to run every 60 seconds (" + customer.getId() + ").");
 
         cache = new ConcurrentHashMap();
         lastUpdated = new ConcurrentHashMap();
         sourceMap = new ConcurrentHashMap();
-        
+
         executor = new ScheduledThreadPoolExecutor(1);
 
         executor.scheduleWithFixedDelay(new Persist(customer, false), 60, 60, TimeUnit.SECONDS);
@@ -155,23 +155,27 @@ public class CachedStatistics {
         @Override
         public void run() {
             System.out.println("Statistics cache (" + customer.getId() + ") includes " + cache.size() + " entries before Persist.");
-            ArrayList<IntervalKey> keys = new ArrayList();
-            for (IntervalKey key : lastUpdated.keySet()) {
-                if ((new Date().getTime() - lastUpdated.get(key).getTime() > MAX_WAIT) || flush) {
-                    keys.add(key);
+            try {
+                ArrayList<IntervalKey> keys = new ArrayList();
+                for (IntervalKey key : lastUpdated.keySet()) {
+                    if ((new Date().getTime() - lastUpdated.get(key).getTime() > MAX_WAIT) || flush) {
+                        keys.add(key);
+                    }
                 }
+
+                ArrayList<StatisticalInterval> intervals = new ArrayList();
+
+                System.out.println("Removing intervals from cache (" + customer.getId() + ").");
+                for (IntervalKey key : keys) {
+                    intervals.add(engine.addStatisticalInterval(cache.remove(key)));
+                    lastUpdated.remove(key);
+                }
+
+                StatisticsManager statisticsManager = new StatisticsManager(customer);
+                statisticsManager.storeStatisticalIntervals(intervals);
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-
-            ArrayList<StatisticalInterval> intervals = new ArrayList();
-
-            System.out.println("Removing intervals from cache (" + customer.getId() + ").");
-            for (IntervalKey key : keys) {
-                intervals.add(engine.addStatisticalInterval(cache.remove(key)));
-                lastUpdated.remove(key);
-            }
-
-            StatisticsManager statisticsManager = new StatisticsManager(customer);
-            statisticsManager.storeStatisticalIntervals(intervals);
 
             System.out.println("Statistics cache (" + customer.getId() + ") includes " + cache.size() + " entries after Persist.");
         }

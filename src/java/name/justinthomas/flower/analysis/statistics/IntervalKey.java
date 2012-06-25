@@ -4,30 +4,47 @@
  */
 package name.justinthomas.flower.analysis.statistics;
 
-import com.sleepycat.persist.model.KeyField;
-import com.sleepycat.persist.model.Persistent;
+import java.io.Serializable;
+import javax.persistence.Column;
+import javax.persistence.Embeddable;
 
 /**
  *
  * @author justin
  */
-@Persistent
-public class IntervalKey {
+@Embeddable
+public class IntervalKey implements Serializable {
 
-    @KeyField(2)
-    public Long interval;
-    @KeyField(1)
-    public Long resolution;
+    @Column(name = "STATISTICALINTERVAL", nullable = false)
+    private Long statisticalInterval;
+    @Column(name = "RESOLUTION", nullable = false)
+    private Long resolution;
 
     protected IntervalKey() {
     }
 
-    public IntervalKey(Long interval, Long resolution) {
-        this.interval = interval;
+    public IntervalKey(Long statisticalInterval, Long resolution) {
+        this.statisticalInterval = statisticalInterval;
         this.resolution = resolution;
     }
 
-    @Override
+    public Long getStatisticalInterval() {
+        return statisticalInterval;
+    }
+
+    public void setStatisticalInterval(Long statisticalInterval) {
+        this.statisticalInterval = statisticalInterval;
+    }
+
+    public Long getResolution() {
+        return resolution;
+    }
+
+    public void setResolution(Long resolution) {
+        this.resolution = resolution;
+    }
+    
+     @Override
     public boolean equals(Object obj) {
         if (obj == null) {
             return false;
@@ -36,7 +53,7 @@ public class IntervalKey {
             return false;
         }
         final IntervalKey other = (IntervalKey) obj;
-        if (this.interval != other.interval && (this.interval == null || !this.interval.equals(other.interval))) {
+        if (this.statisticalInterval != other.statisticalInterval && (this.statisticalInterval == null || !this.statisticalInterval.equals(other.statisticalInterval))) {
             return false;
         }
         if (this.resolution != other.resolution && (this.resolution == null || !this.resolution.equals(other.resolution))) {
@@ -48,10 +65,8 @@ public class IntervalKey {
     @Override
     public int hashCode() {
         int hash = 5;
-        hash = 43 * hash + (this.interval != null ? this.interval.hashCode() : 0);
+        hash = 43 * hash + (this.statisticalInterval != null ? this.statisticalInterval.hashCode() : 0);
         hash = 43 * hash + (this.resolution != null ? this.resolution.hashCode() : 0);
         return hash;
     }
-
-    
 }

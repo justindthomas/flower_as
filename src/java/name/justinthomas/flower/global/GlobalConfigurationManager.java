@@ -108,11 +108,11 @@ public class GlobalConfigurationManager {
     }
 
     public FrequencyManager getFrequencyManager(Customer customer) {
-        if (!this.frequencyMap.containsKey(customer.getId())) {
-            this.frequencyMap.put(customer.getId(), new FrequencyManager(customer));
+        if (!this.frequencyMap.containsKey(customer.getAccount())) {
+            this.frequencyMap.put(customer.getAccount(), new FrequencyManager(customer));
         }
 
-        return this.frequencyMap.get(customer.getId());
+        return this.frequencyMap.get(customer.getAccount());
     }
 
     public void setFrequencyManager(String customerID, FrequencyManager frequencyManager) {
@@ -120,14 +120,14 @@ public class GlobalConfigurationManager {
     }
 
     public Integer getFrequency(Customer customer, Integer protocol, Integer port) {
-        return this.frequencyMap.get(customer.getId()).getFrequency(protocol, port);
+        return this.frequencyMap.get(customer.getAccount()).getFrequency(protocol, port);
     }
 
     public void addFrequency(Customer customer, Integer protocol, Integer[] ports) {
-        if (!this.frequencyMap.containsKey(customer.getId())) {
-            this.frequencyMap.put(customer.getId(), new FrequencyManager(customer));
+        if (!this.frequencyMap.containsKey(customer.getAccount())) {
+            this.frequencyMap.put(customer.getAccount(), new FrequencyManager(customer));
         }
 
-        frequencyMap.get(customer.getId()).addPort(protocol, ports);
+        frequencyMap.get(customer.getAccount()).addPort(protocol, ports);
     }
 }

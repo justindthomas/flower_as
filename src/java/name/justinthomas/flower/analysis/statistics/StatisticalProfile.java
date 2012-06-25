@@ -22,7 +22,7 @@ public class StatisticalProfile {
     FrequencyManager frequencyManager;// = FrequencyManager.getFrequencyManager();
 
     public void addStatisticalSecond(StatisticalInterval second) {
-        for (StatisticalFlow flow : second.flows.values()) {
+        for (StatisticalFlow flow : second.getFlows().values()) {
             ServiceList sourceServices =
                     nodes.containsKey(flow.source) ? nodes.get(flow.source) : new ServiceList();
 

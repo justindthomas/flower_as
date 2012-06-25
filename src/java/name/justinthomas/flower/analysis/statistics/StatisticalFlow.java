@@ -1,7 +1,7 @@
 package name.justinthomas.flower.analysis.statistics;
 
-import com.sleepycat.persist.model.Persistent;
 import java.io.IOException;
+import java.io.Serializable;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.util.HashMap;
@@ -19,9 +19,8 @@ import org.apache.log4j.SimpleLayout;
  *
  * @author justin
  */
-@Persistent(version = 070611)
 @XmlType
-public class StatisticalFlow {
+public class StatisticalFlow implements Serializable {
 
     private static GlobalConfigurationManager globalConfigurationManager;
     private static final Logger log = Logger.getLogger(StatisticalFlow.class.getName());

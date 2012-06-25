@@ -10,7 +10,6 @@ import java.util.List;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
-import name.justinthomas.flower.manager.services.CustomerAdministration.Accounting;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import name.justinthomas.flower.manager.services.CustomerAdministration.CustomerAdministration;
 import name.justinthomas.flower.manager.services.CustomerAdministration.CustomerAdministrationService;
@@ -22,19 +21,6 @@ import name.justinthomas.flower.manager.services.CustomerAdministration.Customer
 public class Utility {
 
     private static GlobalConfigurationManager globalConfigurationManager;
-
-    public static Boolean chargeCustomers(List<Accounting> charges) {
-        try {
-            CustomerAdministrationService admin = new CustomerAdministrationService(new URL(Utility.getGlobalConfigurationManager().getManager() + "/CustomerAdministrationService?wsdl"));
-
-            CustomerAdministration port = admin.getCustomerAdministrationPort();
-            return(port.chargeCustomers(charges));
-            
-        } catch (MalformedURLException e) {
-            System.err.println("Could not access Customer Administration service at: " + Utility.getGlobalConfigurationManager().getManager());
-        }
-        return false;
-    }
     
     public static Customer getCustomer(String customerID) {
         Customer customer = null;
@@ -44,6 +30,7 @@ public class Utility {
 
             CustomerAdministration port = admin.getCustomerAdministrationPort();
             customer = port.getCustomer(null, null, customerID);
+            System.out.println("Retrieved customer: " + customer.getAccount() + ", ID: " + customer.getId());
         } catch (MalformedURLException e) {
             System.err.println("Could not access Customer Administration service at: " + Utility.getGlobalConfigurationManager().getManager());
         }

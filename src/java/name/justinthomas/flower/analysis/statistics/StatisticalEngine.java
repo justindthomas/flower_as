@@ -97,7 +97,7 @@ public class StatisticalEngine {
         @Override
         public void run() {
             try {
-                StatisticalCube cube = new StatisticalCube(customer.getId(), statistics);
+                StatisticalCube cube = new StatisticalCube(customer.getAccount(), statistics);
                 StatisticsManager statisticsManager = new StatisticsManager(customer);
                 statisticsManager.storeCube(cube);
 
@@ -124,12 +124,12 @@ public class StatisticalEngine {
     }
 
     public StatisticalInterval addStatisticalInterval(StatisticalInterval interval) {
-        if ((interval != null) && (interval.key != null) && (interval.key.resolution == 1000000) && (interval.flows != null)) {
+        if ((interval != null) && (interval.key != null) && (interval.key.getResolution() == 1000000) && (interval.getFlows() != null)) {
             ManagedNetworks managedNetworks = new ManagedNetworks(customer);
 
             Map<String, Map<String, Long>> normalized = new HashMap();
 
-            for (StatisticalFlowIdentifier flow : interval.flows.keySet()) {
+            for (StatisticalFlowIdentifier flow : interval.getFlows().keySet()) {
                 String source = flow.source;
                 String destination = flow.destination;
 
@@ -171,9 +171,9 @@ public class StatisticalEngine {
                 }
 
                 Long size = 0l;
-                for (StatisticalFlowDetail detail : interval.flows.get(flow).count.keySet()) {
+                for (StatisticalFlowDetail detail : interval.getFlows().get(flow).count.keySet()) {
                     if (detail.type == StatisticalFlowDetail.Count.BYTE) {
-                        size += interval.flows.get(flow).count.get(detail);
+                        size += interval.getFlows().get(flow).count.get(detail);
                     }
                 }
 
@@ -198,9 +198,9 @@ public class StatisticalEngine {
     }
 
     private void ewma(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
-        Cube type = this.getCubeTypeByTime(interval.key.interval * interval.key.resolution);
+        Cube type = this.getCubeTypeByTime(interval.key.getStatisticalInterval() * interval.key.getResolution());
         Date now = new Date();
-        now.setTime(interval.key.interval * interval.key.resolution);
+        now.setTime(interval.key.getStatisticalInterval() * interval.key.getResolution());
         log.debug("interval date: " + now.toString() + ", selected: " + type);
         
         Map<String, Map<String, DescriptiveStatistics>> prior = new HashMap();

@@ -11,7 +11,12 @@ import javax.annotation.Resource;
 import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebService;
+import javax.persistence.EntityManager;
+import javax.persistence.Persistence;
+import javax.persistence.PersistenceContext;
+import javax.persistence.spi.PersistenceProvider;
 import javax.servlet.http.HttpServletRequest;
+import javax.transaction.UserTransaction;
 import javax.xml.ws.WebServiceContext;
 import javax.xml.ws.handler.MessageContext;
 import name.justinthomas.flower.analysis.authentication.UserAction;
@@ -29,6 +34,10 @@ import name.justinthomas.flower.manager.services.CustomerAdministration.Customer
  */
 @WebService()
 public class FlowInsert {
+    @PersistenceContext
+    EntityManager em;
+    
+    @Resource private UserTransaction utx;
 
     @Resource
     WebServiceContext context;
@@ -138,6 +147,7 @@ public class FlowInsert {
         HashMap<Long, Flow> flows = new HashMap();
 
         public InsertThread(Customer customer, List<PersistentFlow> flowSet, InetAddress collector) {
+            System.out.println("Creating InsertThread...");
             this.flowSet = flowSet;
             this.collector = collector;
             this.customer = customer;
@@ -150,9 +160,12 @@ public class FlowInsert {
 
             for (PersistentFlow xflow : flowSet) {
                 try {
-                    if (xflow.size.longValue() < 0) {
-                        throw new Exception("Negative bytesSent value (" + xflow.size.longValue() + ") in XMLFlow received.");
+                    if (xflow.getByteSize().longValue() < 0) {
+                        throw new Exception("Negative bytesSent value (" + xflow.getByteSize().longValue() + ") in XMLFlow received.");
                     }
+                    
+                    xflow.setReportedBy(this.collector.getHostAddress());
+                    
                     converted.add(new Flow(customer, xflow));
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -160,7 +173,7 @@ public class FlowInsert {
                 }
             }
 
-            FlowReceiver receiver = new FlowReceiver(customer);
+            FlowReceiver receiver = new FlowReceiver(em, utx, customer);
             LinkedList<Long> flowIDs = receiver.addFlows(collector.getHostAddress(), converted, null);
 
             Iterator<Long> idIterator = flowIDs.iterator();

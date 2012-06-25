@@ -29,7 +29,6 @@ public class Flow implements Serializable {
     private static final Integer DEBUG = 1;
     public Date startTimeStamp;
     public Date lastTimeStamp;
-    public String ethernetType;
     public String reportedBy;
     public InetAddress[] addresses = new InetAddress[2];
     public Integer[] ports = {null, null};
@@ -92,56 +91,27 @@ public class Flow implements Serializable {
             }
         }
     }
-    /*
-    public Flow(XMLFlow xflow) throws UnknownHostException {
-    this();
-    
-    this.bytesSent = new BigDecimal(xflow.bytesSent);
-    this.bytesReceived = new BigDecimal(xflow.bytesReceived);
-    this.addresses[0] = InetAddress.getByName(xflow.sourceAddress);
-    this.addresses[1] = InetAddress.getByName(xflow.destinationAddress);
-    this.ports[0] = xflow.sourcePort;
-    this.ports[1] = xflow.destinationPort;
-    
-    this.ethernetType = xflow.ethernetType;
-    
-    this.startTimeStamp = new Date(xflow.startTimeStamp);
-    this.lastTimeStamp = new Date(xflow.lastTimeStamp);
-    this.packetsSent = xflow.packetsSent;
-    this.packetsReceived = xflow.packetsReceived;
-    this.protocol = xflow.protocol;
-    this.flags = xflow.flags;
-    if (this.flags < 0) {
-    System.err.println("Negative flags value in Flow(XMLFlow): " + this.flags);
-    }
-    
-    this.reportedBy = xflow.reportedBy;
-    }
-     *
-     */
 
     public Flow(Customer customer, PersistentFlow sflow) throws UnknownHostException {
         this(customer);
 
-        this.bytesSent = new BigDecimal(sflow.size);
+        this.bytesSent = new BigDecimal(sflow.getByteSize());
 
-        this.addresses[0] = InetAddress.getByName(sflow.source);
-        this.addresses[1] = InetAddress.getByName(sflow.destination);
-        this.ports[0] = sflow.sourcePort;
-        this.ports[1] = sflow.destinationPort;
+        this.addresses[0] = InetAddress.getByName(sflow.getSource());
+        this.addresses[1] = InetAddress.getByName(sflow.getDestination());
+        this.ports[0] = sflow.getSourcePort();
+        this.ports[1] = sflow.getDestinationPort();
         this.sourceOrdinal = 0;
-
-        this.ethernetType = sflow.ethernetType;
 
         this.lastTimeStamp = new Date(sflow.getLastTimeStampMs());
         this.startTimeStamp = new Date(sflow.getStartTimeStampMs());
 
-        this.packetsSent = sflow.packetCount;
-        this.protocol = sflow.protocol;
+        this.packetsSent = sflow.getPacketCount();
+        this.protocol = sflow.getProtocol();
 
-        this.flags = sflow.flags;
+        this.flags = sflow.getFlags();
 
-        this.reportedBy = sflow.reportedBy;
+        this.reportedBy = sflow.getReportedBy();
     }
 
     public PersistentFlow toHashTableFlow() {
@@ -150,57 +120,6 @@ public class Flow implements Serializable {
         return sflow;
     }
 
-    /*
-    public XMLFlow toXMLFlow() {
-    XMLFlow xflow = new XMLFlow();
-    
-    if (startTimeStamp != null) {
-    xflow.startTimeStamp = startTimeStamp.getTime();
-    }
-    
-    if (lastTimeStamp != null) {
-    xflow.lastTimeStamp = lastTimeStamp.getTime();
-    }
-    
-    xflow.ethernetType = ethernetType;
-    
-    try {
-    xflow.sourceAddress = getUnfixedSourceAddress().getHostAddress();
-    xflow.destinationAddress = getUnfixedDestinationAddress().getHostAddress();
-    xflow.sourcePort = getUnfixedSourcePort();
-    xflow.destinationPort = getUnfixedDestinationPort();
-    } catch (Exception e) {
-    System.err.println("Exception in Flow: " + e.getMessage());
-    }
-    
-    if (protocol != null) {
-    xflow.protocol = protocol;
-    }
-    
-    if (bytesSent != null) {
-    xflow.bytesSent = bytesSent.longValue();
-    }
-    
-    if (bytesReceived != null) {
-    xflow.bytesReceived = bytesReceived.longValue();
-    }
-    
-    if (packetsSent != null) {
-    xflow.packetsSent = packetsSent;
-    }
-    
-    if (packetsReceived != null) {
-    xflow.packetsReceived = packetsReceived;
-    }
-    
-    xflow.flags = this.flags;
-    
-    xflow.reportedBy = this.reportedBy;
-    
-    return xflow;
-    }
-     * 
-     */
     private Boolean determineDirectionality() {
         if ((protocol != 6) && (protocol != 17)) {
             sourceOrdinal = 0;
@@ -483,9 +402,7 @@ public class Flow implements Serializable {
             e.printStackTrace();
         }
 
-        if (ipTypeResolution.get(protocol) == null) {
-            flowString.append(" " + ethernetType);
-        } else {
+        if (ipTypeResolution.get(protocol) != null) {
             flowString.append("/" + ipTypeResolution.get(protocol));
         }
 
@@ -561,5 +478,13 @@ public class Flow implements Serializable {
 
     public void setPacketsSent(Integer packetsSent) {
         this.packetsSent = packetsSent;
+    }
+
+    public Customer getCustomer() {
+        return customer;
+    }
+
+    public void setCustomer(Customer customer) {
+        this.customer = customer;
     }
 }

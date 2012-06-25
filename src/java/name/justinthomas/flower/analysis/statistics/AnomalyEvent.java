@@ -1,6 +1,6 @@
 package name.justinthomas.flower.analysis.statistics;
 
-import com.sleepycat.persist.model.Persistent;
+import java.io.Serializable;
 import javax.xml.bind.annotation.XmlEnum;
 import javax.xml.bind.annotation.XmlType;
 
@@ -8,9 +8,8 @@ import javax.xml.bind.annotation.XmlType;
  *
  * @author justin
  */
-@Persistent
 @XmlType
-public class AnomalyEvent {
+public class AnomalyEvent implements Serializable {
     public String source;
     public String destination;
     public Anomaly anomaly;

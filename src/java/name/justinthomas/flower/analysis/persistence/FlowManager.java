@@ -26,7 +26,9 @@ import java.util.LinkedList;
 import java.util.concurrent.TimeUnit;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import javax.persistence.EntityManager;
 import javax.servlet.http.HttpSession;
+import javax.transaction.UserTransaction;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolume;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
@@ -117,7 +119,7 @@ public class FlowManager {
         LinkedHashMap<Long, Long> flowIDs = new LinkedHashMap();
 
         for (StatisticalInterval interval : intervals) {
-            for (Long id : interval.flowIDs) {
+            for (Long id : interval.getFlowIDs()) {
                 flowIDs.put(id, null);
             }
         }
@@ -137,9 +139,9 @@ public class FlowManager {
                 if (dataAccessor.flowById.contains(id)) {
                     PersistentFlow pflow = dataAccessor.flowById.get(id);
                     Boolean select = false;
-                    if (constraints.sourceAddressList.isEmpty() || constraints.sourceAddressList.contains(InetAddress.getByName(pflow.source))) {
+                    if (constraints.sourceAddressList.isEmpty() || constraints.sourceAddressList.contains(InetAddress.getByName(pflow.getSource()))) {
                         select = true;
-                    } else if (constraints.destinationAddressList.isEmpty() || constraints.destinationAddressList.contains(InetAddress.getByName(pflow.destination))) {
+                    } else if (constraints.destinationAddressList.isEmpty() || constraints.destinationAddressList.contains(InetAddress.getByName(pflow.getDestination()))) {
                         select = true;
                     }
 
@@ -194,9 +196,9 @@ public class FlowManager {
             }
 
             while ((flow = flowCursor.next()) != null) {
-                statisticsManager.addStatisticalSeconds(new Flow(customer, flow), flow.id, InetAddress.getByName(collector));
+                statisticsManager.addStatisticalSeconds(new Flow(customer, flow), flow.getId(), InetAddress.getByName(collector));
 
-                id = flow.id;
+                id = flow.getId();
                 if (++flowsProcessed % 20000 == 0) {
                     System.out.println("processed " + flowsProcessed + " flows to statistics - pausing at: " + id);
                     break;
