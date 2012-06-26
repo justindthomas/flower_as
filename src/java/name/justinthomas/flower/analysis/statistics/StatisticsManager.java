@@ -3,6 +3,8 @@ package name.justinthomas.flower.analysis.statistics;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -15,7 +17,6 @@ import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.persistence.EntityManager;
 import javax.persistence.NoResultException;
-import javax.persistence.NonUniqueResultException;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpSession;
 import javax.transaction.*;
@@ -81,32 +82,30 @@ public class StatisticsManager {
         }
     }
 
-    public ArrayList<Long> cleanStatisticalIntervals() {
-        /*
-         * HashMap<IntervalKey, Boolean> keys = identifyExpiredIntervals();
-         *
-         * log.debug("Deleting expired intervals...");
-         *
-         * Environment environment; EntityStore entityStore = new
-         * EntityStore(environment = setupEnvironment(), "Statistics",
-         * this.getStoreConfig(false)); StatisticsAccessor dataAccessor = new
-         * StatisticsAccessor(entityStore); int nullIDs = 0; ArrayList<Long>
-         * flowIDs = new ArrayList(); for (Entry<IntervalKey, Boolean> key :
-         * keys.entrySet()) { if (key.getValue()) { for (Long flowID :
-         * dataAccessor.intervalByKey.get(key.getKey()).getFlowIDs()) { if
-         * (flowID != null) { flowIDs.add(flowID); } else { nullIDs++; } } }
-         * dataAccessor.intervalByKey.delete(key.getKey()); }
-         *
-         * log.error("Null flow IDs found in StatisticalIntervals: " + nullIDs);
-         *
-         * closeStore(entityStore); //recordEnvironmentStatistics(environment);
-         * cleanLog(environment); checkpoint(environment);
-         * closeEnvironment(environment);
-         *
-         * return flowIDs;
-         *
-         */
-        return null;
+    public ArrayList<Long> cleanStatisticalIntervals() {      
+          HashMap<Long, Boolean> keys = identifyExpiredIntervals();
+         
+          log.debug("Deleting expired intervals...");
+         
+          int nullIDs = 0;
+          ArrayList<Long> flowIDs = new ArrayList();
+          for (Entry<Long, Boolean> key : keys.entrySet()) {
+              if (key.getValue()) {
+                  for (Long flowID : this.getStatisticalInterval(key.getKey()).getFlowIDs()) {
+                      if (flowID != null) {
+                          flowIDs.add(flowID);
+                      } else {
+                          nullIDs++;
+                      }
+                  }
+              }
+              
+              //dataAccessor.intervalByKey.delete(key.getKey());
+          }
+         
+          log.error("Null flow IDs found in StatisticalIntervals: " + nullIDs);
+         
+          return flowIDs;  
     }
 
     private HashMap<IntervalKey, StatisticalInterval> flowToInterval(Flow flow, Long resolution, Long flowID) {
@@ -125,6 +124,14 @@ public class StatisticsManager {
         }
 
         return normalized;
+    }
+    
+    public StatisticalInterval getStatisticalInterval(Long id) {
+        System.out.println("Retrieving interval: " + id + " from storage.");
+        
+        StatisticalInterval statisticalInterval = (StatisticalInterval) em.find(StatisticalInterval.class, id);
+
+        return statisticalInterval;
     }
 
     public StatisticalInterval getStatisticalInterval(Long resolution, Long interval) {
@@ -151,49 +158,38 @@ public class StatisticsManager {
         System.out.println("Persisting " + intervals.size() + " intervals to long-term storage.");
 
         try {
-            Context initCtx = new InitialContext();
-            UserTransaction utx = (UserTransaction) initCtx.lookup("java:comp/UserTransaction");
-
-            System.out.println("Beginning transaction...");
+            Context context = new InitialContext();
+            UserTransaction utx = (UserTransaction) context.lookup("java:comp/UserTransaction");
 
             for (StatisticalInterval interval : intervals) {
                 if (this.getStatisticalInterval(interval.getResolution(), interval.getStatisticalInterval()) != null) {
-                    System.out.println("interval merge");
                     StatisticalInterval stored = this.getStatisticalInterval(interval.getResolution(), interval.getStatisticalInterval());
                     stored.addInterval(interval);
                     utx.begin();
                     em.merge(stored);
                     utx.commit();
                 } else {
-                    System.out.println("interval persist");
                     utx.begin();
                     em.persist(interval);
                     utx.commit();
                 }
             }
-
-            System.out.println("Transaction completed...");
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("StatisticalInterval storage failed with message: " + e.getMessage());
         }
     }
 
     public void addStatisticalSeconds(Flow flow, Long flowID, InetAddress collector) {
-        CachedStatistics cachedStatistics = null;
+        CachedStatistics cachedStatistics = globalConfigurationManager.getCachedStatistics(customer.getAccount());
 
-        synchronized (globalConfigurationManager) {
+        if (cachedStatistics == null) {
+            globalConfigurationManager.setCachedStatistics(customer.getAccount(), new CachedStatistics(customer));
             cachedStatistics = globalConfigurationManager.getCachedStatistics(customer.getAccount());
-
-            if (cachedStatistics == null) {
-                globalConfigurationManager.setCachedStatistics(customer.getAccount(), new CachedStatistics(customer));
-                cachedStatistics = globalConfigurationManager.getCachedStatistics(customer.getAccount());
-            }
         }
 
         try {
             if (cachedStatistics.hasOtherRepresentation(flow.getSourceAddress(), flow.getDestinationAddress(), collector)) {
-                log.debug("Ignoring duplicate flow from: " + collector.getHostAddress()
-                        + ", already represented by: " + cachedStatistics.getRepresentation(flow.getSourceAddress(), flow.getDestinationAddress()).getHostAddress());
+                log.debug("Ignoring duplicate flow from: " + collector.getHostAddress() + ", already represented by: " + cachedStatistics.getRepresentation(flow.getSourceAddress(), flow.getDestinationAddress()).getHostAddress());
                 return;
             }
         } catch (Exception e) {
@@ -249,259 +245,254 @@ public class StatisticsManager {
     }
 
     public StatisticalCube getCube() {
-        /*
-         * Environment environment; EntityStore store = new
-         * EntityStore(environment = setupEnvironment(), "Statistics",
-         * this.getStoreConfig(false));
-         *
-         * try { StatisticsAccessor accessor = new StatisticsAccessor(store);
-         * StatisticalCube cube =
-         * accessor.cubesByCustomer.get(customer.getAccount()); if (cube !=
-         * null) { log.debug("Retrieved cubes for customer: " + customer.getId()
-         * + " with " + cube.getStatistics().size() + " mappings"); } return
-         * cube; } finally { closeStore(store); closeEnvironment(environment); }
-         *
-         */
-        return null;
+        System.out.println("Retrieving cube for " + customer.getAccount() + " from storage.");
+        StatisticalCube statisticalCube = null;
+
+        List<StatisticalCube> statisticalCubes = (List<StatisticalCube>) em.createQuery(
+                "SELECT s FROM StatisticalCube s WHERE s.accountId LIKE :accountid")
+                    .setParameter("accountid", customer.getAccount())
+                    .getResultList();
+
+        if (statisticalCubes.size() > 1) {
+            System.err.println("StatisticsManager: too many results");
+        } else if (!statisticalCubes.isEmpty()) {
+            statisticalCube = statisticalCubes.get(0);
+        }
+
+        return statisticalCube;
     }
 
     public void storeCube(StatisticalCube cube) {
-        /*
-         * Environment environment; EntityStore store = new
-         * EntityStore(environment = setupEnvironment(), "Statistics",
-         * this.getStoreConfig(false));
-         *
-         * log.debug("Beginning cube storage routine"); if (cube.getStatistics()
-         * != null) { try { StatisticsAccessor accessor = new
-         * StatisticsAccessor(store); log.debug("Storing cubes for customer: " +
-         * customer.getId() + " with " + cube.getStatistics().size() + "
-         * mappings"); accessor.cubesByCustomer.put(cube); } catch (Throwable t)
-         * { log.error(t.toString()); } finally { closeStore(store);
-         * closeEnvironment(environment); } } else { log.debug("Cube has no
-         * statistics yet."); } log.debug("Cube storage complete.");
-         *
-         */
+        System.out.println("Persisting cube for " + cube.getAccountId() + " to long-term storage.");
+
+        try {
+            Context context = new InitialContext();
+            UserTransaction utx = (UserTransaction) context.lookup("java:comp/UserTransaction");
+
+            if (this.getCube() != null) {
+                utx.begin();
+                em.merge(cube);
+                utx.commit();
+            } else {
+                utx.begin();
+                em.persist(cube);
+                utx.commit();
+            }
+        } catch (Exception e) {
+            log.error("StatisticalCube storage failed with message: " + e.getMessage());
+        }
     }
 
-    public List<StatisticalInterval> getStatisticalIntervals(HttpSession session, Constraints constraints, Integer resolution) {
+    public List<StatisticalInterval> getStatisticalIntervals(Constraints constraints, Integer resolution) {
+        return this.getStatisticalIntervals(constraints.startTime.getTime(), constraints.endTime.getTime(), resolution);
+    }
+    
+    public List<StatisticalInterval> getStatisticalIntervals(Long startTime, Long endTime, Integer resolution) {
         List<StatisticalInterval> intervals = null;
 
-        Long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
+        Long duration = endTime - startTime;
         Long r = (resolution != null) ? resolution : getResolution(duration, null);
 
-        Long start = constraints.startTime.getTime() / r;
+        Long start = startTime / r;
         IntervalKey startKey = new IntervalKey(start, r);
-        Long end = constraints.endTime.getTime() / r;
+        Long end = endTime / r;
         IntervalKey endKey = new IntervalKey(end, r);
 
         try {
             intervals = (List<StatisticalInterval>) em.createQuery(
                     "SELECT s FROM StatisticalInterval s WHERE s.accountId LIKE :accountid AND s.key >= :start AND s.key <= :end").setParameter("accountid", customer.getAccount()).setParameter("resolution", r).setParameter("start", startKey).setParameter("end", endKey).getResultList();
         } catch (NoResultException nre) {
-            System.err.println("StatisticsManager: no result");
-            nre.printStackTrace();
+            log.error("StatisticsManager: no result");
         }
-        /*
-         * LinkedList<StatisticalInterval> intervals = new LinkedList();
-         *
-         * Long duration = constraints.endTime.getTime() -
-         * constraints.startTime.getTime(); Environment environment; Long r =
-         * (resolution != null) ? resolution : getResolution(duration, null);
-         *
-         * EntityStore store = new EntityStore(environment = setupEnvironment(),
-         * "Statistics", this.getStoreConfig(true)); StatisticsAccessor accessor
-         * = new StatisticsAccessor(store); Long start =
-         * constraints.startTime.getTime() / r; IntervalKey startKey = new
-         * IntervalKey(start, r); Long end = constraints.endTime.getTime() / r;
-         * IntervalKey endKey = new IntervalKey(end, r);
-         *
-         * EntityCursor<StatisticalInterval> cursor =
-         * accessor.intervalByKey.entities(startKey, true, endKey, true);
-         *
-         * for (StatisticalInterval interval : cursor) {
-         * intervals.add(interval); }
-         *
-         * cursor.close(); closeStore(store); closeEnvironment(environment);
-         *
-         * return intervals;
-         *
-         */
+
         return intervals;
     }
 
     public LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> getVolumeByTime(Constraints constraints, Integer bins)
             throws ClassNotFoundException {
 
-        /*
-         * LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>>
-         * consolidated = new LinkedHashMap();
-         *
-         * if ((constraints.startTime == null) || (constraints.endTime == null)
-         * || (bins == null) || (constraints.startTime.getTime() >=
-         * constraints.endTime.getTime())) { return consolidated; }
-         *
-         * DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd
-         * HH:mm:ss.SSS"); log.debug("Requesting volume data from " +
-         * dateFormat.format(constraints.startTime) + " to " +
-         * dateFormat.format(constraints.endTime)); log.debug("Populating
-         * consolidated map"); Long duration = constraints.endTime.getTime() -
-         * constraints.startTime.getTime(); log.debug("Duration: " + duration);
-         *
-         * Long interval = duration / bins;
-         *
-         * // Populate consolidated with an entry for each minute that we want
-         * to graph int j; for (j = 0; j < bins;) { HashMap<String,
-         * HashMap<Integer, Long>> interim = new HashMap();
-         * interim.put("versions", new HashMap<Integer, Long>());
-         * interim.put("types", new HashMap<Integer, Long>());
-         * interim.put("tcp", new HashMap<Integer, Long>()); interim.put("udp",
-         * new HashMap<Integer, Long>());
-         *
-         * consolidated.put(new Date(constraints.startTime.getTime() + (j++ *
-         * interval)), interim); }
-         *
-         * log.debug("Iterating over flow volumes in database");
-         *
-         * Long resolution = getResolution(duration, bins);
-         *
-         * if (resolution == null) { log.error("automatically selected
-         * resolution is null; no resolution is granular enough to support the
-         * number of bins selected over the selected time period"); return null;
-         * }
-         *
-         * Long start = constraints.startTime.getTime() / resolution;
-         * IntervalKey startKey = new IntervalKey(start, resolution); Long end =
-         * constraints.endTime.getTime() / resolution; IntervalKey endKey = new
-         * IntervalKey(end, resolution); //log.debug("Start: " + start + ", End:
-         * " + end); Integer flowsProcessed = 0;
-         *
-         * while (startKey.getStatisticalInterval().longValue() <
-         * endKey.getStatisticalInterval().longValue()) { log.debug("start: " +
-         * startKey.getStatisticalInterval() + ", end: " +
-         * endKey.getStatisticalInterval()); Environment environment;
-         * EntityStore store = new EntityStore(environment = setupEnvironment(),
-         * "Statistics", this.getStoreConfig(true)); StatisticsAccessor accessor
-         * = new StatisticsAccessor(store);
-         *
-         * EntityCursor<StatisticalInterval> cursor =
-         * accessor.intervalByKey.entities(startKey, true, endKey, true);
-         *
-         * log.debug("Iterating over volume query results.");
-         *
-         * boolean stopped = false;
-         *
-         * try { try { try { for (StatisticalInterval second : cursor) {
-         * startKey = second.key;
-         *
-         * if (second.key.getResolution().longValue() != resolution.longValue())
-         * { log.debug("skipping resolution: " + second.key.getResolution());
-         * continue; }
-         *
-         * if (++flowsProcessed % 500 == 0) { log.debug("StatisticalSeconds
-         * processed: " + flowsProcessed); stopped = true; break; }
-         *
-         * stopped = false;
-         *
-         * HashMap<Integer, Long> versions = new HashMap(); HashMap<Integer,
-         * Long> types = new HashMap(); HashMap<Integer, Long> tcp = new
-         * HashMap(); HashMap<Integer, Long> udp = new HashMap();
-         *
-         * for (StatisticalFlow entry : second.getFlows().values()) { try { for
-         * (Entry<StatisticalFlowDetail, Long> volume :
-         * entry.getCount().entrySet()) { if
-         * (volume.getKey().getType().equals(StatisticalFlowDetail.Count.BYTE))
-         * {
-         *
-         * if (types.containsKey(volume.getKey().getProtocol())) {
-         * types.put(volume.getKey().getProtocol(),
-         * types.get(volume.getKey().getProtocol()) + volume.getValue()); } else
-         * { types.put(volume.getKey().getProtocol(), volume.getValue()); }
-         *
-         * if (volume.getKey().getProtocol() == 6) { if
-         * (tcp.containsKey(volume.getKey().getDestination())) {
-         * tcp.put(volume.getKey().getDestination(),
-         * tcp.get(volume.getKey().getDestination()) + volume.getValue()); }
-         * else { tcp.put(volume.getKey().getDestination(), volume.getValue());
-         * } }
-         *
-         * if (volume.getKey().getProtocol() == 17) { if
-         * (udp.containsKey(volume.getKey().getDestination())) {
-         * udp.put(volume.getKey().getDestination(),
-         * udp.get(volume.getKey().getDestination()) + volume.getValue()); }
-         * else { udp.put(volume.getKey().getDestination(), volume.getValue());
-         * } }
-         *
-         * if
-         * (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV4))
-         * { if (versions.containsKey(4)) { versions.put(4, versions.get(4) +
-         * volume.getValue()); } else { versions.put(4, volume.getValue()); } }
-         * else if
-         * (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV6))
-         * { if (versions.containsKey(6)) { versions.put(6, versions.get(6) +
-         * volume.getValue()); } else { versions.put(6, volume.getValue()); } }
-         * }
-         *
-         * }
-         * } catch (NullPointerException e) { log.error("Unexpected NULL field
-         * encountered. This is probably a result of bad data in the database
-         * (perhaps an interrupted insert?)"); continue; } }
-         *
-         * // Iterate over the bins in consolidated for (Date bin :
-         * consolidated.keySet()) { if (Thread.currentThread().isInterrupted())
-         * { throw new InterruptedException(); }
-         *
-         * if (new Date(second.getKey().getStatisticalInterval() *
-         * resolution).after(new Date(bin.getTime())) && new
-         * Date(second.getKey().getStatisticalInterval() *
-         * resolution).before(new Date(bin.getTime() + interval))) { if
-         * (!types.isEmpty()) { for (Integer type : types.keySet()) { if
-         * (consolidated.get(bin).get("types").containsKey(type)) {
-         * consolidated.get(bin).get("types").put(type,
-         * consolidated.get(bin).get("types").get(type) + types.get(type)); }
-         * else { consolidated.get(bin).get("types").put(type, types.get(type));
-         * } } }
-         *
-         * if (!tcp.isEmpty()) { for (Integer destination : tcp.keySet()) { if
-         * (consolidated.get(bin).get("tcp").containsKey(destination)) {
-         * consolidated.get(bin).get("tcp").put(destination,
-         * consolidated.get(bin).get("tcp").get(destination) +
-         * tcp.get(destination)); } else {
-         * consolidated.get(bin).get("tcp").put(destination,
-         * tcp.get(destination)); } } }
-         *
-         * if (!udp.isEmpty()) { for (Integer destination : udp.keySet()) { if
-         * (consolidated.get(bin).get("udp").containsKey(destination)) {
-         * consolidated.get(bin).get("udp").put(destination,
-         * consolidated.get(bin).get("udp").get(destination) +
-         * udp.get(destination)); } else {
-         * consolidated.get(bin).get("udp").put(destination,
-         * udp.get(destination)); } } }
-         *
-         * if (!versions.isEmpty()) { for (Integer version : versions.keySet())
-         * { if (consolidated.get(bin).get("versions").containsKey(version)) {
-         * consolidated.get(bin).get("versions").put(version,
-         * consolidated.get(bin).get("versions").get(version) +
-         * versions.get(version)); } else {
-         * consolidated.get(bin).get("versions").put(version,
-         * versions.get(version)); } } } } }
-         *
-         * if (Thread.currentThread().isInterrupted()) {
-         * log.debug("StatisticsManager was interrupted"); throw new
-         * InterruptedException(); } }
-         *
-         * if (!stopped) { endKey = startKey; } } catch (DatabaseException e) {
-         * log.error("Database error: " + e.getMessage()); } finally {
-         * cursor.close(); } } catch (DatabaseException e) { log.error("Database
-         * error: " + e.getMessage()); } finally { closeStore(store); } } catch
-         * (InterruptedException ie) { log.error("Stopping StatisticsManager
-         * during Volume build..."); } finally { closeEnvironment(environment);
-         * } System.gc(); }
-         *
-         * log.debug("Returning from FlowManager:getVolumeByTime"); return
-         * consolidated;
-         *
-         */
-        return null;
+        LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> consolidated = new LinkedHashMap();
+
+        if ((constraints.startTime == null) || (constraints.endTime == null) || (bins == null) || (constraints.startTime.getTime() >= constraints.endTime.getTime())) {
+            return consolidated;
+        }
+
+        DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        log.debug("Requesting volume data from " + dateFormat.format(constraints.startTime) + " to " + dateFormat.format(constraints.endTime));
+        log.debug("Populating consolidated map ");
+        Long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
+        log.debug("Duration: " + duration);
+
+        Long interval = duration / bins;
+
+        // Populate consolidated with an entry for each minute that we want to graph
+        int j;
+        for (j = 0; j < bins;) {
+            HashMap<String, HashMap<Integer, Long>> interim = new HashMap();
+            interim.put("versions", new HashMap<Integer, Long>());
+            interim.put("types", new HashMap<Integer, Long>());
+            interim.put("tcp", new HashMap<Integer, Long>());
+            interim.put("udp", new HashMap<Integer, Long>());
+
+            consolidated.put(new Date(constraints.startTime.getTime() + (j++ * interval)), interim);
+        }
+
+        log.debug("Iterating over flow volumes in database");
+
+        Long resolution = getResolution(duration, bins);
+
+        if (resolution == null) {
+            log.error("automatically selected resolution is null; no resolution is granular enough to support the number of bins selected over the selected time period");
+            return null;
+        }
+
+        Long start = constraints.startTime.getTime() / resolution;
+        IntervalKey startKey = new IntervalKey(start, resolution);
+        Long end = constraints.endTime.getTime() / resolution;
+        IntervalKey endKey = new IntervalKey(end, resolution);
+        //log.debug("Start: " + start + ", End:" + end); Integer flowsProcessed = 0;
+
+        while (startKey.getStatisticalInterval().longValue() < endKey.getStatisticalInterval().longValue()) {
+            log.debug("start: " + startKey.getStatisticalInterval() + ", end: " + endKey.getStatisticalInterval());
+
+            List<StatisticalInterval> intervals = this.getStatisticalIntervals(constraints, bins);
+
+            boolean stopped = false;
+
+            try {
+                for (StatisticalInterval second : intervals) {
+                    startKey = new IntervalKey(second.getResolution(), second.getStatisticalInterval());
+
+                    if (second.getResolution().longValue() != resolution.longValue()) {
+                        log.debug("skipping resolution: " + second.getResolution());
+                        continue;
+                    }
+
+                    stopped = false;
+
+                    HashMap<Integer, Long> versions = new HashMap();
+                    HashMap<Integer, Long> types = new HashMap();
+                    HashMap<Integer, Long> tcp = new HashMap();
+                    HashMap<Integer, Long> udp = new HashMap();
+
+                    for (StatisticalFlow entry : second.getFlows().values()) {
+                        try {
+                            for (Entry<StatisticalFlowDetail, Long> volume :
+                                    entry.getCount().entrySet()) {
+                                if (volume.getKey().getType().equals(StatisticalFlowDetail.Count.BYTE)) {
+
+                                    if (types.containsKey(volume.getKey().getProtocol())) {
+                                        types.put(volume.getKey().getProtocol(), types.get(volume.getKey().getProtocol()) + volume.getValue());
+                                    } else {
+                                        types.put(volume.getKey().getProtocol(), volume.getValue());
+                                    }
+
+                                    if (volume.getKey().getProtocol() == 6) {
+                                        if (tcp.containsKey(volume.getKey().getDestination())) {
+                                            tcp.put(volume.getKey().getDestination(), tcp.get(volume.getKey().getDestination()) + volume.getValue());
+                                        } else {
+                                            tcp.put(volume.getKey().getDestination(), volume.getValue());
+                                        }
+                                    }
+
+                                    if (volume.getKey().getProtocol() == 17) {
+                                        if (udp.containsKey(volume.getKey().getDestination())) {
+                                            udp.put(volume.getKey().getDestination(), udp.get(volume.getKey().getDestination()) + volume.getValue());
+                                        } else {
+                                            udp.put(volume.getKey().getDestination(), volume.getValue());
+                                        }
+                                    }
+
+                                    if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV4)) {
+                                        if (versions.containsKey(4)) {
+                                            versions.put(4, versions.get(4) + volume.getValue());
+                                        } else {
+                                            versions.put(4, volume.getValue());
+                                        }
+                                    } else if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV6)) {
+                                        if (versions.containsKey(6)) {
+                                            versions.put(6, versions.get(6) + volume.getValue());
+                                        } else {
+                                            versions.put(6, volume.getValue());
+                                        }
+                                    }
+                                }
+
+                            }
+                        } catch (NullPointerException e) {
+                            log.error(
+                                    "Unexpected NULL field encountered.This is probably a result of bad data in the database(perhaps  an interrupted insert ?)");
+                            continue;
+                        }
+                    }
+
+                    // Iterate over the bins in consolidated 
+                    for (Date bin : consolidated.keySet()) {
+                        if (Thread.currentThread().isInterrupted()) {
+                            throw new InterruptedException();
+                        }
+
+                        if (new Date(second.getStatisticalInterval()
+                                * resolution).after(new Date(bin.getTime())) && new Date(second.getStatisticalInterval()
+                                * resolution).before(new Date(bin.getTime() + interval))) {
+                            if (!types.isEmpty()) {
+                                for (Integer type : types.keySet()) {
+                                    if (consolidated.get(bin).get("types").containsKey(type)) {
+                                        consolidated.get(bin).get("types").put(type, consolidated.get(bin).get("types").get(type) + types.get(type));
+                                    } else {
+                                        consolidated.get(bin).get("types").put(type, types.get(type));
+                                    }
+                                }
+                            }
+
+                            if (!tcp.isEmpty()) {
+                                for (Integer destination : tcp.keySet()) {
+                                    if (consolidated.get(bin).get("tcp").containsKey(destination)) {
+                                        consolidated.get(bin).get("tcp").put(destination, consolidated.get(bin).get("tcp").get(destination) + tcp.get(destination));
+                                    } else {
+                                        consolidated.get(bin).get("tcp").put(destination, tcp.get(destination));
+                                    }
+                                }
+                            }
+
+                            if (!udp.isEmpty()) {
+                                for (Integer destination : udp.keySet()) {
+                                    if (consolidated.get(bin).get("udp").containsKey(destination)) {
+                                        consolidated.get(bin).get("udp").put(destination, consolidated.get(bin).get("udp").get(destination) + udp.get(destination));
+                                    } else {
+                                        consolidated.get(bin).get("udp").put(destination, udp.get(destination));
+                                    }
+                                }
+                            }
+
+                            if (!versions.isEmpty()) {
+                                for (Integer version : versions.keySet()) {
+                                    if (consolidated.get(bin).get("versions").containsKey(version)) {
+                                        consolidated.get(bin).get("versions").put(version, consolidated.get(bin).get("versions").get(version) + versions.get(version));
+                                    } else {
+                                        consolidated.get(bin).get("versions").put(version, versions.get(version));
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (Thread.currentThread().isInterrupted()) {
+                        log.debug("StatisticsManager was interrupted");
+                        throw new InterruptedException();
+                    }
+                }
+
+                if (!stopped) {
+                    endKey = startKey;
+                }
+            } catch (InterruptedException ie) {
+                log.error("Stopping StatisticsManager during Volume build ...");
+            }
+        }
+
+        log.debug("Returning from FlowManager:getVolumeByTime");
+        return consolidated;
     }
 
     public StatisticalFlow setDefault(ArrayList<Network> networks, StatisticalFlow flow) throws UnknownHostException {
@@ -781,54 +772,32 @@ public class StatisticsManager {
         return null;
     }
 
-    private HashMap<IntervalKey, Boolean> identifyExpiredIntervals() {
-        /*
-         * log.debug("Identifying expired intervals...");
-         *
-         * Environment environment; EntityStore entityStore = new
-         * EntityStore(environment = setupEnvironment(), "Statistics",
-         * this.getStoreConfig(true)); StatisticsAccessor dataAccessor = new
-         * StatisticsAccessor(entityStore);
-         *
-         * Date now = new Date(); Date start = new Date(); start.setTime(0l);
-         *
-         * HashMap<IntervalKey, Boolean> expiredIntervals = new HashMap();
-         *
-         * for (Entry<Long, Boolean> resolution :
-         * globalConfigurationManager.getResolutionMap().entrySet()) {
-         * IntervalKey startKey = new IntervalKey();
-         * startKey.setResolution(resolution.getKey());
-         * startKey.setStatisticalInterval(start.getTime() /
-         * resolution.getKey());
-         *
-         * IntervalKey endKey = new IntervalKey();
-         * endKey.setResolution(resolution.getKey());
-         * endKey.setStatisticalInterval((now.getTime() / resolution.getKey()) -
-         * 100000); // The above line keeps 100000 of any resolution around. At
-         * it's most fine (10000 ms), this is about a week and a half. // At
-         * it's most coarse (10000000 ms), this is about 30 years.
-         *
-         * EntityCursor<StatisticalInterval> cursor =
-         * dataAccessor.intervalByKey.entities(startKey, true, endKey, true);
-         *
-         * Integer intervalsDeleted = 0;
-         *
-         * for (StatisticalInterval statisticalInterval : cursor) {
-         * expiredIntervals.put(statisticalInterval.key, resolution.getValue());
-         *
-         * if (++intervalsDeleted % 1000 == 0) { log.debug(intervalsDeleted + "
-         * intervals marked for deletion at a resolution of " + resolution + "
-         * milliseconds..."); } }
-         *
-         * log.debug(intervalsDeleted + " total seconds marked for deletion at a
-         * resolution of " + resolution + " milliseconds..."); cursor.close(); }
-         *
-         * closeStore(entityStore); closeEnvironment(environment);
-         *
-         * return expiredIntervals;
-         *
-         */
-        return null;
+    private HashMap<Long, Boolean> identifyExpiredIntervals() {
+          log.debug("Identifying expired intervals...");
+         
+          Date expiration = new Date();
+          expiration.setTime(expiration.getTime() - 7776000);
+          Date start = new Date();
+          start.setTime(0l);
+         
+          HashMap<Long, Boolean> expiredIntervals = new HashMap();
+         
+          for (Entry<Long, Boolean> resolution : globalConfigurationManager.getResolutionMap().entrySet()) {
+            List<StatisticalInterval> intervals = this.getStatisticalIntervals(start.getTime(), expiration.getTime(), resolution.getKey().intValue());
+            Integer intervalsDeleted = 0;
+
+            for (StatisticalInterval statisticalInterval : intervals) {
+                expiredIntervals.put(statisticalInterval.getId(), resolution.getValue());
+
+                if (++intervalsDeleted % 1000 == 0) {
+                    log.debug(intervalsDeleted + "intervals marked for deletion at a resolution of " + resolution + "milliseconds...");
+                }
+            }
+         
+            log.debug(intervalsDeleted + " total seconds marked for deletion at a resolution of " + resolution + " milliseconds...");
+          }
+         
+          return expiredIntervals;
     }
 
     class NameResolution {

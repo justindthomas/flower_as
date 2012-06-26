@@ -178,7 +178,7 @@ public class ChartData {
         }
 
         StatisticsManager statisticsManager = new StatisticsManager(customer);
-        return statisticsManager.getStatisticalIntervals(null, new Constraints(constraints), resolution);
+        return statisticsManager.getStatisticalIntervals(new Constraints(constraints), resolution);
     }
 
     /**

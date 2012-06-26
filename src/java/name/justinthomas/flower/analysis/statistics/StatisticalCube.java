@@ -1,9 +1,11 @@
 package name.justinthomas.flower.analysis.statistics;
 
-import com.sleepycat.persist.model.Entity;
-import com.sleepycat.persist.model.PrimaryKey;
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
 import name.justinthomas.flower.analysis.statistics.StatisticalEngine.Cube;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math.stat.descriptive.SynchronizedDescriptiveStatistics;
@@ -13,19 +15,29 @@ import org.apache.commons.math.stat.descriptive.SynchronizedDescriptiveStatistic
  * @author justin
  */
 @Entity
-public class StatisticalCube {
-    @PrimaryKey
-    private String customerID;
+public class StatisticalCube implements Serializable {
+    private Long id;
+    private String accountId;
     private HashMap<String, HashMap<String, HashMap<Cube, double[]>>> statistics;
+    
+    @Id
+    @GeneratedValue
+    public Long getId() {
+        return this.id;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
+    }
     
     public StatisticalCube() {
         statistics = new HashMap();
     }
 
-    public StatisticalCube(String customerID, ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics) {
+    public StatisticalCube(String accountId, ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<Cube, DescriptiveStatistics>>> statistics) {
         this();
         
-        this.customerID = customerID;
+        this.accountId = accountId;
         
         for(String source : statistics.keySet()) {
             if(!this.statistics.containsKey(source)) {
@@ -45,18 +57,18 @@ public class StatisticalCube {
     }
     
     
-    public StatisticalCube(String customerID) {
+    public StatisticalCube(String accountId) {
         this();
         
-        this.customerID = customerID;
+        this.accountId = accountId;
     }
 
-    public String getCustomerID() {
-        return customerID;
+    public String getAccountId() {
+        return accountId;
     }
 
-    public void setCustomerID(String customerID) {
-        this.customerID = customerID;
+    public void setAccountId(String accountId) {
+        this.accountId = accountId;
     }
 
     public HashMap<String, HashMap<String, HashMap<Cube, double[]>>> getStatistics() {
