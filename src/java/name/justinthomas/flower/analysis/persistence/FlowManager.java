@@ -1,114 +1,53 @@
 package name.justinthomas.flower.analysis.persistence;
 
-import name.justinthomas.flower.global.GlobalConfigurationManager;
-import com.sleepycat.je.CheckpointConfig;
-import com.sleepycat.je.DatabaseException;
-import name.justinthomas.flower.analysis.statistics.StatisticsManager;
-import com.sleepycat.je.Environment;
-import com.sleepycat.je.EnvironmentConfig;
-import com.sleepycat.je.StatsConfig;
-import com.sleepycat.persist.EntityStore;
-import com.sleepycat.persist.ForwardCursor;
-import com.sleepycat.persist.StoreConfig;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.ArrayList;
-
-import java.net.InetAddress;
-import name.justinthomas.flower.analysis.element.Flow;
-import name.justinthomas.flower.analysis.element.Network;
-import java.net.UnknownHostException;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
-import javax.transaction.UserTransaction;
+import javax.transaction.*;
+import name.justinthomas.flower.analysis.element.Flow;
+import name.justinthomas.flower.analysis.element.Network;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolume;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
-import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
+import name.justinthomas.flower.analysis.statistics.StatisticsManager;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 
+@PersistenceContext(name = "persistence/Analysis", unitName = "AnalysisPU")
 public class FlowManager {
 
     private Customer customer;
-    private static final Integer DEBUG = 2;
-    private GlobalConfigurationManager configurationManager;
+    private GlobalConfigurationManager globalConfigurationManager;
+    private EntityManager em;
+    private UserTransaction utx;
+    private Context envCtx;
+
 
     public FlowManager(Customer customer) {
         this.customer = customer;
 
         try {
-            configurationManager = InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+            this.globalConfigurationManager = InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+        } catch (NamingException e) {
+            e.printStackTrace();
+        }
+        
+        try {
+            this.envCtx = new InitialContext();
+            this.em = (EntityManager) envCtx.lookup("java:comp/env/persistence/Analysis");
+            this.utx = (UserTransaction)envCtx.lookup("java:comp/UserTransaction");
         } catch (NamingException e) {
             e.printStackTrace();
         }
     }
 
-    private Environment setupEnvironment() {
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/flows");
-
-        try {
-            if (!environmentHome.exists()) {
-                if (!environmentHome.mkdirs()) {
-                    throw new Exception("Could not open or create base statistics directory.");
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
-        }
-
-        EnvironmentConfig environmentConfig = new EnvironmentConfig();
-
-        environmentConfig.setAllowCreate(true);
-        environmentConfig.setReadOnly(false);
-        environmentConfig.setLockTimeout(15, TimeUnit.SECONDS);
-
-        Environment environment = new Environment(environmentHome, environmentConfig);
-        return environment;
-    }
-
-    private void closeEnvironment(Environment environment) {
-        if (environment != null) {
-            try {
-                environment.close();
-            } catch (DatabaseException e) {
-                System.err.println("Error closing environment: " + e.toString());
-            } catch (IllegalStateException e) {
-                System.err.println("Error closing environment: " + e.toString());
-            }
-        }
-    }
-
-    private StoreConfig getStoreConfig(Boolean readOnly) {
-        StoreConfig storeConfig = new StoreConfig();
-        storeConfig.setAllowCreate(true);
-        if (readOnly) {
-            storeConfig.setReadOnly(true);
-        } else {
-            storeConfig.setReadOnly(false);
-        }
-        //storeConfig.setDeferredWrite(true);
-
-        return storeConfig;
-    }
-
-    private void closeStore(EntityStore store) {
-        try {
-            store.close();
-        } catch (DatabaseException e) {
-            System.err.println("Error closing EntityStore: " + e.getMessage());
-        }
-    }
-
     public void getFlows(HttpSession session, String constraintsString, String tracker) {
-
+        /*
         System.out.println("getFlows called.");
         Constraints constraints = new Constraints(constraintsString);
         SessionManager.getFlows(session, tracker).clear();
@@ -128,10 +67,6 @@ public class FlowManager {
         Environment environment;
         EntityStore readOnlyEntityStore = new EntityStore(environment = setupEnvironment(), "Flow", this.getStoreConfig(true));
         FlowAccessor dataAccessor = new FlowAccessor(readOnlyEntityStore);
-
-        if (DEBUG >= 1) {
-            System.out.println("Iterating over query results.");
-        }
 
         Integer flowsProcessed = 0;
         try {
@@ -169,10 +104,13 @@ public class FlowManager {
             closeStore(readOnlyEntityStore);
             closeEnvironment(environment);
         }
+        * 
+        */
     }
 
     public Long rebuildStatistics(String collector, Long start) {
 
+        /*
         StatisticsManager statisticsManager = new StatisticsManager(customer);
 
         Environment environment;
@@ -220,6 +158,9 @@ public class FlowManager {
         }
 
         return id;
+        * 
+        */
+        return null;
     }
 
     public XMLDataVolumeList getXMLDataVolumes(HttpSession session, String constr, Integer nmb_bins) {
@@ -342,6 +283,7 @@ public class FlowManager {
     }
 
     public void cleanFlows(ArrayList<Long> flowIDs) {
+        /*
         System.out.println("Deleting expired flows...");
 
         Environment environment;
@@ -366,35 +308,52 @@ public class FlowManager {
         cleanLog(environment);
         checkpoint(environment);
         closeEnvironment(environment);
+        * 
+        */
     }
 
-    private void cleanLog(Environment environment) {
+    public LinkedList<Long> addFlows(String sender, LinkedList<Flow> flows) {
+        return this.addFlows(sender, flows, null);
+    }
+
+    private void addFlow(PersistentFlow flow) {
         try {
-            environment.cleanLog();
-        } catch (DatabaseException e) {
-            System.err.println("Error running cleanLog: " + e.getMessage());
+            utx.begin();
+            em.persist(flow);
+            utx.commit();
+        } catch (NullPointerException npe) {
+            npe.printStackTrace();
+        } catch (NotSupportedException nse) {
+            nse.printStackTrace();
+        } catch (RollbackException rbe) {
+            rbe.printStackTrace();
+        } catch (HeuristicMixedException hme) {
+            hme.printStackTrace();
+        } catch (HeuristicRollbackException hrbe) {
+            hrbe.printStackTrace();
+        } catch (SystemException se) {
+            se.printStackTrace();
         }
     }
 
-    private void checkpoint(Environment environment) {
-        CheckpointConfig checkpointConfig = new CheckpointConfig();
-        try {
-            environment.checkpoint(checkpointConfig);
-        } catch (DatabaseException e) {
-            System.err.println("Error running checkpoint: " + e.getMessage());
-        }
-    }
+    public LinkedList<Long> addFlows(String sender, LinkedList<Flow> flows, HttpServletRequest request) {
+        LinkedList<Long> ids = new LinkedList();
 
-    private void recordEnvironmentStatistics(Environment environment) {
         try {
-            FileWriter writer = new FileWriter("/traces/databasestatistics.txt", true);
-            writer.append("Date: " + new Date() + "\n");
-            StatsConfig config = new StatsConfig();
-            config.setClear(true);
-            writer.append(environment.getStats(config).toStringVerbose());
-            writer.close();
-        } catch (IOException ioe) {
-            System.err.println("Error writing database statistics: " + ioe.getMessage());
+            for (Flow flow : flows) {
+                if ((flow.protocol == 6) || (flow.protocol == 17)) {
+                    globalConfigurationManager.addFrequency(customer, flow.protocol, flow.ports);
+                }
+
+                PersistentFlow pflow = flow.toHashTableFlow();
+                this.addFlow(pflow);
+
+                ids.add(pflow.getId());
+            }
+        } catch (Exception e) {
+            System.err.println(e.getMessage());
         }
+
+        return ids;
     }
 }

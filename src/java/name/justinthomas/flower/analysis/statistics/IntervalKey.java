@@ -69,4 +69,9 @@ public class IntervalKey implements Serializable {
         hash = 43 * hash + (this.resolution != null ? this.resolution.hashCode() : 0);
         return hash;
     }
+    
+    @Override
+    public String toString() {
+        return this.resolution + ":" + this.statisticalInterval;
+    }
 }

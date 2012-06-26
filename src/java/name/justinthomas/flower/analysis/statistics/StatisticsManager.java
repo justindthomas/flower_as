@@ -1,6 +1,5 @@
 package name.justinthomas.flower.analysis.statistics;
 
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -9,13 +8,14 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.persistence.EntityManager;
+import javax.persistence.NoResultException;
+import javax.persistence.NonUniqueResultException;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpSession;
 import javax.transaction.*;
@@ -40,15 +40,23 @@ public class StatisticsManager {
 
     private static final Logger log = Logger.getLogger(StatisticsManager.class.getName());
     private static FileAppender fileAppender;
-    private static final GlobalConfigurationManager globalConfigurationManager = StatisticsManager.getGlobalConfigurationManager();
-    private Customer customer;
-    private HashMap<String, NameResolution> resolver = new HashMap();
-    private Context envCtx;
+    private GlobalConfigurationManager globalConfigurationManager;
     private EntityManager em;
+    private Customer customer;
 
     private static GlobalConfigurationManager getGlobalConfigurationManager() {
         try {
-            return InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+            return (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+        } catch (NamingException e) {
+            log.error(e.getMessage());
+        }
+
+        return null;
+    }
+
+    public static EntityManager getEntityManager() {
+        try {
+            return (EntityManager) InitialContext.doLookup("java:comp/env/persistence/Analysis");
         } catch (NamingException e) {
             log.error(e.getMessage());
         }
@@ -58,13 +66,8 @@ public class StatisticsManager {
 
     public StatisticsManager(Customer customer) {
         this.customer = customer;
-
-        try {
-            envCtx = new InitialContext();
-            em = (EntityManager) envCtx.lookup("java:comp/env/persistence/Analysis");
-        } catch (NamingException e) {
-            log.error(e.getMessage());
-        }
+        this.globalConfigurationManager = StatisticsManager.getGlobalConfigurationManager();
+        this.em = StatisticsManager.getEntityManager();
 
         if (fileAppender == null) {
             try {
@@ -76,8 +79,6 @@ public class StatisticsManager {
                 log.error(e.getMessage());
             }
         }
-
-
     }
 
     public ArrayList<Long> cleanStatisticalIntervals() {
@@ -108,62 +109,73 @@ public class StatisticsManager {
         return null;
     }
 
-    private HashMap<IntervalKey, StatisticalInterval> flowToInterval(Flow flow, Long interval, Long flowID) {
+    private HashMap<IntervalKey, StatisticalInterval> flowToInterval(Flow flow, Long resolution, Long flowID) {
         HashMap<IntervalKey, StatisticalInterval> normalized = new HashMap<IntervalKey, StatisticalInterval>();
 
-        Long startSecond = (flow.startTimeStamp.getTime() / interval);
-        Long endSecond = (flow.lastTimeStamp.getTime() / interval);
+        Long startSecond = (flow.startTimeStamp.getTime() / resolution);
+        Long endSecond = (flow.lastTimeStamp.getTime() / resolution);
         Long spread = endSecond - startSecond;
 
-        for (long l = startSecond; l <= endSecond; l++) {
+        for (long interval = startSecond; interval <= endSecond; interval++) {
             StatisticalInterval sInterval = new StatisticalInterval();
-            sInterval.key = new IntervalKey(l, interval);
-            normalized.put(new IntervalKey(l, interval), sInterval.addFlow(new StatisticalFlow(spread, flow), flowID));
+            sInterval.setAccountId(customer.getAccount());
+            sInterval.setResolution(resolution);
+            sInterval.setStatisticalInterval(interval);
+            normalized.put(new IntervalKey(interval, resolution), sInterval.addFlow(new StatisticalFlow(spread, flow), flowID));
         }
 
         return normalized;
     }
 
+    public StatisticalInterval getStatisticalInterval(Long resolution, Long interval) {
+        System.out.println("Retrieving interval: " + resolution + ":" + interval + " from storage.");
+        StatisticalInterval statisticalInterval = null;
+
+        List<StatisticalInterval> statisticalIntervals = (List<StatisticalInterval>) em.createQuery(
+                "SELECT s FROM StatisticalInterval s WHERE s.accountId LIKE :accountid AND s.resolution = :resolution AND s.statisticalInterval = :interval")
+                    .setParameter("accountid", customer.getAccount())
+                    .setParameter("resolution", resolution)
+                    .setParameter("interval", interval)
+                    .getResultList();
+
+        if (statisticalIntervals.size() > 1) {
+            System.err.println("StatisticsManager: too many results");
+        } else if (!statisticalIntervals.isEmpty()) {
+            statisticalInterval = statisticalIntervals.get(0);
+        }
+
+        return statisticalInterval;
+    }
+
     public void storeStatisticalIntervals(ArrayList<StatisticalInterval> intervals) {
         System.out.println("Persisting " + intervals.size() + " intervals to long-term storage.");
-        
-        
-            
+
         try {
             Context initCtx = new InitialContext();
-            UserTransaction utx = (UserTransaction)initCtx.lookup("java:comp/UserTransaction");
-            
+            UserTransaction utx = (UserTransaction) initCtx.lookup("java:comp/UserTransaction");
+
             System.out.println("Beginning transaction...");
-            utx.begin();
+
             for (StatisticalInterval interval : intervals) {
-                /*
-                 * if (dataAccessor.intervalByKey.get(interval.key) != null) {
-                 * StatisticalInterval stored =
-                 * dataAccessor.intervalByKey.get(interval.key); stored =
-                 * stored.addInterval(interval);
-                 * dataAccessor.intervalByKey.put(stored); } else {
-                 * dataAccessor.intervalByKey.put(interval); }
-                 *
-                 */
-                System.out.println("interval persist");
-                em.persist(interval);
+                if (this.getStatisticalInterval(interval.getResolution(), interval.getStatisticalInterval()) != null) {
+                    System.out.println("interval merge");
+                    StatisticalInterval stored = this.getStatisticalInterval(interval.getResolution(), interval.getStatisticalInterval());
+                    stored.addInterval(interval);
+                    utx.begin();
+                    em.merge(stored);
+                    utx.commit();
+                } else {
+                    System.out.println("interval persist");
+                    utx.begin();
+                    em.persist(interval);
+                    utx.commit();
+                }
             }
-            utx.commit();
+
             System.out.println("Transaction completed...");
         } catch (Exception e) {
             e.printStackTrace();
-        } /*
-         * catch (NotSupportedException nse) {
-         * log.error("storeStatisticalInterval Failed: " + nse.getMessage()); }
-         * catch (SystemException se) { log.error("storeStatisticalInterval
-         * Failed: " + se.getMessage()); } catch (RollbackException re) {
-         * log.error("storeStatisticalInterval Failed: " + re.getMessage()); }
-         * catch (HeuristicMixedException hme) {
-         * log.error("storeStatisticalInterval Failed: " + hme.getMessage()); }
-         * catch (HeuristicRollbackException hre) {
-         * log.error("storeStatisticalInterval Failed: " + hre.getMessage());
-            }
-         */
+        }
     }
 
     public void addStatisticalSeconds(Flow flow, Long flowID, InetAddress collector) {
@@ -271,7 +283,24 @@ public class StatisticsManager {
          */
     }
 
-    public LinkedList<StatisticalInterval> getStatisticalIntervals(HttpSession session, Constraints constraints, Integer resolution) {
+    public List<StatisticalInterval> getStatisticalIntervals(HttpSession session, Constraints constraints, Integer resolution) {
+        List<StatisticalInterval> intervals = null;
+
+        Long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
+        Long r = (resolution != null) ? resolution : getResolution(duration, null);
+
+        Long start = constraints.startTime.getTime() / r;
+        IntervalKey startKey = new IntervalKey(start, r);
+        Long end = constraints.endTime.getTime() / r;
+        IntervalKey endKey = new IntervalKey(end, r);
+
+        try {
+            intervals = (List<StatisticalInterval>) em.createQuery(
+                    "SELECT s FROM StatisticalInterval s WHERE s.accountId LIKE :accountid AND s.key >= :start AND s.key <= :end").setParameter("accountid", customer.getAccount()).setParameter("resolution", r).setParameter("start", startKey).setParameter("end", endKey).getResultList();
+        } catch (NoResultException nre) {
+            System.err.println("StatisticsManager: no result");
+            nre.printStackTrace();
+        }
         /*
          * LinkedList<StatisticalInterval> intervals = new LinkedList();
          *
@@ -297,7 +326,7 @@ public class StatisticsManager {
          * return intervals;
          *
          */
-        return null;
+        return intervals;
     }
 
     public LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> getVolumeByTime(Constraints constraints, Integer bins)
@@ -750,30 +779,6 @@ public class StatisticsManager {
          *
          */
         return null;
-    }
-
-    private void createTraceFile(ArrayList<Network> networks) {
-        try {
-            FileWriter writer = new FileWriter("/traces/analysis_out.txt");
-            for (Network network : networks) {
-                writer.append("Monitored Network: " + network.getNetwork().toString() + " has " + network.getAllNodes().size() + " entries.\n");
-                /*
-                 * for (Node node : network.getAllNodes()) { writer.append("n:"
-                 * + node.toString() + ", receivedBytes: " +
-                 * node.getBytesReceived() + ", sentBytes: " +
-                 * node.getBytesSent() + "\n"); for (Flow flow :
-                 * node.getFlowsOriginated()) { writer.append("s:" +
-                 * flow.toString() + "\n"); }
-                 *
-                 * for (Flow flow : node.getFlowsReceived()) {
-                 * writer.append("d:" + flow.toString() + "\n"); } }
-                 *
-                 */
-            }        // Add the default node (with newly acquired flows) to the default network
-            writer.close();
-        } catch (IOException ioe) {
-            log.error("Error creating trace file: " + ioe.getMessage());
-        }
     }
 
     private HashMap<IntervalKey, Boolean> identifyExpiredIntervals() {

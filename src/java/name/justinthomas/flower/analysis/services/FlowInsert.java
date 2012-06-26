@@ -22,7 +22,6 @@ import javax.xml.ws.handler.MessageContext;
 import name.justinthomas.flower.analysis.authentication.UserAction;
 import name.justinthomas.flower.analysis.element.Flow;
 import name.justinthomas.flower.analysis.persistence.FlowManager;
-import name.justinthomas.flower.analysis.persistence.FlowReceiver;
 import name.justinthomas.flower.analysis.persistence.PersistentFlow;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
@@ -34,37 +33,37 @@ import name.justinthomas.flower.manager.services.CustomerAdministration.Customer
  */
 @WebService()
 public class FlowInsert {
+
     @PersistenceContext
     EntityManager em;
-    
-    @Resource private UserTransaction utx;
-
+    @Resource
+    private UserTransaction utx;
     @Resource
     WebServiceContext context;
-    
+
     @WebMethod(operationName = "rebuildStatistics")
     public Boolean rebuildStatistics(
             @WebParam(name = "customerID") String customerID,
             @WebParam(name = "username") String username,
             @WebParam(name = "password") String password) {
-        
+
         UserAction userAction = new UserAction();
 
         if (!userAction.authenticate(customerID, username, password).administrator) {
             return (null);
         }
-        
+
         MessageContext messageContext = context.getMessageContext();
         HttpServletRequest request = (HttpServletRequest) messageContext.get(MessageContext.SERVLET_REQUEST);
-        
+
         String address = request.getRemoteAddr();
         System.out.println("Rebuild request received from: " + address);
-        
+
         Customer customer = Utility.getCustomer(customerID);
-        
+
         Thread thread = new Thread(new RebuildThread(customer, address));
         thread.start();
-        
+
         return true;
     }
 
@@ -109,34 +108,35 @@ public class FlowInsert {
 
         return 0;
     }
-    
+
     class RebuildThread implements Runnable {
+
         Customer customer;
         String collector;
-        
+
         public RebuildThread(Customer customer, String collector) {
             this.customer = customer;
             this.collector = collector;
         }
-        
+
         @Override
         public void run() {
             FlowManager flowManager = new FlowManager(customer);
             Long end = 0l;
-            
-            while(end != null) {
+
+            while (end != null) {
                 end = flowManager.rebuildStatistics(collector, end);
-                
+
                 try {
                     flowManager = new FlowManager(customer);
                     System.gc();
-                    Thread.sleep(60000);          
+                    Thread.sleep(60000);
                 } catch (InterruptedException ie) {
                     System.err.println("RebuildThread interrupted.");
                     return;
                 }
             }
-        }       
+        }
     }
 
     class InsertThread implements Runnable {
@@ -163,17 +163,20 @@ public class FlowInsert {
                     if (xflow.getByteSize().longValue() < 0) {
                         throw new Exception("Negative bytesSent value (" + xflow.getByteSize().longValue() + ") in XMLFlow received.");
                     }
-                    
+
                     xflow.setReportedBy(this.collector.getHostAddress());
-                    
+
                     converted.add(new Flow(customer, xflow));
+                } catch (UnknownHostException e) {
+                    e.printStackTrace();
+                    return;
                 } catch (Exception e) {
                     e.printStackTrace();
                     return;
                 }
             }
 
-            FlowReceiver receiver = new FlowReceiver(em, utx, customer);
+            FlowManager receiver = new FlowManager(customer);
             LinkedList<Long> flowIDs = receiver.addFlows(collector.getHostAddress(), converted, null);
 
             Iterator<Long> idIterator = flowIDs.iterator();
@@ -190,7 +193,7 @@ public class FlowInsert {
                 statisticsManager.addStatisticalSeconds(flow.getValue(), flow.getKey(), collector);
             }
 
-            //System.out.println("Completed processing statistics for " + flows.size() + " flows.");
+            System.out.println("Completed processing statistics for " + flows.size() + " flows.");
         }
     }
 }

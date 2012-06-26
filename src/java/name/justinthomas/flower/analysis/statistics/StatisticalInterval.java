@@ -6,7 +6,8 @@ import java.util.HashMap;
 import java.util.Map.Entry;
 import javax.persistence.EmbeddedId;
 import javax.persistence.Entity;
-import javax.persistence.Transient;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
 import javax.xml.bind.annotation.XmlType;
 import name.justinthomas.flower.analysis.statistics.AnomalyEvent.Anomaly;
 
@@ -19,15 +20,24 @@ import name.justinthomas.flower.analysis.statistics.AnomalyEvent.Anomaly;
 @XmlType
 public class StatisticalInterval implements Serializable {
 
-    @EmbeddedId
-    protected IntervalKey key;
+    //@EmbeddedId
+    //protected IntervalKey key;
+    private Long id;
+    private Long statisticalInterval;
+    private Long resolution;
+    private String accountId;
     private HashMap<StatisticalFlowIdentifier, StatisticalFlow> flows = new HashMap();
     private ArrayList<Long> flowIDs = new ArrayList();
     private ArrayList<AnomalyEvent> anomalies = new ArrayList();
 
-    public void clear() {
-        key = null;
-        flows.clear();
+    @Id
+    @GeneratedValue
+    public Long getId() {
+        return this.id;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
     }
     
     public StatisticalInterval addAnomaly(StatisticalFlowIdentifier id, Anomaly anomaly, Integer basis) {
@@ -87,11 +97,27 @@ public class StatisticalInterval implements Serializable {
         this.flows = flows;
     }
 
-    public IntervalKey getKey() {
-        return key;
+    public String getAccountId() {
+        return accountId;
     }
 
-    public void setKey(IntervalKey key) {
-        this.key = key;
+    public void setAccountId(String accountId) {
+        this.accountId = accountId;
+    }
+
+    public Long getResolution() {
+        return resolution;
+    }
+
+    public void setResolution(Long resolution) {
+        this.resolution = resolution;
+    }
+
+    public Long getStatisticalInterval() {
+        return statisticalInterval;
+    }
+
+    public void setStatisticalInterval(Long statisticalInterval) {
+        this.statisticalInterval = statisticalInterval;
     }
 }

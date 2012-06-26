@@ -124,7 +124,7 @@ public class StatisticalEngine {
     }
 
     public StatisticalInterval addStatisticalInterval(StatisticalInterval interval) {
-        if ((interval != null) && (interval.key != null) && (interval.key.getResolution() == 1000000) && (interval.getFlows() != null)) {
+        if ((interval != null) && (interval.getResolution() == 1000000) && (interval.getFlows() != null)) {
             ManagedNetworks managedNetworks = new ManagedNetworks(customer);
 
             Map<String, Map<String, Long>> normalized = new HashMap();
@@ -198,9 +198,9 @@ public class StatisticalEngine {
     }
 
     private void ewma(Map<String, Map<String, Long>> normalized, StatisticalInterval interval) {
-        Cube type = this.getCubeTypeByTime(interval.key.getStatisticalInterval() * interval.key.getResolution());
+        Cube type = this.getCubeTypeByTime(interval.getStatisticalInterval() * interval.getResolution());
         Date now = new Date();
-        now.setTime(interval.key.getStatisticalInterval() * interval.key.getResolution());
+        now.setTime(interval.getStatisticalInterval() * interval.getResolution());
         log.debug("interval date: " + now.toString() + ", selected: " + type);
         
         Map<String, Map<String, DescriptiveStatistics>> prior = new HashMap();
