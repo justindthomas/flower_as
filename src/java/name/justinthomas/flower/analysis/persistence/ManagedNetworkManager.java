@@ -96,6 +96,7 @@ public class ManagedNetworkManager {
     }
     
     public Boolean addManagedNetwork(ManagedNetwork network) {
+        network.setAccountId(customer.getAccount());
         System.out.println("Adding ManagedNetwork: " + network.toString());
         
         try {

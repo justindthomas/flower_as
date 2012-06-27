@@ -123,4 +123,9 @@ public class StatisticalFlow implements Serializable {
     public void setCount(HashMap<StatisticalFlowDetail, Long> count) {
         this.count = count;
     }
+    
+    @Override
+    public String toString() {
+        return("StatisticalFlow: " + this.source + "->" + this.destination);
+    }
 }

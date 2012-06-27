@@ -4,13 +4,16 @@
  */
 package name.justinthomas.flower.analysis.authentication;
 
-import name.justinthomas.flower.global.GlobalConfigurationManager;
 import java.io.IOException;
 import java.util.List;
+import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.transaction.*;
 import name.justinthomas.flower.analysis.persistence.ManagedNetworkManager;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
@@ -20,6 +23,7 @@ import org.apache.log4j.PatternLayout;
  *
  * @author justin
  */
+@PersistenceContext(name = "persistence/Analysis", unitName = "AnalysisPU")
 public class DirectoryDomainManager {
 
     private static final Logger log = Logger.getLogger(DirectoryDomainManager.class.getName());
@@ -66,138 +70,100 @@ public class DirectoryDomainManager {
     }
     
     public Boolean removeGroup(String domain, String group) {
-        /*
-        Boolean error = false;
-        setupEnvironment();
-        try {
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
-            EntityStore entityStore = new EntityStore(environment, "DirectoryDomain", storeConfig);
-            CustomerConfigurationAccessor accessor = new CustomerConfigurationAccessor(entityStore);
-
-            if (accessor.directoryDomainByName.contains(domain)) {
-                if (accessor.directoryDomainByName.get(domain).getGroups().containsKey(group)) {
-                    DirectoryDomain directoryDomain = accessor.directoryDomainByName.get(domain);
-                    directoryDomain.getGroups().remove(group);
-                    if(directoryDomain.getGroups().isEmpty()) {
-                        accessor.directoryDomainByName.delete(domain);
-                    } else {
-                        accessor.directoryDomainByName.put(directoryDomain);
-                    }
-                } else {
-                    System.err.println("DirectoryDomain group entry does not exist.");
-                    error = true;
-                }
-            } else {
-                System.err.println("DirectoryDomain entry does not exist.");
-                error = true;
-            }
-
-            entityStore.close();
-        } catch (DatabaseException e) {
-            System.err.println("DatabaseException in DirectoryDomainManager: " + e.getMessage());
-        } finally {
-            closeEnvironment();
-        }
-
-        return !error;
-        * 
-        */
-        return null;
+        DirectoryDomain directoryDomain = this.getDirectoryDomain(domain);
+        directoryDomain.getGroups().remove(group);
+        this.updateDirectoryDomain(directoryDomain);
+        return true;
     }
     
-    public Boolean addDirectoryDomain(String domain, String group, Boolean privileged) {
-        /*
-        Boolean error = false;
-        setupEnvironment();
-        try {
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
-            EntityStore entityStore = new EntityStore(environment, "DirectoryDomain", storeConfig);
-            CustomerConfigurationAccessor accessor = new CustomerConfigurationAccessor(entityStore);
-
-            if (accessor.directoryDomainByName.contains(domain)) {
-                if (!accessor.directoryDomainByName.get(domain).getGroups().containsKey(group)) {
-                    DirectoryDomain directoryDomain = accessor.directoryDomainByName.get(domain);
-                    directoryDomain.getGroups().put(group, privileged);
-                    accessor.directoryDomainByName.put(directoryDomain);
-                } else {
-                    System.err.println("DirectoryDomain entry already exists.");
-                    error = true;
-                }
-            } else {
-                DirectoryDomain directoryDomain = new DirectoryDomain(domain, group, privileged);
-                accessor.directoryDomainByName.put(directoryDomain);
-            }
-
-            entityStore.close();
-        } catch (DatabaseException e) {
-            System.err.println("DatabaseException in ManagedNetworkManager: " + e.getMessage());
-        } finally {
-            closeEnvironment();
+    public Boolean updateDirectoryDomain(DirectoryDomain directoryDomain) {
+        log.debug("Updating DirectoryDomain: " + directoryDomain.toString());
+        
+        if(directoryDomain.getId() == null) {
+            directoryDomain = this.getDirectoryDomain(directoryDomain.getDomain());
         }
+        
+        try {
+            Context context = new InitialContext();
+            UserTransaction utx = (UserTransaction) context.lookup("java:comp/UserTransaction");
 
-        return !error;
-        * 
-        */
-        return null;
+            utx.begin();
+            em.merge(directoryDomain);
+            utx.commit();
+        } catch (NullPointerException npe) {
+            npe.printStackTrace();
+        } catch (NotSupportedException nse) {
+            nse.printStackTrace();
+        } catch (RollbackException rbe) {
+            rbe.printStackTrace();
+        } catch (HeuristicMixedException hme) {
+            hme.printStackTrace();
+        } catch (HeuristicRollbackException hrbe) {
+            hrbe.printStackTrace();
+        } catch (SystemException se) {
+            se.printStackTrace();
+        } catch (NamingException ne) {
+            ne.printStackTrace();
+        }
+        
+        return true;
+    }
+    public Boolean addDirectoryDomain(String domain, String group, Boolean privileged) {
+        DirectoryDomain directoryDomain = new DirectoryDomain(domain, group, privileged);
+        directoryDomain.setAccountId(customer.getAccount());
+        
+        System.out.println("Adding DirectoryDomain: " + directoryDomain.toString());
+        
+        try {
+            Context context = new InitialContext();
+            UserTransaction utx = (UserTransaction) context.lookup("java:comp/UserTransaction");
+
+            utx.begin();
+            em.persist(directoryDomain);
+            utx.commit();
+        } catch (NullPointerException npe) {
+            npe.printStackTrace();
+        } catch (NotSupportedException nse) {
+            nse.printStackTrace();
+        } catch (RollbackException rbe) {
+            rbe.printStackTrace();
+        } catch (HeuristicMixedException hme) {
+            hme.printStackTrace();
+        } catch (HeuristicRollbackException hrbe) {
+            hrbe.printStackTrace();
+        } catch (SystemException se) {
+            se.printStackTrace();
+        } catch (NamingException ne) {
+            ne.printStackTrace();
+        }
+        
+        return true;
     }
 
     public DirectoryDomain getDirectoryDomain(String domain) {
-        /*
-        DirectoryDomain directoryDomain = null;
-        setupEnvironment();
-        try {
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
-            EntityStore entityStore = new EntityStore(environment, "DirectoryDomain", storeConfig);
-            CustomerConfigurationAccessor accessor = new CustomerConfigurationAccessor(entityStore);
-
-            directoryDomain = accessor.directoryDomainByName.get(domain);
-
-            entityStore.close();
-        } catch (DatabaseException e) {
-            System.err.println("DatabaseException in ManagedNetworkManager: " + e.getMessage());
-        } finally {
-            closeEnvironment();
+        System.out.println("Getting directory domain " + domain + " for: " + customer.getAccount());
+        
+        List directoryDomains = (List) em.createQuery(
+                "SELECT s FROM DirectoryDomain s WHERE s.accountId LIKE :accountid AND s.domain LIKE :domain")
+                    .setParameter("accountid", customer.getAccount())
+                    .setParameter("domain", domain)
+                    .getResultList();
+        
+        if(directoryDomains.size() > 1) {
+            log.error("DirectoryDomainManager: too many results");
+        } else if(!directoryDomains.isEmpty()) {
+            return (DirectoryDomain) directoryDomains.get(0);
         }
-
-        return directoryDomain;
-        * 
-        */
+        
         return null;
     }
 
     public List<DirectoryDomain> getDirectoryDomains() {
-        /*
-        List<DirectoryDomain> directoryDomains = new ArrayList();
-        setupEnvironment();
-        try {
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
-            EntityStore entityStore = new EntityStore(environment, "DirectoryDomain", storeConfig);
-            CustomerConfigurationAccessor accessor = new CustomerConfigurationAccessor(entityStore);
-
-            EntityCursor<DirectoryDomain> cursor = accessor.directoryDomainByName.entities();
-            for (DirectoryDomain directoryDomain : cursor) {
-                directoryDomains.add(directoryDomain);
-            }
-            cursor.close();
-
-            entityStore.close();
-        } catch (DatabaseException e) {
-            System.err.println("DatabaseException in ManagedNetworkManager: " + e.getMessage());
-        } finally {
-            closeEnvironment();
-        }
-
-        return directoryDomains;
-        * 
-        */
-        return null;
+        System.out.println("Getting directory domains for: " + customer.getAccount());
+ 
+        return (List) em.createQuery(
+                "SELECT s FROM DirectoryDomain s WHERE s.accountId LIKE :accountid")
+                    .setParameter("accountid", customer.getAccount())
+                    .getResultList();
     }
 }

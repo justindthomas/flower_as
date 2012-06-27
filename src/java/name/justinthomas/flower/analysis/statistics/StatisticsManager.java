@@ -27,6 +27,7 @@ import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import name.justinthomas.flower.utility.AddressAnalysis;
 import org.apache.log4j.FileAppender;
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 
@@ -74,6 +75,7 @@ public class StatisticsManager {
                 String pattern = "%d{dd MMM yyyy HH:mm:ss.SSS} - %p - %m %n";
                 PatternLayout layout = new PatternLayout(pattern);
                 fileAppender = new FileAppender(layout, globalConfigurationManager.getBaseDirectory() + "/statistics.log");
+                log.setLevel(Level.DEBUG);
                 log.addAppender(fileAppender);
             } catch (IOException e) {
                 log.error(e.getMessage());
@@ -281,10 +283,12 @@ public class StatisticsManager {
     }
 
     public List<StatisticalInterval> getStatisticalIntervals(Constraints constraints, Integer resolution) {
+        log.debug("entered getStatisticalIntervals(" + constraints + "," + resolution + ")");
         return this.getStatisticalIntervals(constraints.startTime.getTime(), constraints.endTime.getTime(), resolution);
     }
 
     public List<StatisticalInterval> getStatisticalIntervals(Long startTime, Long endTime, Integer resolution) {
+        log.debug("entered getStatisticalIntervals(" + startTime + "," + endTime + "," + resolution + ")");
         List<StatisticalInterval> intervals = null;
 
         Long duration = endTime - startTime;
@@ -295,12 +299,7 @@ public class StatisticsManager {
 
         try {
             intervals = (List<StatisticalInterval>) em.createQuery(
-                    "SELECT s FROM StatisticalInterval s WHERE s.accountId LIKE :accountid AND s.resolution = :resolution AND s.statisticalInterval >= :start AND s.statisticalInterval <= :end")
-                        .setParameter("accountid", customer.getAccount())
-                        .setParameter("resolution", r)
-                        .setParameter("start", start)
-                        .setParameter("end", end)
-                        .getResultList();
+                    "SELECT s FROM StatisticalInterval s WHERE s.accountId LIKE :accountid AND s.resolution = :resolution AND s.statisticalInterval >= :start AND s.statisticalInterval <= :end").setParameter("accountid", customer.getAccount()).setParameter("resolution", r).setParameter("start", start).setParameter("end", end).getResultList();
         } catch (NoResultException nre) {
             log.error("StatisticsManager: no result");
         }
@@ -308,39 +307,101 @@ public class StatisticsManager {
         return intervals;
     }
 
-    public LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> getVolumeByTime(Constraints constraints, Integer bins)
-            throws ClassNotFoundException {
+    private LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> getEmptySummaryMap(Constraints constraints, Integer bins) {
+        LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> map = new LinkedHashMap();
 
-        LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> consolidated = new LinkedHashMap();
-
-        if ((constraints.startTime == null) || (constraints.endTime == null) || (bins == null) || (constraints.startTime.getTime() >= constraints.endTime.getTime())) {
-            return consolidated;
-        }
-
-        DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-        log.debug("Requesting volume data from " + dateFormat.format(constraints.startTime) + " to " + dateFormat.format(constraints.endTime));
-        log.debug("Populating consolidated map ");
         Long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
-        log.debug("Duration: " + duration);
-
         Long interval = duration / bins;
 
+        log.debug("Populating summary map ");
         // Populate consolidated with an entry for each minute that we want to graph
-        int j;
-        for (j = 0; j < bins;) {
+        
+        for (int j = 0; j < bins;) {
             HashMap<String, HashMap<Integer, Long>> interim = new HashMap();
             interim.put("versions", new HashMap<Integer, Long>());
             interim.put("types", new HashMap<Integer, Long>());
             interim.put("tcp", new HashMap<Integer, Long>());
             interim.put("udp", new HashMap<Integer, Long>());
 
-            consolidated.put(new Date(constraints.startTime.getTime() + (j++ * interval)), interim);
+            map.put(new Date(constraints.startTime.getTime() + (j++ * interval)), interim);
         }
+
+        return map;
+    }
+
+    private void populateSummaries(StatisticalInterval interval, HashMap<Integer, Long> versions, HashMap<Integer, Long> types, HashMap<Integer, Long> tcp, HashMap<Integer, Long> udp) {
+        log.debug("entered populateSummaries");
+        for (StatisticalFlow flow : interval.getFlows().values()) {
+            log.debug("evaluating statisticalFlow: " + flow.toString());
+            try {
+                for (Entry<StatisticalFlowDetail, Long> volume : flow.getCount().entrySet()) {
+                    log.debug("flow detail: " + volume.getKey().toString());
+                    if (volume.getKey().getType().equals(StatisticalFlowDetail.Count.BYTE)) {
+                        if (types.containsKey(volume.getKey().getProtocol())) {
+                            types.put(volume.getKey().getProtocol(), types.get(volume.getKey().getProtocol()) + volume.getValue());
+                        } else {
+                            types.put(volume.getKey().getProtocol(), volume.getValue());
+                        }
+
+                        if (volume.getKey().getProtocol() == 6) {
+                            if (tcp.containsKey(volume.getKey().getDestination())) {
+                                tcp.put(volume.getKey().getDestination(), tcp.get(volume.getKey().getDestination()) + volume.getValue());
+                            } else {
+                                tcp.put(volume.getKey().getDestination(), volume.getValue());
+                            }
+                        }
+
+                        if (volume.getKey().getProtocol() == 17) {
+                            if (udp.containsKey(volume.getKey().getDestination())) {
+                                udp.put(volume.getKey().getDestination(), udp.get(volume.getKey().getDestination()) + volume.getValue());
+                            } else {
+                                udp.put(volume.getKey().getDestination(), volume.getValue());
+                            }
+                        }
+
+                        if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV4)) {
+                            if (versions.containsKey(4)) {
+                                versions.put(4, versions.get(4) + volume.getValue());
+                            } else {
+                                versions.put(4, volume.getValue());
+                            }
+                        } else if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV6)) {
+                            if (versions.containsKey(6)) {
+                                versions.put(6, versions.get(6) + volume.getValue());
+                            } else {
+                                versions.put(6, volume.getValue());
+                            }
+                        }
+                    }
+
+                }
+            } catch (NullPointerException e) {
+                log.error(
+                        "Unexpected NULL field encountered.This is probably a result of bad data in the database(perhaps  an interrupted insert ?)");
+                continue;
+            }
+        }
+    }
+
+    public LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> getVolumeByTime(Constraints constraints, Integer bins)
+            throws ClassNotFoundException {
+
+        if ((constraints.startTime == null) || (constraints.endTime == null) || (bins == null) || (constraints.startTime.getTime() >= constraints.endTime.getTime())) {
+            return null;
+        }
+
+        LinkedHashMap<Date, HashMap<String, HashMap<Integer, Long>>> consolidated = this.getEmptySummaryMap(constraints, bins);
+
+        DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        log.debug("Requesting volume data from " + dateFormat.format(constraints.startTime) + " to " + dateFormat.format(constraints.endTime));
+
+        Long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
+        log.debug("Duration: " + duration);
+        Long interval = duration / bins;
 
         log.debug("Iterating over flow volumes in database");
 
         Long resolution = getResolution(duration, bins);
-
         if (resolution == null) {
             log.error("automatically selected resolution is null; no resolution is granular enough to support the number of bins selected over the selected time period");
             return null;
@@ -355,12 +416,13 @@ public class StatisticsManager {
         while (startKey.getStatisticalInterval().longValue() < endKey.getStatisticalInterval().longValue()) {
             log.debug("start: " + startKey.getStatisticalInterval() + ", end: " + endKey.getStatisticalInterval());
 
-            List<StatisticalInterval> intervals = this.getStatisticalIntervals(constraints, bins);
+            List<StatisticalInterval> intervals = this.getStatisticalIntervals(constraints, resolution.intValue());
 
             boolean stopped = false;
 
             try {
                 for (StatisticalInterval second : intervals) {
+                    log.debug("evaluating interval: " + second.getStatisticalInterval());
                     startKey = new IntervalKey(second.getResolution(), second.getStatisticalInterval());
 
                     if (second.getResolution().longValue() != resolution.longValue()) {
@@ -375,56 +437,7 @@ public class StatisticsManager {
                     HashMap<Integer, Long> tcp = new HashMap();
                     HashMap<Integer, Long> udp = new HashMap();
 
-                    for (StatisticalFlow entry : second.getFlows().values()) {
-                        try {
-                            for (Entry<StatisticalFlowDetail, Long> volume :
-                                    entry.getCount().entrySet()) {
-                                if (volume.getKey().getType().equals(StatisticalFlowDetail.Count.BYTE)) {
-
-                                    if (types.containsKey(volume.getKey().getProtocol())) {
-                                        types.put(volume.getKey().getProtocol(), types.get(volume.getKey().getProtocol()) + volume.getValue());
-                                    } else {
-                                        types.put(volume.getKey().getProtocol(), volume.getValue());
-                                    }
-
-                                    if (volume.getKey().getProtocol() == 6) {
-                                        if (tcp.containsKey(volume.getKey().getDestination())) {
-                                            tcp.put(volume.getKey().getDestination(), tcp.get(volume.getKey().getDestination()) + volume.getValue());
-                                        } else {
-                                            tcp.put(volume.getKey().getDestination(), volume.getValue());
-                                        }
-                                    }
-
-                                    if (volume.getKey().getProtocol() == 17) {
-                                        if (udp.containsKey(volume.getKey().getDestination())) {
-                                            udp.put(volume.getKey().getDestination(), udp.get(volume.getKey().getDestination()) + volume.getValue());
-                                        } else {
-                                            udp.put(volume.getKey().getDestination(), volume.getValue());
-                                        }
-                                    }
-
-                                    if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV4)) {
-                                        if (versions.containsKey(4)) {
-                                            versions.put(4, versions.get(4) + volume.getValue());
-                                        } else {
-                                            versions.put(4, volume.getValue());
-                                        }
-                                    } else if (volume.getKey().getVersion().equals(StatisticalFlowDetail.Version.IPV6)) {
-                                        if (versions.containsKey(6)) {
-                                            versions.put(6, versions.get(6) + volume.getValue());
-                                        } else {
-                                            versions.put(6, volume.getValue());
-                                        }
-                                    }
-                                }
-
-                            }
-                        } catch (NullPointerException e) {
-                            log.error(
-                                    "Unexpected NULL field encountered.This is probably a result of bad data in the database(perhaps  an interrupted insert ?)");
-                            continue;
-                        }
-                    }
+                    this.populateSummaries(second, versions, types, tcp, udp);
 
                     // Iterate over the bins in consolidated 
                     for (Date bin : consolidated.keySet()) {
@@ -432,9 +445,8 @@ public class StatisticsManager {
                             throw new InterruptedException();
                         }
 
-                        if (new Date(second.getStatisticalInterval()
-                                * resolution).after(new Date(bin.getTime())) && new Date(second.getStatisticalInterval()
-                                * resolution).before(new Date(bin.getTime() + interval))) {
+                        if (new Date(second.getStatisticalInterval() * resolution).after(new Date(bin.getTime())) && 
+                                new Date(second.getStatisticalInterval() * resolution).before(new Date(bin.getTime() + interval))) {
                             if (!types.isEmpty()) {
                                 for (Integer type : types.keySet()) {
                                     if (consolidated.get(bin).get("types").containsKey(type)) {
@@ -679,7 +691,6 @@ public class StatisticsManager {
                 log.debug(secondsProcessed + "StatisticalSeconds processed.");
             }
         }
-
 
         response.ready = true;
 

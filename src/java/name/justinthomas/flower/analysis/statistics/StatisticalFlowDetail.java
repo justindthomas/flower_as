@@ -96,4 +96,9 @@ public class StatisticalFlowDetail implements Serializable {
     public void setVersion(Version version) {
         this.version = version;
     }
+    
+    @Override
+    public String toString() {
+        return type + ":" + version + ":" + protocol + ":" + type + ":" + source + ":" + destination;
+    }
 }

@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.PostConstruct;
+import javax.ejb.ConcurrencyManagement;
+import javax.ejb.ConcurrencyManagementType;
 import javax.ejb.Singleton;
 import name.justinthomas.flower.analysis.persistence.FrequencyManager;
 import name.justinthomas.flower.analysis.statistics.CachedStatistics;
@@ -18,6 +20,7 @@ import org.apache.log4j.Logger;
  * @author JustinThomas
  */
 @Singleton
+@ConcurrencyManagement(ConcurrencyManagementType.BEAN)
 public class GlobalConfigurationManager {
 
     private static final Logger log = Logger.getLogger(GlobalConfigurationManager.class.getName());

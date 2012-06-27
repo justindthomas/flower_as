@@ -21,6 +21,7 @@ import javax.xml.bind.annotation.XmlType;
 public class DirectoryDomain implements Serializable {
 
     private Long id;
+    private String accountId;
     private String domain;
     // <group name, privileged>
     private HashMap<String, Boolean> groups;
@@ -59,5 +60,13 @@ public class DirectoryDomain implements Serializable {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getAccountId() {
+        return accountId;
+    }
+
+    public void setAccountId(String accountId) {
+        this.accountId = accountId;
     }
 }

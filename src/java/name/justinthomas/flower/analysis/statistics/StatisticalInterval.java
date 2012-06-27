@@ -4,7 +4,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map.Entry;
-import javax.persistence.EmbeddedId;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
@@ -15,7 +14,6 @@ import name.justinthomas.flower.analysis.statistics.AnomalyEvent.Anomaly;
  *
  * @author justin
  */
-
 @Entity
 @XmlType
 public class StatisticalInterval implements Serializable {
@@ -26,47 +24,47 @@ public class StatisticalInterval implements Serializable {
     private Long statisticalInterval;
     private Long resolution;
     private String accountId;
-    private HashMap<StatisticalFlowIdentifier, StatisticalFlow> flows = new HashMap();
-    private ArrayList<Long> flowIDs = new ArrayList();
-    private ArrayList<AnomalyEvent> anomalies = new ArrayList();
+    private HashMap<StatisticalFlowIdentifier, StatisticalFlow> flows;
+    private ArrayList<Long> flowIDs;
+    private ArrayList<AnomalyEvent> anomalies;
 
     @Id
     @GeneratedValue
     public Long getId() {
         return this.id;
     }
-    
+
     public void setId(Long id) {
         this.id = id;
     }
-    
+
     public StatisticalInterval addAnomaly(StatisticalFlowIdentifier id, Anomaly anomaly, Integer basis) {
-        anomalies.add(new AnomalyEvent(id.getSource(), id.getDestination(), anomaly, basis));
+        this.getAnomalies().add(new AnomalyEvent(id.getSource(), id.getDestination(), anomaly, basis));
         return this;
     }
 
     public StatisticalInterval addFlow(StatisticalFlow flow, Long flowID) {
-        if (flows.containsKey(flow.id())) {
-            flows.put(flow.id(), flow.addFlow(flow));
+        if (this.getFlows().containsKey(flow.id())) {
+            this.getFlows().put(flow.id(), flow.addFlow(flow));
         } else {
-            flows.put(flow.id(), flow);
+            this.getFlows().put(flow.id(), flow);
         }
 
-        flowIDs.add(flowID);
+        this.getFlowIDs().add(flowID);
 
         return this;
     }
 
     public StatisticalInterval addInterval(StatisticalInterval statisticalInterval) {
-        for (Entry<StatisticalFlowIdentifier, StatisticalFlow> entry : statisticalInterval.flows.entrySet()) {
-            if (flows.containsKey(entry.getKey())) {
-                flows.put(entry.getKey(), flows.get(entry.getKey()).addFlow(entry.getValue()));
+        for (Entry<StatisticalFlowIdentifier, StatisticalFlow> entry : statisticalInterval.getFlows().entrySet()) {
+            if (this.getFlows().containsKey(entry.getKey())) {
+                this.getFlows().put(entry.getKey(), this.getFlows().get(entry.getKey()).addFlow(entry.getValue()));
             } else {
-                flows.put(entry.getKey(), entry.getValue());
+                this.getFlows().put(entry.getKey(), entry.getValue());
             }
 
-            for(Long flowID : statisticalInterval.flowIDs) {
-                flowIDs.add(flowID);
+            for (Long flowID : statisticalInterval.getFlowIDs()) {
+                this.getFlowIDs().add(flowID);
             }
         }
 
@@ -74,6 +72,10 @@ public class StatisticalInterval implements Serializable {
     }
 
     public ArrayList<AnomalyEvent> getAnomalies() {
+        if(anomalies == null) {
+            anomalies = new ArrayList();
+        }
+        
         return anomalies;
     }
 
@@ -82,6 +84,9 @@ public class StatisticalInterval implements Serializable {
     }
 
     public ArrayList<Long> getFlowIDs() {
+        if(flowIDs == null) {
+            flowIDs = new ArrayList();
+        }
         return flowIDs;
     }
 
@@ -90,6 +95,10 @@ public class StatisticalInterval implements Serializable {
     }
 
     public HashMap<StatisticalFlowIdentifier, StatisticalFlow> getFlows() {
+        if (flows == null) {
+            flows = new HashMap();
+        }
+        
         return flows;
     }
 
