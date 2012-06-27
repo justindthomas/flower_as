@@ -47,9 +47,9 @@ public class ManagedNetworks {
         for (ManagedNetwork network : mnm.getManagedNetworks()) {
             //System.out.println("Network ID: " + e.getValue());
 
-            String[] parts = network.address.split("/");
+            String[] parts = network.getAddress().split("/");
             try {
-                addNetwork(network.description, new InetNetwork(InetAddress.getByName(parts[0].trim()), Integer.valueOf(parts[1].trim()), network.description));
+                addNetwork(network.getDescription(), new InetNetwork(InetAddress.getByName(parts[0].trim()), Integer.valueOf(parts[1].trim()), network.getDescription()));
             } catch (UnknownHostException uhe) {
                 System.err.println("Unable to parse address: " + uhe.getMessage());
             }

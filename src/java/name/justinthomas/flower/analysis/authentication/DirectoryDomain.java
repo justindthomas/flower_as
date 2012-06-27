@@ -5,10 +5,11 @@
 
 package name.justinthomas.flower.analysis.authentication;
 
-import com.sleepycat.persist.model.Entity;
-import com.sleepycat.persist.model.PrimaryKey;
+import java.io.Serializable;
 import java.util.HashMap;
-import java.util.Map;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
 import javax.xml.bind.annotation.XmlType;
 
 /**
@@ -17,12 +18,12 @@ import javax.xml.bind.annotation.XmlType;
  */
 @Entity
 @XmlType
-public class DirectoryDomain {
+public class DirectoryDomain implements Serializable {
 
-    @PrimaryKey
-    public String domain;
+    private Long id;
+    private String domain;
     // <group name, privileged>
-    public Map<String, Boolean> groups;
+    private HashMap<String, Boolean> groups;
 
     public DirectoryDomain() {
 
@@ -32,5 +33,31 @@ public class DirectoryDomain {
         this.domain = domain;
         this.groups = new HashMap();
         this.groups.put(group, privileged);
+    }
+
+    public String getDomain() {
+        return domain;
+    }
+
+    public void setDomain(String domain) {
+        this.domain = domain;
+    }
+
+    public HashMap<String, Boolean> getGroups() {
+        return groups;
+    }
+
+    public void setGroups(HashMap<String, Boolean> groups) {
+        this.groups = groups;
+    }
+
+    @Id
+    @GeneratedValue
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 }

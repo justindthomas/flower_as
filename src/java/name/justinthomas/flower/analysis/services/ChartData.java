@@ -263,8 +263,8 @@ public class ChartData {
         if (token.authenticated && token.authorized) {
             for (ManagedNetwork network : new ManagedNetworkManager(Utility.getCustomer(customerID)).getManagedNetworks()) {
                 XMLNetwork xnetwork = new XMLNetwork();
-                xnetwork.name = network.description;
-                String cidr = network.address;
+                xnetwork.name = network.getDescription();
+                String cidr = network.getAddress();
                 String[] cidrParts = cidr.split("/");
                 xnetwork.address = cidrParts[0];
                 xnetwork.mask = Integer.parseInt(cidrParts[1].trim());

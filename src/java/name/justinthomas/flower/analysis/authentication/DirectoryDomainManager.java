@@ -5,19 +5,16 @@
 package name.justinthomas.flower.analysis.authentication;
 
 import name.justinthomas.flower.global.GlobalConfigurationManager;
-import com.sleepycat.je.DatabaseException;
-import com.sleepycat.je.Environment;
-import com.sleepycat.je.EnvironmentConfig;
-import com.sleepycat.persist.EntityCursor;
-import com.sleepycat.persist.EntityStore;
-import com.sleepycat.persist.StoreConfig;
-import java.io.File;
-import java.util.ArrayList;
+import java.io.IOException;
 import java.util.List;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
-import name.justinthomas.flower.analysis.persistence.CustomerConfigurationAccessor;
+import javax.persistence.EntityManager;
+import name.justinthomas.flower.analysis.persistence.ManagedNetworkManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.Logger;
+import org.apache.log4j.PatternLayout;
 
 /**
  *
@@ -25,15 +22,51 @@ import name.justinthomas.flower.manager.services.CustomerAdministration.Customer
  */
 public class DirectoryDomainManager {
 
+    private static final Logger log = Logger.getLogger(DirectoryDomainManager.class.getName());
+    private static FileAppender fileAppender;
     private Customer customer;
-    private Environment environment;
-    private static GlobalConfigurationManager configurationManager;
+    private GlobalConfigurationManager globalConfigurationManager;
+    private EntityManager em;
+    
+    private static GlobalConfigurationManager getGlobalConfigurationManager() {
+        try {
+            return (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+        } catch (NamingException e) {
+            log.error(e.getMessage());
+        }
+
+        return null;
+    }
+    
+    public static EntityManager getEntityManager() {
+        try {
+            return (EntityManager) InitialContext.doLookup("java:comp/env/persistence/Analysis");
+        } catch (NamingException e) {
+            log.error(e.getMessage());
+        }
+
+        return null;
+    }
 
     public DirectoryDomainManager(Customer customer) { 
         this.customer = customer;
+        this.globalConfigurationManager = DirectoryDomainManager.getGlobalConfigurationManager();
+        this.em = ManagedNetworkManager.getEntityManager();
+        
+        if (fileAppender == null) {
+            try {
+                String pattern = "%d{dd MMM yyyy HH:mm:ss.SSS} - %p - %m %n";
+                PatternLayout layout = new PatternLayout(pattern);
+                fileAppender = new FileAppender(layout, globalConfigurationManager.getBaseDirectory() + "/statistics.log");
+                log.addAppender(fileAppender);
+            } catch (IOException e) {
+                log.error(e.getMessage());
+            }
+        }
     }
     
     public Boolean removeGroup(String domain, String group) {
+        /*
         Boolean error = false;
         setupEnvironment();
         try {
@@ -44,10 +77,10 @@ public class DirectoryDomainManager {
             CustomerConfigurationAccessor accessor = new CustomerConfigurationAccessor(entityStore);
 
             if (accessor.directoryDomainByName.contains(domain)) {
-                if (accessor.directoryDomainByName.get(domain).groups.containsKey(group)) {
+                if (accessor.directoryDomainByName.get(domain).getGroups().containsKey(group)) {
                     DirectoryDomain directoryDomain = accessor.directoryDomainByName.get(domain);
-                    directoryDomain.groups.remove(group);
-                    if(directoryDomain.groups.isEmpty()) {
+                    directoryDomain.getGroups().remove(group);
+                    if(directoryDomain.getGroups().isEmpty()) {
                         accessor.directoryDomainByName.delete(domain);
                     } else {
                         accessor.directoryDomainByName.put(directoryDomain);
@@ -69,8 +102,13 @@ public class DirectoryDomainManager {
         }
 
         return !error;
+        * 
+        */
+        return null;
     }
+    
     public Boolean addDirectoryDomain(String domain, String group, Boolean privileged) {
+        /*
         Boolean error = false;
         setupEnvironment();
         try {
@@ -81,9 +119,9 @@ public class DirectoryDomainManager {
             CustomerConfigurationAccessor accessor = new CustomerConfigurationAccessor(entityStore);
 
             if (accessor.directoryDomainByName.contains(domain)) {
-                if (!accessor.directoryDomainByName.get(domain).groups.containsKey(group)) {
+                if (!accessor.directoryDomainByName.get(domain).getGroups().containsKey(group)) {
                     DirectoryDomain directoryDomain = accessor.directoryDomainByName.get(domain);
-                    directoryDomain.groups.put(group, privileged);
+                    directoryDomain.getGroups().put(group, privileged);
                     accessor.directoryDomainByName.put(directoryDomain);
                 } else {
                     System.err.println("DirectoryDomain entry already exists.");
@@ -102,9 +140,13 @@ public class DirectoryDomainManager {
         }
 
         return !error;
+        * 
+        */
+        return null;
     }
 
     public DirectoryDomain getDirectoryDomain(String domain) {
+        /*
         DirectoryDomain directoryDomain = null;
         setupEnvironment();
         try {
@@ -124,9 +166,13 @@ public class DirectoryDomainManager {
         }
 
         return directoryDomain;
+        * 
+        */
+        return null;
     }
 
     public List<DirectoryDomain> getDirectoryDomains() {
+        /*
         List<DirectoryDomain> directoryDomains = new ArrayList();
         setupEnvironment();
         try {
@@ -150,40 +196,8 @@ public class DirectoryDomainManager {
         }
 
         return directoryDomains;
-    }
-
-    private void setupEnvironment() {
-        if (configurationManager == null) {
-            try {
-                configurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
-            } catch (NamingException e) {
-                e.printStackTrace();
-            }
-        }
-
-        File environmentHome = new File(configurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/configuration");
-
-        if (!environmentHome.exists()) {
-            if (environmentHome.mkdirs()) {
-                System.out.println("Created configuration directory: " + environmentHome);
-            } else {
-                System.err.println("Configuration directory '" + environmentHome + "' does not exist and could not be created (permissions?)");
-            }
-        }
-
-        EnvironmentConfig environmentConfig = new EnvironmentConfig();
-        environmentConfig.setAllowCreate(true);
-        environmentConfig.setReadOnly(false);
-        environment = new Environment(environmentHome, environmentConfig);
-    }
-
-    private void closeEnvironment() {
-        if (environment != null) {
-            try {
-                environment.close();
-            } catch (DatabaseException e) {
-                System.err.println("Error closing environment: " + e.toString());
-            }
-        }
+        * 
+        */
+        return null;
     }
 }

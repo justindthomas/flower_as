@@ -67,7 +67,7 @@ public class Alerts {
         if(userAction.authenticate(customerID, user, password).authorized) {
             System.out.println("Deleting alert...");
             AlertManager alertManager = new AlertManager(Utility.getCustomer(customerID));
-            return alertManager.deleteSnortAlert(record);
+            return alertManager.deleteAlert(SnortAlert.class, record);
         }
         return false;
     }
@@ -82,7 +82,7 @@ public class Alerts {
         if(userAction.authenticate(customerID, user, password).authorized) {
             System.out.println("Deleting alert...");
             AlertManager alertManager = new AlertManager(Utility.getCustomer(customerID));
-            return alertManager.deleteModSecurityAlert(record);
+            return alertManager.deleteAlert(ModSecurityAlert.class, record);
         }
         return false;
     }
@@ -101,7 +101,7 @@ public class Alerts {
             System.out.println("Retrieving alerts...");
             AlertManager alertManager = new AlertManager(Utility.getCustomer(customerID));
             Constraints constraints = new Constraints(constraintsString);
-            alerts.addAll(alertManager.getSnortAlerts(constraints));
+            alerts.addAll(alertManager.getAlerts(SnortAlert.class, constraints));
         }
 
         return alerts;
@@ -121,7 +121,7 @@ public class Alerts {
             System.out.println("Retrieving alerts...");
             AlertManager alertManager = new AlertManager(Utility.getCustomer(customerID));
             Constraints constraints = new Constraints(constraintsString);
-            alerts.addAll(alertManager.getModSecurityAlerts(constraints));
+            alerts.addAll(alertManager.getAlerts(ModSecurityAlert.class, constraints));
         }
 
         return alerts;

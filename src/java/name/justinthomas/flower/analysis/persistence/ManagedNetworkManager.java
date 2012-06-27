@@ -5,151 +5,128 @@
 package name.justinthomas.flower.analysis.persistence;
 
 import name.justinthomas.flower.global.GlobalConfigurationManager;
-import com.sleepycat.je.DatabaseException;
-import com.sleepycat.je.Environment;
-import com.sleepycat.je.EnvironmentConfig;
-import com.sleepycat.persist.EntityCursor;
-import com.sleepycat.persist.EntityStore;
-import com.sleepycat.persist.StoreConfig;
-import java.io.File;
-import java.util.ArrayList;
+import java.io.IOException;
 import java.util.List;
+import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.transaction.*;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.Logger;
+import org.apache.log4j.PatternLayout;
 
 /**
  *
  * @author justin
  */
+@PersistenceContext(name = "persistence/Analysis", unitName = "AnalysisPU")
 public class ManagedNetworkManager {
 
+    private static final Logger log = Logger.getLogger(ManagedNetworkManager.class.getName());
+    private static FileAppender fileAppender;
     private Customer customer;
-    private static GlobalConfigurationManager globalConfigurationManager;
-    private Environment environment;
+    private GlobalConfigurationManager globalConfigurationManager;
+    private EntityManager em;
 
+    private static GlobalConfigurationManager getGlobalConfigurationManager() {
+        try {
+            return (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+        } catch (NamingException e) {
+            log.error(e.getMessage());
+        }
+
+        return null;
+    }
+    
+    public static EntityManager getEntityManager() {
+        try {
+            return (EntityManager) InitialContext.doLookup("java:comp/env/persistence/Analysis");
+        } catch (NamingException e) {
+            log.error(e.getMessage());
+        }
+
+        return null;
+    }
+    
     public ManagedNetworkManager(Customer customer) {
         this.customer = customer;
+        this.globalConfigurationManager = ManagedNetworkManager.getGlobalConfigurationManager();
+        this.em = ManagedNetworkManager.getEntityManager();
+        
+        if (fileAppender == null) {
+            try {
+                String pattern = "%d{dd MMM yyyy HH:mm:ss.SSS} - %p - %m %n";
+                PatternLayout layout = new PatternLayout(pattern);
+                fileAppender = new FileAppender(layout, globalConfigurationManager.getBaseDirectory() + "/statistics.log");
+                log.addAppender(fileAppender);
+            } catch (IOException e) {
+                log.error(e.getMessage());
+            }
+        }
     }
     
     public List<ManagedNetwork> getManagedNetworks() {
-        ArrayList<ManagedNetwork> networks = new ArrayList();
-
-        setupEnvironment();
-        try {
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
-            EntityStore entityStore = new EntityStore(environment, "ManagedNetwork", storeConfig);
-            CustomerConfigurationAccessor accessor = new CustomerConfigurationAccessor(entityStore);
-
-            EntityCursor<ManagedNetwork> cursor = accessor.managedNetworkByAddress.entities();
-            
-            for(ManagedNetwork network : cursor) {
-                networks.add(network);
-            }
-
-            cursor.close();
-            entityStore.close();
-        } catch (DatabaseException e) {
-            System.err.println("DatabaseException in ManagedNetworkManager: " + e.getMessage());
-        } catch (Throwable t) {
-            t.printStackTrace();
-        } finally {
-            closeEnvironment();
-        }
-
-        return networks;
+        System.out.println("Getting managed networks for: " + customer.getAccount());
+ 
+        return (List) em.createQuery(
+                "SELECT s FROM ManagedNetwork s WHERE s.accountId LIKE :accountid")
+                    .setParameter("accountid", customer.getAccount())
+                    .getResultList();
     }
 
-    public Boolean addManagedNetwork(ManagedNetwork network) {
-        Boolean error = false;
-        setupEnvironment();
-        try {
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
-            EntityStore entityStore = new EntityStore(environment, "ManagedNetwork", storeConfig);
-            CustomerConfigurationAccessor accessor = new CustomerConfigurationAccessor(entityStore);
-
-            if(!accessor.managedNetworkByAddress.contains(network.address)) {
-                accessor.managedNetworkByAddress.put(network);
-            } else {
-                System.err.println("Attempted to add managed network that already exists.");
-                error = true;
-            }
-
-            entityStore.close();
-        } catch (DatabaseException e) {
-            System.err.println("DatabaseException in ManagedNetworkManager: " + e.getMessage());
-        } finally {
-            closeEnvironment();
+    public ManagedNetwork getManagedNetwork(String address) {
+        System.out.println("Getting managed network " + address + " for: " + customer.getAccount());
+        
+        List managedNetworks = (List) em.createQuery(
+                "SELECT s FROM ManagedNetwork s WHERE s.accountId LIKE :accountid AND s.address LIKE :address")
+                    .setParameter("accountid", customer.getAccount())
+                    .setParameter("address", address)
+                    .getResultList();
+        
+        if(managedNetworks.size() > 1) {
+            log.error("ManagedNetworkManager: too many results");
+        } else if(!managedNetworks.isEmpty()) {
+            return (ManagedNetwork) managedNetworks.get(0);
         }
+        
+        return null;
+    }
+    
+    public Boolean addManagedNetwork(ManagedNetwork network) {
+        System.out.println("Adding ManagedNetwork: " + network.toString());
+        
+        try {
+            Context context = new InitialContext();
+            UserTransaction utx = (UserTransaction) context.lookup("java:comp/UserTransaction");
 
-        return !error;
+            utx.begin();
+            em.persist(network);
+            utx.commit();
+        } catch (NullPointerException npe) {
+            npe.printStackTrace();
+        } catch (NotSupportedException nse) {
+            nse.printStackTrace();
+        } catch (RollbackException rbe) {
+            rbe.printStackTrace();
+        } catch (HeuristicMixedException hme) {
+            hme.printStackTrace();
+        } catch (HeuristicRollbackException hrbe) {
+            hrbe.printStackTrace();
+        } catch (SystemException se) {
+            se.printStackTrace();
+        } catch (NamingException ne) {
+            ne.printStackTrace();
+        }
+        
+        return true;
     }
 
     public Boolean deleteManagedNetwork(String address) {
-        Boolean error = false;
-
-        setupEnvironment();
-        try {
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
-            EntityStore entityStore = new EntityStore(environment, "ManagedNetwork", storeConfig);
-            CustomerConfigurationAccessor accessor = new CustomerConfigurationAccessor(entityStore);
-
-            if(accessor.managedNetworkByAddress.contains(address)) {
-                accessor.managedNetworkByAddress.delete(address);
-            } else {
-                System.err.println("Attempted to delete managed network that does not exist.");
-                error = true;
-            }
-
-            entityStore.close();
-        } catch (DatabaseException e) {
-            System.err.println("DatabaseException in ManagedNetworkManager: " + e.getMessage());
-        } finally {
-            closeEnvironment();
-        }
-
-        return !error;
-    }
-    
-    private void setupEnvironment() {
-        if (globalConfigurationManager == null) {
-            try {
-                globalConfigurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
-            } catch (NamingException e) {
-                e.printStackTrace();
-            }
-        }
-
-        File environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/configuration");
-
-        if (!environmentHome.exists()) {
-            if (environmentHome.mkdirs()) {
-                System.out.println("Created directory: " + environmentHome);
-            } else {
-                System.err.println("Configuration directory '" + environmentHome + "' does not exist and could not be created (permissions?)");
-            }
-        }
-
-        EnvironmentConfig environmentConfig = new EnvironmentConfig();
-        environmentConfig.setAllowCreate(true);
-        environmentConfig.setReadOnly(false);
-        //environmentConfig.setConfigParam(EnvironmentConfig.CLEANER_EXPUNGE, "false");
-        environment = new Environment(environmentHome, environmentConfig);
-    }
-
-    private void closeEnvironment() {
-        if (environment != null) {
-            try {
-                environment.close();
-            } catch (DatabaseException e) {
-                System.err.println("Error closing environment: " + e.toString());
-            }
-        }
+        ManagedNetwork managedNetwork = this.getManagedNetwork(address);
+        em.remove(managedNetwork);
+        return true;
     }
 }

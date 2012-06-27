@@ -237,8 +237,8 @@ public class Administration {
         if (token.authenticated && token.authorized && token.administrator) {
             for (DirectoryDomain directoryDomain : new DirectoryDomainManager(Utility.getCustomer(customerID)).getDirectoryDomains()) {
                 XMLDirectoryDomain xdomain = new XMLDirectoryDomain();
-                xdomain.domain = directoryDomain.domain;
-                for (Entry<String, Boolean> group : directoryDomain.groups.entrySet()) {
+                xdomain.domain = directoryDomain.getDomain();
+                for (Entry<String, Boolean> group : directoryDomain.getGroups().entrySet()) {
                     XMLDirectoryGroup xgroup = new XMLDirectoryGroup();
                     xgroup.name = group.getKey();
                     xgroup.privileged = group.getValue();

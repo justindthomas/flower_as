@@ -252,35 +252,35 @@ public class ActiveDirectory {
         } else {
             for (DirectoryDomain item : directoryDomainManager.getDirectoryDomains()) {
                 log.debug("Trying: " + username + "@" + domain);
-                env.put(Context.SECURITY_PRINCIPAL, username + "@" + item.domain);
-                String url = getLdapServer(item.domain) + ":636";
+                env.put(Context.SECURITY_PRINCIPAL, username + "@" + item.getDomain());
+                String url = getLdapServer(item.getDomain()) + ":636";
                 if (url != null) {
                     env.put(Context.PROVIDER_URL, url);
                     try {
                         ctx = new InitialLdapContext(env, null);
                     } catch (AuthenticationException e) {
-                        log.warn("Failed: " + item.domain);
+                        log.warn("Failed: " + item.getDomain());
                         continue;
                     } catch (CommunicationException e) {
-                        log.warn("Failed: " + item.domain + "/" + e.getExplanation() + " this is probably due to a certificate error.");
+                        log.warn("Failed: " + item.getDomain() + "/" + e.getExplanation() + " this is probably due to a certificate error.");
 
                         if (configurationManager.getUnsafeLdap()) {
-                            log.warn("Attempting unencrypted authentication: " + item.domain);
-                            ctx = tryUnsafe(item.domain, ctx, env);
+                            log.warn("Attempting unencrypted authentication: " + item.getDomain());
+                            ctx = tryUnsafe(item.getDomain(), ctx, env);
                         }
 
                         if (domain != null) {
-                            log.warn("Unencrypted authentication was successful against: " + item.domain);
+                            log.warn("Unencrypted authentication was successful against: " + item.getDomain());
                             break;
                         }
 
                         continue;
                     } catch (NamingException e) {
-                        log.warn("Failed: " + item.domain + "/" + e.getExplanation());
+                        log.warn("Failed: " + item.getDomain() + "/" + e.getExplanation());
                         continue;
                     }
-                    this.domain = item.domain;
-                    log.debug("Authentication seems to have succeeded against: " + item.domain);
+                    this.domain = item.getDomain();
+                    log.debug("Authentication seems to have succeeded against: " + item.getDomain());
                     break;
                 }
             }
@@ -307,7 +307,7 @@ public class ActiveDirectory {
 
     private AuthenticationToken authorize(LdapContext ctx, String domain, AuthenticationToken token) {
         log.debug("Getting groups for: " + domain);
-        Map<String, Boolean> groups = directoryDomainManager.getDirectoryDomain(domain).groups;
+        Map<String, Boolean> groups = directoryDomainManager.getDirectoryDomain(domain).getGroups();
 
         for (String group : groups.keySet()) {
             log.debug("Evaluating: " + group);
