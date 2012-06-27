@@ -4,46 +4,72 @@
  */
 package name.justinthomas.flower.analysis.persistence;
 
-import name.justinthomas.flower.global.GlobalConfigurationManager;
-import com.sleepycat.je.Environment;
-import com.sleepycat.je.EnvironmentConfig;
-import com.sleepycat.persist.EntityStore;
-import com.sleepycat.persist.StoreConfig;
-import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.transaction.*;
+import name.justinthomas.flower.analysis.authentication.UserManager;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.Logger;
+import org.apache.log4j.SimpleLayout;
 
 /**
  *
  * @author justin
  */
+@PersistenceContext(name = "persistence/Analysis", unitName = "AnalysisPU")
 public class FrequencyManager {
 
-    private static Integer DEBUG = 0;
+    private static final Logger log = Logger.getLogger(UserManager.class.getName());
+    private static FileAppender fileAppender;
     private Customer customer;
-    private File environmentHome = null;
     private static GlobalConfigurationManager globalConfigurationManager;
-    //private final Map<String, Integer> map = Collections.synchronizedMap(new HashMap<String, Integer>());
-    private final Map<String, Integer> map = new ConcurrentHashMap();
+    private final Map<TransportPairing, Integer> map = new ConcurrentHashMap();
+    private EntityManager em;
+
+    public static EntityManager getEntityManager() {
+        try {
+            return (EntityManager) InitialContext.doLookup("java:comp/env/persistence/Analysis");
+        } catch (NamingException e) {
+            log.error(e.getMessage());
+        }
+
+        return null;
+    }
 
     public FrequencyManager(Customer customer) {
         this.customer = customer;
         setConfiguration();
-        loadMap();
+        em = FrequencyManager.getEntityManager();
+        
+        if (fileAppender == null) {
+            try {
+                fileAppender = new FileAppender(new SimpleLayout(), globalConfigurationManager.getBaseDirectory() + "/authentication.log");
+                log.addAppender(fileAppender);
+            } catch (IOException e) {
+                log.error(e.getMessage());
+            }
+        }
 
-        if (DEBUG >= 1) {
-            System.out.println("Setting UpdateDatabase to run in 60 minutes and every hour.");
+        PersistentFrequency stored = loadMap();
+        if(stored != null) {
+            map.putAll(stored.getFrequencyMap());
         }
 
         ScheduledThreadPoolExecutor stpe = new ScheduledThreadPoolExecutor(3);
-        UpdateDatabase ud = new UpdateDatabase(environmentHome, this);
+        UpdateDatabase ud = new UpdateDatabase(customer, this);
         stpe.scheduleAtFixedRate(ud, 15, 15, TimeUnit.MINUTES);
     }
 
@@ -55,80 +81,46 @@ public class FrequencyManager {
         } catch (NamingException e) {
             e.printStackTrace();
         }
-
-        if (environmentHome == null) {
-            environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/frequency");
-
-            //System.out.println("Frequency Directory: " + environmentHome);
-            try {
-                if (!environmentHome.exists()) {
-                    if (!environmentHome.mkdirs()) {
-                        throw new Exception("Could not open or create base directory.");
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("Error: " + e.getMessage());
-            }
-        }
     }
 
-    private void loadMap() {
-        if (DEBUG >= 1) {
-            System.out.println("Populating frequency map from storage.");
-        }
-        EnvironmentConfig environmentConfig = new EnvironmentConfig();
-        environmentConfig.setAllowCreate(true);
-        environmentConfig.setReadOnly(false);
-        Environment environment = new Environment(environmentHome, environmentConfig);
-        StoreConfig storeConfig = new StoreConfig();
-        storeConfig.setAllowCreate(true);
-        storeConfig.setReadOnly(false);
-        EntityStore entityStore = new EntityStore(environment, "Frequency", storeConfig);
+    private PersistentFrequency loadMap() {
+        System.out.println("Retrieving frequency map from storage.");
 
-        FrequencyAccessor dataAccessor = new FrequencyAccessor(entityStore);
-        int i = 0;
-        for (Entry<String, PersistentFrequency> entry : dataAccessor.frequencyByPort.map().entrySet()) {
-            i++;
-            map.put(entry.getKey(), entry.getValue().frequency);
-        }
+        PersistentFrequency pf = null;
+        
+        List<PersistentFrequency> frequencies = (List<PersistentFrequency>) em.createQuery(
+                "SELECT f FROM PersistentFrequency f WHERE f.accountId LIKE :accountid").setParameter("accountid", customer.getAccount()).getResultList();
 
-        //System.out.println("Frequency records retrieved: " + i);
-
-        if (entityStore != null) {
-            entityStore.close();
+        if (frequencies.size() > 1) {
+            System.err.println("FrequencyManager: too many results");
+        } else if (!frequencies.isEmpty()) {
+            pf = frequencies.get(0);
         }
-        if (environment != null && environment.isValid()) {
-            environment.cleanLog();
-            environment.close();
-        }
-        if (DEBUG >= 1) {
-            System.out.println("Frequency map populated.");
-        }
+        
+        return pf;
     }
 
-    public void incrementFrequency(String protocol_port) {
-        if (DEBUG >= 3) {
-            System.out.println("Incrementing frequency for: " + protocol_port);
-        }
-
-        if (map.get(protocol_port) != null) {
-            map.put(protocol_port, map.get(protocol_port) + 1);
+    public void incrementFrequency(Integer protocol, Integer port) {
+        TransportPairing pairing = new TransportPairing(protocol, port);
+        if (map.get(pairing) != null) {
+            map.put(pairing, map.get(pairing) + 1);
         } else {
-            map.put(protocol_port, 1);
+            map.put(pairing, 1);
         }
     }
 
-    public Integer getFrequency(String protocol_port) {
-        if (map.get(protocol_port) == null) {
+    public Integer getFrequency(Integer protocol, Integer port) {
+        TransportPairing pairing = new TransportPairing(protocol, port);
+
+        if (map.get(pairing) == null) {
             return 0;
         }
 
-        return map.get(protocol_port);
+        return map.get(pairing);
     }
 
     public void addPort(Integer protocol, Integer port) {
-        String key = protocol.toString() + "_" + port.toString();
-        incrementFrequency(key);
+        incrementFrequency(protocol, port);
     }
 
     public void addPort(Integer protocol, Integer[] port) {
@@ -137,95 +129,8 @@ public class FrequencyManager {
         }
     }
 
-    public Integer getFrequency(Integer protocol, Integer port) {
-        String key = protocol.toString() + "_" + port.toString();
-        return getFrequency(key);
-    }
-
-    public class UpdateDatabase implements Runnable {
-
-        File environmentHome;
-        FrequencyManager frequencyManager;
-
-        public UpdateDatabase(File environmentHome, FrequencyManager frequencyManager) {
-            this.environmentHome = environmentHome;
-            this.frequencyManager = frequencyManager;
-        }
-
-        private void saveMap() {
-            if (DEBUG >= 1) {
-                System.out.println("Saving frequency map...");
-            }
-            EnvironmentConfig environmentConfig = new EnvironmentConfig();
-            environmentConfig.setAllowCreate(true);
-            environmentConfig.setReadOnly(false);
-
-            Environment environment = new Environment(environmentHome, environmentConfig);
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
-            EntityStore entityStore = new EntityStore(environment, "Frequency", storeConfig);
-
-            FrequencyAccessor dataAccessor = new FrequencyAccessor(entityStore);
-
-            if (DEBUG >= 1) {
-                System.out.println("Setting up Frequency EntrySet");
-            }
-
-            Set<Entry<String, Integer>> entries = map.entrySet();
-
-            if (DEBUG >= 1) {
-                System.out.println("Setting up Frequency Iterator");
-            }
-
-            int recordCount = 0;
-            //synchronized (map) {
-
-            if (DEBUG >= 1) {
-                System.out.println("Entering save loop.");
-            }
-            for (Entry<String, Integer> entry : entries) {
-                if (DEBUG >= 2) {
-                    System.out.println("Record: " + recordCount++);
-                } else if (DEBUG >= 1 && (++recordCount % 10000 == 0)) {
-                    System.out.println("Record: " + recordCount);
-                }
-                PersistentFrequency htf = new PersistentFrequency(entry.getKey(), entry.getValue());
-                dataAccessor.frequencyByPort.put(htf);
-            }
-            //}
-
-            if (DEBUG >= 1) {
-                System.out.println("Records saved: " + recordCount);
-            }
-
-            if (entityStore != null) {
-                entityStore.close();
-            }
-
-            if (environment.isValid()) {
-                environment.close();
-            }
-
-            if (DEBUG >= 1) {
-                System.out.println("Frequency map update completed.");
-            }
-        }
-
-        @Override
-        public void run() {
-            if(frequencyManager.getLargestFrequency() > (0.75 * Integer.MAX_VALUE)) {
-                pruneMap();
-            }
-
-            saveMap();
-        }
-    }
-
     public void pruneMap() {
-        int i = 0;
-        for(Entry<String, Integer> frequency : map.entrySet()) {
-            //if(++i % 1000 == 0) System.out.println("Reducing: " + frequency.getValue() + " to: " + new Double(0.1 * frequency.getValue()).intValue());
+        for (Entry<TransportPairing, Integer> frequency : map.entrySet()) {
             map.put(frequency.getKey(), new Double(0.1 * frequency.getValue()).intValue());
         }
     }
@@ -242,5 +147,63 @@ public class FrequencyManager {
             }
         }
         return i;
+    }
+    
+    public class UpdateDatabase implements Runnable {
+        Customer customer;
+        FrequencyManager frequencyManager;
+
+        public UpdateDatabase(Customer customer, FrequencyManager frequencyManager) {
+            this.customer = customer;
+            this.frequencyManager = frequencyManager;
+        }
+
+        private void saveMap() {
+            try {
+                Context context = new InitialContext();
+                UserTransaction utx = (UserTransaction) context.lookup("java:comp/UserTransaction");
+
+                if (frequencyManager.loadMap() != null) {
+                    PersistentFrequency stored = frequencyManager.loadMap();
+                    stored.getFrequencyMap().clear();
+                    stored.getFrequencyMap().putAll(frequencyManager.map);
+
+                    utx.begin();
+                    em.merge(stored);
+                    utx.commit();
+                } else {
+                    PersistentFrequency frequencies = new PersistentFrequency();
+                    frequencies.setAccountId(customer.getAccount());
+                    frequencies.setFrequencyMap(new HashMap<TransportPairing, Integer>());
+                    
+                    utx.begin();
+                    em.persist(frequencies);
+                    utx.commit();
+                }
+            } catch (NullPointerException npe) {
+                npe.printStackTrace();
+            } catch (NotSupportedException nse) {
+                nse.printStackTrace();
+            } catch (RollbackException rbe) {
+                rbe.printStackTrace();
+            } catch (HeuristicMixedException hme) {
+                hme.printStackTrace();
+            } catch (HeuristicRollbackException hrbe) {
+                hrbe.printStackTrace();
+            } catch (SystemException se) {
+                se.printStackTrace();
+            } catch (NamingException ne) {
+                ne.printStackTrace();
+            }
+        }
+
+        @Override
+        public void run() {
+            if (frequencyManager.getLargestFrequency() > (0.75 * Integer.MAX_VALUE)) {
+                pruneMap();
+            }
+
+            saveMap();
+        }
     }
 }

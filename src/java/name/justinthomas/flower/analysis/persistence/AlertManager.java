@@ -17,7 +17,6 @@ import name.justinthomas.flower.manager.services.CustomerAdministration.Customer
 public class AlertManager {
 
     private Customer customer;
-    private static final Integer DEBUG = 2;
     private static GlobalConfigurationManager configurationManager;
     
     public AlertManager(Customer customer) {

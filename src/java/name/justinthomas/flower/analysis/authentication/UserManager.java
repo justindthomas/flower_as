@@ -1,23 +1,19 @@
 package name.justinthomas.flower.analysis.authentication;
 
-import name.justinthomas.flower.global.GlobalConfigurationManager;
-import com.sleepycat.je.DatabaseException;
-import com.sleepycat.je.Environment;
-import com.sleepycat.je.EnvironmentConfig;
-import com.sleepycat.persist.EntityStore;
-import com.sleepycat.persist.ForwardCursor;
-import com.sleepycat.persist.StoreConfig;
-import java.io.File;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Security;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
-import java.util.TimeZone;
+import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.transaction.*;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
@@ -28,21 +24,32 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
  *
  * @author justin
  */
-public class UserManager {
+@PersistenceContext(name = "persistence/Analysis", unitName = "AnalysisPU")
+public final class UserManager {
 
     private static final Logger log = Logger.getLogger(UserManager.class.getName());
     private static FileAppender fileAppender;
     private Customer customer;
-    private static Integer DEBUG = 1;
-    private Environment environment;
-    private static GlobalConfigurationManager globalConfigurationManager;
+    private GlobalConfigurationManager globalConfigurationManager;
+    private EntityManager em;
+
+    public static EntityManager getEntityManager() {
+        try {
+            return (EntityManager) InitialContext.doLookup("java:comp/env/persistence/Analysis");
+        } catch (NamingException e) {
+            log.error(e.getMessage());
+        }
+
+        return null;
+    }
 
     public UserManager(Customer customer) {
         this.customer = customer;
+        this.em = UserManager.getEntityManager();
 
-        if (globalConfigurationManager == null) {
+        if (this.globalConfigurationManager == null) {
             try {
-                globalConfigurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
+                this.globalConfigurationManager = (GlobalConfigurationManager) InitialContext.doLookup("java:global/Analysis/GlobalConfigurationManager");
             } catch (NamingException e) {
                 log.error(e.getMessage());
             }
@@ -56,16 +63,20 @@ public class UserManager {
                 log.error(e.getMessage());
             }
         }
+        
+        if(this.getUsers().isEmpty()) {
+            this.createFirstUser();
+        }
     }
 
     private void createFirstUser() {
         Security.addProvider(new BouncyCastleProvider());
         MessageDigest hash = null;
         StringBuilder builder = new StringBuilder();
-        
+
         try {
             Random r = new Random();
-            
+
             for (int i = 0; i < 8; i++) {
                 int c;
                 c = r.nextInt(126);
@@ -85,52 +96,38 @@ public class UserManager {
 
         try {
             log.debug("Creating first user: flower, " + builder.toString());
-            updateUser(new User("flower", new String(hash.digest()), "Administrator", true, "PST"));
+            updateUser(new FlowerUser(customer.getAccount(), "flower", new String(hash.digest()), "Administrator", true, "PST"));
         } catch (Exception e) {
             log.error(e.getMessage());
         }
     }
 
     public Boolean deleteUser(String userName) {
-        setupEnvironment();
-        Boolean deleted = false;
+        FlowerUser user = this.getUser(userName);
+        Boolean deleted;
+        
         try {
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
-            EntityStore entityStore = new EntityStore(environment, "User", storeConfig);
-            UserAccessor accessor = new UserAccessor(entityStore);
-
-            deleted = accessor.userById.delete(userName);
-
-            entityStore.close();
-        } catch (DatabaseException e) {
-            log.error(e.getMessage());
-        } finally {
-            closeEnvironment();
+            em.remove(user);
+            deleted = true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            deleted = false;
         }
-
+        
         return deleted;
     }
 
-    public User getUser(String userName) {
-        setupEnvironment();
-        User user = null;
+    public FlowerUser getUser(String userName) {
+        System.out.println("Retrieving user: " + userName + " from storage.");
+        FlowerUser user = null;
 
-        try {
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(false);
-            storeConfig.setReadOnly(true);
-            EntityStore entityStore = new EntityStore(environment, "User", storeConfig);
-            UserAccessor accessor = new UserAccessor(entityStore);
+        List<FlowerUser> users = (List<FlowerUser>) em.createQuery(
+                "SELECT u FROM FlowerUser u WHERE u.username LIKE :username").setParameter("username", userName).getResultList();
 
-            user = accessor.userById.get(userName);
-
-            entityStore.close();
-        } catch (Throwable t) {
-            log.error(t.getMessage());
-        } finally {
-            closeEnvironment();
+        if (users.size() > 1) {
+            System.err.println("UserManager: too many results");
+        } else if (!users.isEmpty()) {
+            user = users.get(0);
         }
 
         return user;
@@ -151,7 +148,7 @@ public class UserManager {
         }
 
         try {
-            updateUser(new User(user, new String(hash.digest()), fullName, administrator, timeZone));
+            updateUser(new FlowerUser(customer.getAccount(), user, new String(hash.digest()), fullName, administrator, timeZone));
         } catch (Exception e) {
             log.error(e.getMessage());
             return false;
@@ -159,79 +156,46 @@ public class UserManager {
         return true;
     }
 
-    private void updateUser(User user) {
-        log.debug("Updating User: " + user.username);
+    private void updateUser(FlowerUser user) {
+        System.out.println("Persisting " + user.getUsername() + " to long-term storage.");
 
-        setupEnvironment();
         try {
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(true);
-            storeConfig.setReadOnly(false);
-            EntityStore entityStore = new EntityStore(environment, "User", storeConfig);
-            UserAccessor accessor = new UserAccessor(entityStore);
+            Context context = new InitialContext();
+            UserTransaction utx = (UserTransaction) context.lookup("java:comp/UserTransaction");
 
-            accessor.userById.put(user);
-            entityStore.close();
-        } catch (DatabaseException e) {
-            log.error(e.getMessage());
-        } finally {
-            closeEnvironment();
+            if (this.getUser(user.getUsername()) != null) {
+                FlowerUser stored = this.getUser(user.getUsername());
+                user.setId(stored.getId());
+                utx.begin();
+                em.merge(stored);
+                utx.commit();
+            } else {
+                utx.begin();
+                em.persist(user);
+                utx.commit();
+            }
+        } catch (NullPointerException npe) {
+            npe.printStackTrace();
+        } catch (NotSupportedException nse) {
+            nse.printStackTrace();
+        } catch (RollbackException rbe) {
+            rbe.printStackTrace();
+        } catch (HeuristicMixedException hme) {
+            hme.printStackTrace();
+        } catch (HeuristicRollbackException hrbe) {
+            hrbe.printStackTrace();
+        } catch (SystemException se) {
+            se.printStackTrace();
+        } catch (NamingException ne) {
+            ne.printStackTrace();
         }
     }
 
-    public ArrayList<User> getUsers() {
-        setupEnvironment();
-        ArrayList<User> users = new ArrayList<User>();
+    public List<FlowerUser> getUsers() {
+        System.out.println("Retrieving users from storage.");
 
-        try {
-            StoreConfig storeConfig = new StoreConfig();
-            storeConfig.setAllowCreate(false);
-            storeConfig.setReadOnly(true);
-            EntityStore entityStore = new EntityStore(environment, "User", storeConfig);
-            UserAccessor accessor = new UserAccessor(entityStore);
-
-            ForwardCursor<User> cursor = accessor.userById.entities();
-
-            for (User user : cursor) {
-                users.add(user);
-            }
-
-            cursor.close();
-            entityStore.close();
-        } catch (DatabaseException e) {
-            log.error(e.getMessage());
-        } finally {
-            closeEnvironment();
-        }
+        List<FlowerUser> users = (List<FlowerUser>) em.createQuery("SELECT u FROM FlowerUser u").getResultList();
 
         return users;
-    }
-
-    private void setupEnvironment() {
-        File environmentHome = new File(globalConfigurationManager.getBaseDirectory() + "/customers/" + customer.getDirectory() + "/users");
-
-        if (!environmentHome.exists()) {
-            if (environmentHome.mkdirs()) {
-                log.debug("Created user directory: " + environmentHome);
-                createFirstUser();
-            } else {
-                log.error("User directory '" + environmentHome + "' does not exist and could not be created (permissions?)");
-            }
-        }
-
-        EnvironmentConfig environmentConfig = new EnvironmentConfig();
-        environmentConfig.setAllowCreate(true);
-        environmentConfig.setReadOnly(false);
-        environment = new Environment(environmentHome, environmentConfig);
-    }
-
-    private void closeEnvironment() {
-        if (environment != null) {
-            try {
-                environment.close();
-            } catch (DatabaseException e) {
-                log.error(e.getMessage());
-            }
-        }
     }
 }

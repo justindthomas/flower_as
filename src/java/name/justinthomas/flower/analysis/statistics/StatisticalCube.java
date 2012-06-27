@@ -3,6 +3,7 @@ package name.justinthomas.flower.analysis.statistics;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
@@ -63,6 +64,7 @@ public class StatisticalCube implements Serializable {
         this.accountId = accountId;
     }
 
+    @Column(unique=true)
     public String getAccountId() {
         return accountId;
     }

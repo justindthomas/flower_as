@@ -1,5 +1,7 @@
 package name.justinthomas.flower.analysis.persistence;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.*;
 import javax.naming.Context;
 import javax.naming.InitialContext;
@@ -10,10 +12,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import javax.transaction.*;
 import name.justinthomas.flower.analysis.element.Flow;
-import name.justinthomas.flower.analysis.element.Network;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolume;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDataVolumeList;
-import name.justinthomas.flower.analysis.services.xmlobjects.XMLNetworkList;
+import name.justinthomas.flower.analysis.statistics.StatisticalInterval;
 import name.justinthomas.flower.analysis.statistics.StatisticsManager;
 import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
@@ -24,9 +25,6 @@ public class FlowManager {
     private Customer customer;
     private GlobalConfigurationManager globalConfigurationManager;
     private EntityManager em;
-    private UserTransaction utx;
-    private Context envCtx;
-
 
     public FlowManager(Customer customer) {
         this.customer = customer;
@@ -36,130 +34,110 @@ public class FlowManager {
         } catch (NamingException e) {
             e.printStackTrace();
         }
-        
+
         try {
-            this.envCtx = new InitialContext();
-            this.em = (EntityManager) envCtx.lookup("java:comp/env/persistence/Analysis");
-            this.utx = (UserTransaction)envCtx.lookup("java:comp/UserTransaction");
+            this.em = (EntityManager) InitialContext.doLookup("java:comp/env/persistence/Analysis");
         } catch (NamingException e) {
             e.printStackTrace();
         }
     }
 
+    public List<PersistentFlow> getFlows(Set<Long> ids) {
+        List<PersistentFlow> flows = new ArrayList();
+
+        for (Long id : ids) {
+            flows.add((PersistentFlow) em.find(PersistentFlow.class, id));
+        }
+
+        return flows;
+    }
+
     public void getFlows(HttpSession session, String constraintsString, String tracker) {
-        /*
         System.out.println("getFlows called.");
         Constraints constraints = new Constraints(constraintsString);
         SessionManager.getFlows(session, tracker).clear();
 
         StatisticsManager statisticsManager = new StatisticsManager(customer);
-        LinkedList<StatisticalInterval> intervals = statisticsManager.getStatisticalIntervals(session, constraints, null);
+        List<StatisticalInterval> intervals = statisticsManager.getStatisticalIntervals(constraints, null);
 
-        LinkedHashMap<Long, Long> flowIDs = new LinkedHashMap();
+        HashSet<Long> flowIDs = new HashSet();
 
         for (StatisticalInterval interval : intervals) {
             for (Long id : interval.getFlowIDs()) {
-                flowIDs.put(id, null);
+                flowIDs.add(id);
             }
         }
 
+        List<PersistentFlow> flows = this.getFlows(flowIDs);
+
+
         System.out.println("Total flagged IDs: " + flowIDs.size());
-        Environment environment;
-        EntityStore readOnlyEntityStore = new EntityStore(environment = setupEnvironment(), "Flow", this.getStoreConfig(true));
-        FlowAccessor dataAccessor = new FlowAccessor(readOnlyEntityStore);
 
-        Integer flowsProcessed = 0;
         try {
-            for (Long id : flowIDs.keySet()) {
-                if (dataAccessor.flowById.contains(id)) {
-                    PersistentFlow pflow = dataAccessor.flowById.get(id);
-                    Boolean select = false;
-                    if (constraints.sourceAddressList.isEmpty() || constraints.sourceAddressList.contains(InetAddress.getByName(pflow.getSource()))) {
-                        select = true;
-                    } else if (constraints.destinationAddressList.isEmpty() || constraints.destinationAddressList.contains(InetAddress.getByName(pflow.getDestination()))) {
-                        select = true;
-                    }
+            for (PersistentFlow pflow : flows) {
+                Boolean select = false;
+                if (constraints.sourceAddressList.isEmpty() || constraints.sourceAddressList.contains(InetAddress.getByName(pflow.getSource()))) {
+                    select = true;
+                } else if (constraints.destinationAddressList.isEmpty() || constraints.destinationAddressList.contains(InetAddress.getByName(pflow.getDestination()))) {
+                    select = true;
+                }
 
-                    if (select) {
-                        SessionManager.getFlows(session, tracker).add(new Flow(customer, pflow));
-                    }
+                if (select) {
+                    SessionManager.getFlows(session, tracker).add(new Flow(customer, pflow));
+                }
 
-                    if (DEBUG > 0) {
-                        if (++flowsProcessed % 10000 == 0) {
-                            System.out.println("Flows processed: " + flowsProcessed);
-                        }
-                    }
-
-                    if (Thread.currentThread().isInterrupted()) {
-                        throw new InterruptedException();
-                    }
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new InterruptedException();
                 }
             }
-
         } catch (InterruptedException ie) {
             System.err.println("FlowManager interrupted during getFlows: " + ie.getMessage());
         } catch (UnknownHostException uhe) {
             System.err.println("FlowManager interrupted during getFlows: " + uhe.getMessage());
-        } finally {
-            closeStore(readOnlyEntityStore);
-            closeEnvironment(environment);
         }
-        * 
-        */
     }
 
     public Long rebuildStatistics(String collector, Long start) {
 
         /*
-        StatisticsManager statisticsManager = new StatisticsManager(customer);
-
-        Environment environment;
-        EntityStore readOnlyEntityStore = new EntityStore(environment = setupEnvironment(), "Flow", this.getStoreConfig(true));
-        FlowAccessor dataAccessor = new FlowAccessor(readOnlyEntityStore);
-
-        Long id = null;
-        ForwardCursor<PersistentFlow> flowCursor = null;
-
-        try {
-            System.out.println("beginning to build statistics from flows, starting at: " + start + "...");
-
-
-            int flowsProcessed = 0;
-            PersistentFlow flow = null;
-
-            if (start == 0l) {
-                flowCursor = dataAccessor.flowById.entities();
-            } else {
-                flowCursor = dataAccessor.flowById.entities(start, false, null, false);
-            }
-
-            while ((flow = flowCursor.next()) != null) {
-                statisticsManager.addStatisticalSeconds(new Flow(customer, flow), flow.getId(), InetAddress.getByName(collector));
-
-                id = flow.getId();
-                if (++flowsProcessed % 20000 == 0) {
-                    System.out.println("processed " + flowsProcessed + " flows to statistics - pausing at: " + id);
-                    break;
-                }
-            }
-
-            if (flow == null) {
-                System.out.println("completed building statistics from flows.");
-                id = null;
-            }
-        } catch (UnknownHostException uhe) {
-            System.err.println("Error in rebuildStatistics: " + uhe.getMessage());
-        } finally {
-            if (flowCursor != null) {
-                flowCursor.close();
-            }
-            closeStore(readOnlyEntityStore);
-            closeEnvironment(environment);
-        }
-
-        return id;
-        * 
-        */
+         * StatisticsManager statisticsManager = new
+         * StatisticsManager(customer);
+         *
+         * Environment environment; EntityStore readOnlyEntityStore = new
+         * EntityStore(environment = setupEnvironment(), "Flow",
+         * this.getStoreConfig(true)); FlowAccessor dataAccessor = new
+         * FlowAccessor(readOnlyEntityStore);
+         *
+         * Long id = null; ForwardCursor<PersistentFlow> flowCursor = null;
+         *
+         * try { System.out.println("beginning to build statistics from flows,
+         * starting at: " + start + "...");
+         *
+         *
+         * int flowsProcessed = 0; PersistentFlow flow = null;
+         *
+         * if (start == 0l) { flowCursor = dataAccessor.flowById.entities(); }
+         * else { flowCursor = dataAccessor.flowById.entities(start, false,
+         * null, false); }
+         *
+         * while ((flow = flowCursor.next()) != null) {
+         * statisticsManager.addStatisticalSeconds(new Flow(customer, flow),
+         * flow.getId(), InetAddress.getByName(collector));
+         *
+         * id = flow.getId(); if (++flowsProcessed % 20000 == 0) {
+         * System.out.println("processed " + flowsProcessed + " flows to
+         * statistics - pausing at: " + id); break; } }
+         *
+         * if (flow == null) { System.out.println("completed building statistics
+         * from flows."); id = null; } } catch (UnknownHostException uhe) {
+         * System.err.println("Error in rebuildStatistics: " +
+         * uhe.getMessage()); } finally { if (flowCursor != null) {
+         * flowCursor.close(); } closeStore(readOnlyEntityStore);
+         * closeEnvironment(environment); }
+         *
+         * return id;
+         *
+         */
         return null;
     }
 
@@ -255,61 +233,29 @@ public class FlowManager {
         return volumeList;
     }
 
-    public XMLNetworkList getXMLNetworks(HttpSession session, String constraints) {
-        XMLNetworkList networkList = new XMLNetworkList();
-        StatisticsManager statisticsManager = new StatisticsManager(customer);
-        ArrayList<Network> networks = statisticsManager.getNetworks(session, new Constraints(constraints));
-
-        Boolean cancelNetworks = false;
-
-        for (Network network : networks) {
-            networkList.networks.add(network.toXMLNetwork());
-
-            if (cancelNetworks) {
-                break;
-            }
-        }
-
-        if (!cancelNetworks) {
-            System.out.println("Completed XMLNetworkList creation and writing to session...");
-            networkList.ready = true;
-            SessionManager.setNetworks(session, networkList);
-        } else {
-            System.out.println("Canceled map build");
-        }
-
-        System.out.println("Returning XMLNetworkList to caller...");
-        return networkList;
-    }
-
     public void cleanFlows(ArrayList<Long> flowIDs) {
         /*
-        System.out.println("Deleting expired flows...");
-
-        Environment environment;
-        EntityStore entityStore = new EntityStore(environment = setupEnvironment(), "Flow", this.getStoreConfig(false));
-        FlowAccessor dataAccessor = new FlowAccessor(entityStore);
-
-        int deletedCount = 0;
-        for (Long flowID : flowIDs) {
-            if ((flowID != null) && dataAccessor.flowById.contains(flowID)) {
-                dataAccessor.flowById.delete(flowID);
-
-                if (++deletedCount % 1000 == 0) {
-                    System.out.println("Flows deleted: " + deletedCount);
-                }
-            }
-        }
-
-        System.out.println("Total flows deleted: " + deletedCount);
-
-        closeStore(entityStore);
-        //recordEnvironmentStatistics(environment);
-        cleanLog(environment);
-        checkpoint(environment);
-        closeEnvironment(environment);
-        * 
-        */
+         * System.out.println("Deleting expired flows...");
+         *
+         * Environment environment; EntityStore entityStore = new
+         * EntityStore(environment = setupEnvironment(), "Flow",
+         * this.getStoreConfig(false)); FlowAccessor dataAccessor = new
+         * FlowAccessor(entityStore);
+         *
+         * int deletedCount = 0; for (Long flowID : flowIDs) { if ((flowID !=
+         * null) && dataAccessor.flowById.contains(flowID)) {
+         * dataAccessor.flowById.delete(flowID);
+         *
+         * if (++deletedCount % 1000 == 0) { System.out.println("Flows deleted:
+         * " + deletedCount); } } }
+         *
+         * System.out.println("Total flows deleted: " + deletedCount);
+         *
+         * closeStore(entityStore); //recordEnvironmentStatistics(environment);
+         * cleanLog(environment); checkpoint(environment);
+         * closeEnvironment(environment);
+         *
+         */
     }
 
     public LinkedList<Long> addFlows(String sender, LinkedList<Flow> flows) {
@@ -318,6 +264,9 @@ public class FlowManager {
 
     private void addFlow(PersistentFlow flow) {
         try {
+            Context context = new InitialContext();
+            UserTransaction utx = (UserTransaction) context.lookup("java:comp/UserTransaction");
+
             utx.begin();
             em.persist(flow);
             utx.commit();
@@ -333,6 +282,8 @@ public class FlowManager {
             hrbe.printStackTrace();
         } catch (SystemException se) {
             se.printStackTrace();
+        } catch (NamingException ne) {
+            ne.printStackTrace();
         }
     }
 

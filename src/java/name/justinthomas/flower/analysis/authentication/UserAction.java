@@ -100,7 +100,7 @@ public class UserAction {
             UserManager userManager = new UserManager(customer);
 
             if ((username != null) && (password != null) && (userManager != null)) {
-                User user = userManager.getUser(username);
+                FlowerUser user = userManager.getUser(username);
                 if (user == null) {
                     log.debug("Invalid User: " + username);
                     return token;
@@ -119,14 +119,14 @@ public class UserAction {
                 }
 
 
-                if (user.hashedPassword.equals(new String(hash.digest()))) {
+                if (user.getHashedPassword().equals(new String(hash.digest()))) {
                     token.authenticated = true;
                     token.authorized = true;
-                    if (user.administrator) {
+                    if (user.getAdministrator()) {
                         token.administrator = true;
                     }
-                    token.fullName = user.fullName;
-                    token.timeZone = user.timeZone;
+                    token.fullName = user.getFullName();
+                    token.timeZone = user.getTimeZone();
                     log.debug("Authenticated successfully against internal database: " + username);
                     return token;
                 }
@@ -203,9 +203,9 @@ public class UserAction {
 
         if (customer != null) {
             UserManager userManager = new UserManager(customer);
-            User user = userManager.getUser(authUser);
+            FlowerUser user = userManager.getUser(authUser);
             if (token.authorized && token.internal && (userManager.getUser(authUser) != null)) {
-                if (!userManager.updateUser(authUser, updatedPassword, fullName, user.administrator, timeZone)) {
+                if (!userManager.updateUser(authUser, updatedPassword, fullName, user.getAdministrator(), timeZone)) {
                     return false;
                 }
             } else {

@@ -17,7 +17,7 @@ import name.justinthomas.flower.analysis.authentication.DirectoryDomainManager;
 import name.justinthomas.flower.analysis.persistence.ManagedNetwork;
 import name.justinthomas.flower.analysis.persistence.ManagedNetworkManager;
 import name.justinthomas.flower.analysis.authentication.UserManager;
-import name.justinthomas.flower.analysis.authentication.User;
+import name.justinthomas.flower.analysis.authentication.FlowerUser;
 import name.justinthomas.flower.analysis.persistence.FrequencyManager;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryDomain;
 import name.justinthomas.flower.analysis.services.xmlobjects.XMLDirectoryGroup;
@@ -202,12 +202,12 @@ public class Administration {
     }
 
     @WebMethod(operationName = "getUsers")
-    public List<User> getUsers(
+    public List<FlowerUser> getUsers(
             @WebParam(name = "customer") String customerID,
             @WebParam(name = "user") String user,
             @WebParam(name = "password") String password) {
 
-        List<User> xusers = new ArrayList();
+        List<FlowerUser> xusers = new ArrayList();
         UserAction userAction = new UserAction();
         AuthenticationToken token = userAction.authenticate(customerID, user, password);
 
@@ -216,7 +216,7 @@ public class Administration {
         if (customer != null) {
             UserManager userManager = new UserManager(customer);
             if (token.authenticated && token.authorized && token.administrator) {
-                for (User puser : userManager.getUsers()) {
+                for (FlowerUser puser : userManager.getUsers()) {
                     xusers.add(puser.sanitize());
                 }
             }

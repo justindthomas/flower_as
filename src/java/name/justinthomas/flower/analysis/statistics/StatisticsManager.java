@@ -1,16 +1,13 @@
 package name.justinthomas.flower.analysis.statistics;
 
 import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.*;
 import java.util.Map.Entry;
 import javax.naming.Context;
 import javax.naming.InitialContext;
@@ -19,9 +16,10 @@ import javax.persistence.EntityManager;
 import javax.persistence.NoResultException;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpSession;
-import javax.transaction.*;
+import javax.transaction.UserTransaction;
 import name.justinthomas.flower.analysis.element.Flow;
 import name.justinthomas.flower.analysis.element.InetNetwork;
+import name.justinthomas.flower.analysis.element.ManagedNetworks;
 import name.justinthomas.flower.analysis.element.Network;
 import name.justinthomas.flower.analysis.persistence.Constraints;
 import name.justinthomas.flower.analysis.services.MapDataResponse;
@@ -44,6 +42,7 @@ public class StatisticsManager {
     private GlobalConfigurationManager globalConfigurationManager;
     private EntityManager em;
     private Customer customer;
+    private HashMap<String, NameResolution> resolver = new HashMap();
 
     private static GlobalConfigurationManager getGlobalConfigurationManager() {
         try {
@@ -82,30 +81,30 @@ public class StatisticsManager {
         }
     }
 
-    public ArrayList<Long> cleanStatisticalIntervals() {      
-          HashMap<Long, Boolean> keys = identifyExpiredIntervals();
-         
-          log.debug("Deleting expired intervals...");
-         
-          int nullIDs = 0;
-          ArrayList<Long> flowIDs = new ArrayList();
-          for (Entry<Long, Boolean> key : keys.entrySet()) {
-              if (key.getValue()) {
-                  for (Long flowID : this.getStatisticalInterval(key.getKey()).getFlowIDs()) {
-                      if (flowID != null) {
-                          flowIDs.add(flowID);
-                      } else {
-                          nullIDs++;
-                      }
-                  }
-              }
-              
-              //dataAccessor.intervalByKey.delete(key.getKey());
-          }
-         
-          log.error("Null flow IDs found in StatisticalIntervals: " + nullIDs);
-         
-          return flowIDs;  
+    public ArrayList<Long> cleanStatisticalIntervals() {
+        HashMap<Long, Boolean> keys = identifyExpiredIntervals();
+
+        log.debug("Deleting expired intervals...");
+
+        int nullIDs = 0;
+        ArrayList<Long> flowIDs = new ArrayList();
+        for (Entry<Long, Boolean> key : keys.entrySet()) {
+            if (key.getValue()) {
+                for (Long flowID : this.getStatisticalInterval(key.getKey()).getFlowIDs()) {
+                    if (flowID != null) {
+                        flowIDs.add(flowID);
+                    } else {
+                        nullIDs++;
+                    }
+                }
+            }
+
+            //dataAccessor.intervalByKey.delete(key.getKey());
+        }
+
+        log.error("Null flow IDs found in StatisticalIntervals: " + nullIDs);
+
+        return flowIDs;
     }
 
     private HashMap<IntervalKey, StatisticalInterval> flowToInterval(Flow flow, Long resolution, Long flowID) {
@@ -125,10 +124,10 @@ public class StatisticsManager {
 
         return normalized;
     }
-    
+
     public StatisticalInterval getStatisticalInterval(Long id) {
         System.out.println("Retrieving interval: " + id + " from storage.");
-        
+
         StatisticalInterval statisticalInterval = (StatisticalInterval) em.find(StatisticalInterval.class, id);
 
         return statisticalInterval;
@@ -139,11 +138,7 @@ public class StatisticsManager {
         StatisticalInterval statisticalInterval = null;
 
         List<StatisticalInterval> statisticalIntervals = (List<StatisticalInterval>) em.createQuery(
-                "SELECT s FROM StatisticalInterval s WHERE s.accountId LIKE :accountid AND s.resolution = :resolution AND s.statisticalInterval = :interval")
-                    .setParameter("accountid", customer.getAccount())
-                    .setParameter("resolution", resolution)
-                    .setParameter("interval", interval)
-                    .getResultList();
+                "SELECT s FROM StatisticalInterval s WHERE s.accountId LIKE :accountid AND s.resolution = :resolution AND s.statisticalInterval = :interval").setParameter("accountid", customer.getAccount()).setParameter("resolution", resolution).setParameter("interval", interval).getResultList();
 
         if (statisticalIntervals.size() > 1) {
             System.err.println("StatisticsManager: too many results");
@@ -249,9 +244,7 @@ public class StatisticsManager {
         StatisticalCube statisticalCube = null;
 
         List<StatisticalCube> statisticalCubes = (List<StatisticalCube>) em.createQuery(
-                "SELECT s FROM StatisticalCube s WHERE s.accountId LIKE :accountid")
-                    .setParameter("accountid", customer.getAccount())
-                    .getResultList();
+                "SELECT s FROM StatisticalCube s WHERE s.accountId LIKE :accountid").setParameter("accountid", customer.getAccount()).getResultList();
 
         if (statisticalCubes.size() > 1) {
             System.err.println("StatisticsManager: too many results");
@@ -268,12 +261,16 @@ public class StatisticsManager {
         try {
             Context context = new InitialContext();
             UserTransaction utx = (UserTransaction) context.lookup("java:comp/UserTransaction");
+            StatisticalCube storedCube = this.getCube();
 
-            if (this.getCube() != null) {
+            if (storedCube != null) {
+                System.out.println("cube merge");
+                cube.setId(storedCube.getId());
                 utx.begin();
                 em.merge(cube);
                 utx.commit();
             } else {
+                System.out.println("cube persist");
                 utx.begin();
                 em.persist(cube);
                 utx.commit();
@@ -286,7 +283,7 @@ public class StatisticsManager {
     public List<StatisticalInterval> getStatisticalIntervals(Constraints constraints, Integer resolution) {
         return this.getStatisticalIntervals(constraints.startTime.getTime(), constraints.endTime.getTime(), resolution);
     }
-    
+
     public List<StatisticalInterval> getStatisticalIntervals(Long startTime, Long endTime, Integer resolution) {
         List<StatisticalInterval> intervals = null;
 
@@ -294,13 +291,16 @@ public class StatisticsManager {
         Long r = (resolution != null) ? resolution : getResolution(duration, null);
 
         Long start = startTime / r;
-        IntervalKey startKey = new IntervalKey(start, r);
         Long end = endTime / r;
-        IntervalKey endKey = new IntervalKey(end, r);
 
         try {
             intervals = (List<StatisticalInterval>) em.createQuery(
-                    "SELECT s FROM StatisticalInterval s WHERE s.accountId LIKE :accountid AND s.key >= :start AND s.key <= :end").setParameter("accountid", customer.getAccount()).setParameter("resolution", r).setParameter("start", startKey).setParameter("end", endKey).getResultList();
+                    "SELECT s FROM StatisticalInterval s WHERE s.accountId LIKE :accountid AND s.resolution = :resolution AND s.statisticalInterval >= :start AND s.statisticalInterval <= :end")
+                        .setParameter("accountid", customer.getAccount())
+                        .setParameter("resolution", r)
+                        .setParameter("start", start)
+                        .setParameter("end", end)
+                        .getResultList();
         } catch (NoResultException nre) {
             log.error("StatisticsManager: no result");
         }
@@ -532,257 +532,171 @@ public class StatisticsManager {
     }
 
     public MapDataResponse getMapData(HttpSession session, Constraints constraints) throws InterruptedException {
-        /*
-         * LinkedHashMap<String, InetNetwork> managedNetworks = new
-         * ManagedNetworks(customer).getNetworks();
-         *
-         * String untracked = "untracked"; MapDataResponse response = new
-         * MapDataResponse(untracked); ArrayList<InetNetwork> networks = new
-         * ArrayList();
-         *
-         * for (Entry<String, InetNetwork> entry : managedNetworks.entrySet()) {
-         * String version = null; if (entry.getValue().getAddress() instanceof
-         * Inet4Address) { version = "ipv4"; } else if
-         * (entry.getValue().getAddress() instanceof Inet6Address) { version =
-         * "ipv6"; } response.networks.add(new
-         * MapDataResponse.Network(entry.getKey(), version,
-         * entry.getValue().getAddress().getHostAddress() + "/" +
-         * entry.getValue().getMask())); networks.add(entry.getValue()); }
-         *
-         * long duration = constraints.endTime.getTime() -
-         * constraints.startTime.getTime(); long resolution =
-         * getResolution(duration, null); Environment environment; EntityStore
-         * readOnlyEntityStore = new EntityStore(environment =
-         * setupEnvironment(), "Statistics", this.getStoreConfig(true));
-         * StatisticsAccessor accessor = new
-         * StatisticsAccessor(readOnlyEntityStore); IntervalKey startKey = new
-         * IntervalKey(constraints.startTime.getTime() / resolution,
-         * resolution); IntervalKey endKey = new
-         * IntervalKey(constraints.endTime.getTime() / resolution, resolution);
-         * EntityCursor<StatisticalInterval> cursor =
-         * accessor.intervalByKey.entities(startKey, true, endKey, true);
-         *
-         * // We only want to do this query once, so make it count.
-         *
-         * log.debug("Iterating over query results.");
-         *
-         * Integer secondsProcessed = 0; try { for (StatisticalInterval second :
-         * cursor) { for (StatisticalFlow flow : second.getFlows().values()) {
-         * try { flow = setDefault(networks, flow, untracked); } catch
-         * (UnknownHostException e) { log.error("UnknownHostException while
-         * attempting to setDefault: " + e.getMessage()); }
-         *
-         * if (flow.getSource() != null) { try { Boolean sourceCaptured = false;
-         * Boolean destinationCaptured = false;
-         *
-         * if (flow.getSource().equals(untracked)) { sourceCaptured = true; }
-         *
-         * if (flow.getDestination().equals(untracked)) { destinationCaptured =
-         * true; }
-         *
-         * InetAddress sourceAddress = null; InetAddress destinationAddress =
-         * null;
-         *
-         * if (!sourceCaptured) { sourceAddress =
-         * InetAddress.getByName(flow.getSource()); }
-         *
-         * if (!destinationCaptured) { destinationAddress =
-         * InetAddress.getByName(flow.getDestination()); }
-         *
-         *
-         * // Iterate through managed networks and add the Nodes (complete with
-         * Flows) // as they are encountered for (MapDataResponse.Network
-         * network : response.networks) { InetNetwork iNetwork = new
-         * InetNetwork();
-         * iNetwork.setAddress(InetAddress.getByName(network.address.split("/")[0]));
-         * iNetwork.setMask(Integer.parseInt(network.address.split("/")[1])); if
-         * (!sourceCaptured || !destinationCaptured) { if (!sourceCaptured) { if
-         * (AddressAnalysis.isMember(sourceAddress, iNetwork)) { if
-         * (!resolver.containsKey(sourceAddress.getHostAddress())) {
-         * resolver.put(sourceAddress.getHostAddress(), new
-         * NameResolution(sourceAddress.getHostName())); }
-         *
-         * network.nodes.add(new
-         * MapDataResponse.Node(sourceAddress.getHostAddress(),
-         * resolver.get(sourceAddress.getHostAddress()).name)); sourceCaptured =
-         * true; } }
-         *
-         * if (!destinationCaptured) { if
-         * (AddressAnalysis.isMember(destinationAddress, iNetwork)) { if
-         * (!resolver.containsKey(destinationAddress.getHostAddress())) {
-         * resolver.put(destinationAddress.getHostAddress(), new
-         * NameResolution(destinationAddress.getHostName())); }
-         *
-         * network.nodes.add(new
-         * MapDataResponse.Node(destinationAddress.getHostAddress(),
-         * resolver.get(destinationAddress.getHostAddress()).name));
-         * destinationCaptured = true; } }
-         *
-         * if (Thread.currentThread().isInterrupted()) { throw new
-         * InterruptedException(); } } } } catch (UnknownHostException e) {
-         * log.error("UnknownHostException while setting networks: " +
-         * e.getMessage()); }
-         *
-         *
-         * for (Entry<StatisticalFlowDetail, Long> entry :
-         * flow.getCount().entrySet()) { StatisticalFlowDetail detail =
-         * entry.getKey(); if (detail.getType() ==
-         * StatisticalFlowDetail.Count.BYTE) { Boolean reversed = false; if
-         * (detail.getSource() > 0 && detail.getDestination() > 0) { if
-         * (globalConfigurationManager.getFrequency(customer,
-         * detail.getProtocol(), detail.getSource()) >
-         * globalConfigurationManager.getFrequency(customer,
-         * detail.getProtocol(), detail.getDestination())) { reversed = true; }
-         * }
-         *
-         * MapDataResponse.Flow responseFlow = null; if (!reversed) {
-         * responseFlow = new MapDataResponse.Flow(flow.getSource(),
-         * flow.getDestination(), String.valueOf(detail.getProtocol()),
-         * String.valueOf(detail.getDestination()),
-         * String.valueOf(entry.getValue()), "0"); } else { responseFlow = new
-         * MapDataResponse.Flow(flow.getDestination(), flow.getSource(),
-         * String.valueOf(detail.getProtocol()),
-         * String.valueOf(detail.getSource()), "0",
-         * String.valueOf(entry.getValue())); }
-         *
-         * response.addFlow(responseFlow); } } }
-         *
-         * if (Thread.currentThread().isInterrupted()) { //log.debug("Stopping
-         * FlowManager..."); throw new InterruptedException(); } }
-         *
-         * if (++secondsProcessed % 10000 == 0) { log.debug(secondsProcessed + "
-         * StatisticalSeconds processed."); } } } catch (DatabaseException e) {
-         * log.error("Database error: " + e.getMessage()); } finally {
-         * cursor.close(); }
-         *
-         * response.ready = true;
-         *
-         * return response;
-         *
-         */
-        return null;
-    }
+        LinkedHashMap<String, InetNetwork> managedNetworks = new ManagedNetworks(customer).getNetworks();
 
-    public ArrayList<Network> getNetworks(HttpSession session, Constraints constraints) {
-        /*
-         * LinkedHashMap<String, InetNetwork> managedNetworks = new
-         * ManagedNetworks(customer).getNetworks();
-         *
-         * ArrayList<Network> networks = new ArrayList<Network>();
-         *
-         * for (InetNetwork network : managedNetworks.values()) {
-         * networks.add(new Network(network)); }
-         *
-         * Integer g = 0, n = 0;
-         *
-         * Network defaultNetwork = null;
-         *
-         * try { defaultNetwork = new Network(InetAddress.getByName("0.0.0.0"),
-         * 0, "DEFAULT"); } catch (UnknownHostException uhe) { log.error("Could
-         * not parse network for DEFAULT: " + uhe.getMessage()); }
-         *
-         * DefaultNode defaultNode = new DefaultNode();
-         *
-         * long duration = constraints.endTime.getTime() -
-         * constraints.startTime.getTime(); long resolution =
-         * getResolution(duration, null); Environment environment; EntityStore
-         * readOnlyEntityStore = new EntityStore(environment =
-         * setupEnvironment(), "Statistics", this.getStoreConfig(true));
-         * StatisticsAccessor accessor = new
-         * StatisticsAccessor(readOnlyEntityStore); IntervalKey startKey = new
-         * IntervalKey(constraints.startTime.getTime() / resolution,
-         * resolution); IntervalKey endKey = new
-         * IntervalKey(constraints.endTime.getTime() / resolution, resolution);
-         * EntityCursor<StatisticalInterval> cursor =
-         * accessor.intervalByKey.entities(startKey, true, endKey, true);
-         *
-         * // We only want to do this query once, so make it count.
-         *
-         * log.debug("Iterating over query results.");
-         *
-         * Integer secondsProcessed = 0; try { try { try {
-         *
-         * for (StatisticalInterval second : cursor) { for (StatisticalFlow flow
-         * : second.getFlows().values()) { flow = setDefault(networks, flow);
-         *
-         * if (flow.getSource() == null) { n++; } else { InetAddress
-         * sourceAddress = InetAddress.getByName(flow.getSource()); InetAddress
-         * destinationAddress = InetAddress.getByName(flow.getDestination());
-         * Node sourceNode = new Node(flow.getSource()); Node destinationNode =
-         * new Node(flow.getDestination());
-         *
-         * //log.debug("."); // Associate the flow with the source (flows are
-         * never associated with the destination) sourceNode.addFlow(customer,
-         * flow); // On that last point, just kidding
-         * destinationNode.addFlow(customer, flow);
-         *
-         * Boolean sourceCaptured = false; Boolean destinationCaptured = false;
-         * // Iterate through managed networks and add the Nodes (complete with
-         * Flows) // as they are encountered for (Network network : networks) {
-         * if (!sourceCaptured || !destinationCaptured) { // If the source
-         * address belongs to a managed network, add it to the map //
-         * De-duplication is handled by the "addNode" method in the Network
-         * object if (AddressAnalysis.isMember(sourceAddress,
-         * network.getNetwork())) { network.addNode(sourceNode); sourceCaptured
-         * = true; }
-         *
-         * if (AddressAnalysis.isMember(destinationAddress,
-         * network.getNetwork())) { network.addNode(destinationNode);
-         * destinationCaptured = true; }
-         *
-         * if (Thread.currentThread().isInterrupted()) { throw new
-         * InterruptedException(); } } }
-         *
-         * if (!sourceCaptured) { if (!flow.getDestination().equals("0.0.0.0"))
-         * { defaultNode.addFlow(customer, flow); } } else if
-         * (!destinationCaptured) { defaultNode.addFlow(customer, flow); }
-         *
-         * // If the flow was not captured, add it to the default node //if
-         * (!sourceCaptured || !destinationCaptured) { //
-         * defaultNode.addFlow(flow); //} }
-         *
-         * if (Thread.currentThread().isInterrupted()) { //log.debug("Stopping
-         * FlowManager..."); throw new InterruptedException(); } }
-         *
-         * if (++secondsProcessed % 10000 == 0) { log.debug(secondsProcessed + "
-         * StatisticalSeconds processed."); } } } catch (DatabaseException e) {
-         * log.error("Database error: " + e.getMessage()); } finally {
-         * cursor.close(); } } catch (DatabaseException e) { log.error("Database
-         * error: " + e.getMessage()); } finally {
-         * closeStore(readOnlyEntityStore); } } catch (UnknownHostException e) {
-         * log.error("UnknownHostException caught in " +
-         * e.getStackTrace()[0].getMethodName() + ": " + e.getMessage()); }
-         * catch (InterruptedException ie) { log.error("Stopped FlowManager
-         * during network build"); } catch (Exception e) { log.error("Exception
-         * caught in " + e.getStackTrace()[0].getMethodName() + ": " +
-         * e.getMessage()); } finally { closeEnvironment(environment); }
-         *
-         * log.debug(secondsProcessed + " total StatisticalSeconds analyzed.");
-         * log.debug("Found " + n + " null flows."); log.debug("Found " + g + "
-         * non-IP flows."); defaultNetwork.addNode(defaultNode);
-         *
-         * // Add the default network to the bottom of the network list
-         * networks.add(defaultNetwork);
-         *
-         * //createTraceFile(networks);
-         *
-         * return networks;
-         *
-         */
-        return null;
+        String untracked = "untracked";
+        MapDataResponse response = new MapDataResponse(untracked);
+        ArrayList<InetNetwork> networks = new ArrayList();
+
+        for (Entry<String, InetNetwork> entry : managedNetworks.entrySet()) {
+            String version = null;
+
+            if (entry.getValue().getAddress() instanceof Inet4Address) {
+                version = "ipv4";
+            } else if (entry.getValue().getAddress() instanceof Inet6Address) {
+                version = "ipv6";
+            }
+            response.networks.add(new MapDataResponse.Network(entry.getKey(), version, entry.getValue().getAddress().getHostAddress() + "/" + entry.getValue().getMask()));
+            networks.add(entry.getValue());
+        }
+
+        Long duration = constraints.endTime.getTime() - constraints.startTime.getTime();
+        Long resolution = getResolution(duration, null);
+        List<StatisticalInterval> intervals = this.getStatisticalIntervals(constraints.startTime.getTime(), constraints.endTime.getTime(), resolution.intValue());
+
+        log.debug("Iterating over query results.");
+
+        Integer secondsProcessed = 0;
+
+        for (StatisticalInterval second : intervals) {
+            for (StatisticalFlow flow : second.getFlows().values()) {
+                try {
+                    flow = setDefault(networks, flow, untracked);
+                } catch (UnknownHostException e) {
+                    log.error("UnknownHostException while attempting to setDefault: " + e.getMessage());
+                }
+
+                if (flow.getSource() != null) {
+                    try {
+                        Boolean sourceCaptured = false;
+                        Boolean destinationCaptured = false;
+                        if (flow.getSource().equals(untracked)) {
+                            sourceCaptured = true;
+                        }
+
+                        if (flow.getDestination().equals(untracked)) {
+                            destinationCaptured =
+                                    true;
+                        }
+
+                        InetAddress sourceAddress = null;
+                        InetAddress destinationAddress =
+                                null;
+
+                        if (!sourceCaptured) {
+                            sourceAddress =
+                                    InetAddress.getByName(flow.getSource());
+                        }
+
+                        if (!destinationCaptured) {
+                            destinationAddress =
+                                    InetAddress.getByName(flow.getDestination());
+                        }
+
+                        // Iterate through managed networks and add the Nodes (complete with Flows) 
+                        // as they are encountered 
+                        for (MapDataResponse.Network network : response.networks) {
+                            InetNetwork iNetwork = new InetNetwork();
+                            iNetwork.setAddress(InetAddress.getByName(network.address.split("/")[0]));
+                            iNetwork.setMask(Integer.parseInt(network.address.split("/")[1]));
+                            if (!sourceCaptured || !destinationCaptured) {
+                                if (!sourceCaptured) {
+                                    if (AddressAnalysis.isMember(sourceAddress, iNetwork)) {
+                                        if (!resolver.containsKey(sourceAddress.getHostAddress())) {
+                                            resolver.put(sourceAddress.getHostAddress(), new NameResolution(sourceAddress.getHostName()));
+                                        }
+
+                                        network.nodes.add(new MapDataResponse.Node(sourceAddress.getHostAddress(),
+                                                resolver.get(sourceAddress.getHostAddress()).name));
+                                        sourceCaptured =
+                                                true;
+                                    }
+                                }
+
+                                if (!destinationCaptured) {
+                                    if (AddressAnalysis.isMember(destinationAddress, iNetwork)) {
+                                        if (!resolver.containsKey(destinationAddress.getHostAddress())) {
+                                            resolver.put(destinationAddress.getHostAddress(), new NameResolution(destinationAddress.getHostName()));
+                                        }
+
+                                        network.nodes.add(new MapDataResponse.Node(destinationAddress.getHostAddress(),
+                                                resolver.get(destinationAddress.getHostAddress()).name));
+                                        destinationCaptured = true;
+                                    }
+                                }
+
+                                if (Thread.currentThread().isInterrupted()) {
+                                    throw new InterruptedException();
+                                }
+                            }
+                        }
+                    } catch (UnknownHostException e) {
+                        log.error("UnknownHostException while setting networks: "
+                                + e.getMessage());
+                    }
+
+
+                    for (Entry<StatisticalFlowDetail, Long> entry :
+                            flow.getCount().entrySet()) {
+                        StatisticalFlowDetail detail =
+                                entry.getKey();
+                        if (detail.getType()
+                                == StatisticalFlowDetail.Count.BYTE) {
+                            Boolean reversed = false;
+                            if (detail.getSource() > 0 && detail.getDestination() > 0) {
+                                if (globalConfigurationManager.getFrequency(customer,
+                                        detail.getProtocol(), detail.getSource())
+                                        > globalConfigurationManager.getFrequency(customer,
+                                        detail.getProtocol(), detail.getDestination())) {
+                                    reversed = true;
+                                }
+                            }
+
+                            MapDataResponse.Flow responseFlow = null;
+                            if (!reversed) {
+                                responseFlow = new MapDataResponse.Flow(flow.getSource(),
+                                        flow.getDestination(), String.valueOf(detail.getProtocol()),
+                                        String.valueOf(detail.getDestination()),
+                                        String.valueOf(entry.getValue()), "0");
+                            } else {
+                                responseFlow = new MapDataResponse.Flow(flow.getDestination(), flow.getSource(),
+                                        String.valueOf(detail.getProtocol()),
+                                        String.valueOf(detail.getSource()), "0",
+                                        String.valueOf(entry.getValue()));
+                            }
+
+                            response.addFlow(responseFlow);
+                        }
+                    }
+                }
+
+                if (Thread.currentThread().isInterrupted()) { //log.debug("Stopping FlowManager..."); 
+                    throw new InterruptedException();
+                }
+            }
+
+            if (++secondsProcessed % 10000 == 0) {
+                log.debug(secondsProcessed + "StatisticalSeconds processed.");
+            }
+        }
+
+
+        response.ready = true;
+
+        return response;
     }
 
     private HashMap<Long, Boolean> identifyExpiredIntervals() {
-          log.debug("Identifying expired intervals...");
-         
-          Date expiration = new Date();
-          expiration.setTime(expiration.getTime() - 7776000);
-          Date start = new Date();
-          start.setTime(0l);
-         
-          HashMap<Long, Boolean> expiredIntervals = new HashMap();
-         
-          for (Entry<Long, Boolean> resolution : globalConfigurationManager.getResolutionMap().entrySet()) {
+        log.debug("Identifying expired intervals...");
+
+        Date expiration = new Date();
+        expiration.setTime(expiration.getTime() - 7776000);
+        Date start = new Date();
+        start.setTime(0l);
+
+        HashMap<Long, Boolean> expiredIntervals = new HashMap();
+
+        for (Entry<Long, Boolean> resolution : globalConfigurationManager.getResolutionMap().entrySet()) {
             List<StatisticalInterval> intervals = this.getStatisticalIntervals(start.getTime(), expiration.getTime(), resolution.getKey().intValue());
             Integer intervalsDeleted = 0;
 
@@ -793,11 +707,11 @@ public class StatisticsManager {
                     log.debug(intervalsDeleted + "intervals marked for deletion at a resolution of " + resolution + "milliseconds...");
                 }
             }
-         
+
             log.debug(intervalsDeleted + " total seconds marked for deletion at a resolution of " + resolution + " milliseconds...");
-          }
-         
-          return expiredIntervals;
+        }
+
+        return expiredIntervals;
     }
 
     class NameResolution {

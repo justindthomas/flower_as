@@ -5,33 +5,50 @@
 
 package name.justinthomas.flower.analysis.persistence;
 
-import com.sleepycat.persist.model.Entity;
-import com.sleepycat.persist.model.PrimaryKey;
-import com.sleepycat.persist.model.Relationship;
-import com.sleepycat.persist.model.SecondaryKey;
+import java.io.Serializable;
+import java.util.HashMap;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
 
 /**
  *
  * @author justin
  */
 @Entity
-public class PersistentFrequency {
-    @PrimaryKey
-    String protocol_port = null;
-    @SecondaryKey(relate=Relationship.MANY_TO_ONE)
-    public Integer frequency = 0;
+public class PersistentFrequency implements Serializable {
 
-    public PersistentFrequency() {
-        
+    private Long id;
+    private String accountId;
+    private HashMap<TransportPairing, Integer> frequencyMap = new HashMap();
+
+    public PersistentFrequency() { }
+
+    @Id
+    @GeneratedValue
+    public Long getId() {
+        return this.id;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
     }
 
-    public PersistentFrequency(String protocol_port, Integer frequency) {
-        this.protocol_port = protocol_port;
-        this.frequency = frequency;
+    @Column(unique = true)
+    public String getAccountId() {
+        return accountId;
     }
 
-    public PersistentFrequency increment() {
-        frequency++;
-        return this;
+    public void setAccountId(String accountId) {
+        this.accountId = accountId;
+    }
+
+    public HashMap<TransportPairing, Integer> getFrequencyMap() {
+        return frequencyMap;
+    }
+
+    public void setFrequencyMap(HashMap<TransportPairing, Integer> frequencyMap) {
+        this.frequencyMap = frequencyMap;
     }
 }
