@@ -120,7 +120,7 @@ public class StatisticalEngine {
     }
 
     public StatisticalInterval addStatisticalInterval(StatisticalInterval interval) {
-        if ((interval != null) && (interval.getResolution() == 1000000) && (interval.getFlows() != null)) {
+        if ((interval != null) && (interval.getResolution() == 300000) && (interval.getFlows() != null)) {
             ManagedNetworks managedNetworks = new ManagedNetworks(customer);
 
             Map<String, Map<String, Long>> normalized = new HashMap();

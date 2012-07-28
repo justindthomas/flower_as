@@ -15,12 +15,12 @@ import javax.xml.bind.annotation.XmlType;
 public class FlowerUser implements Serializable {
 
     private Long id;
-    private String accountId;
-    private String username;
-    private String hashedPassword;
-    private String fullName;
-    private Boolean administrator;
-    private String timeZone;
+    private String accountId = "";
+    private String username = "";
+    private String hashedPassword = "";
+    private String fullName = "";
+    private Boolean administrator = false;
+    private String timeZone = "";
 
     protected FlowerUser() { }
 
