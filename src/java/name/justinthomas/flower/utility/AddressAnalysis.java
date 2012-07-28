@@ -2,7 +2,6 @@ package name.justinthomas.flower.utility;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
-
 import java.net.InetAddress;
 import name.justinthomas.flower.analysis.element.InetNetwork;
 

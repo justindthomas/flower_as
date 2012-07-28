@@ -1,6 +1,5 @@
 package name.justinthomas.flower.analysis.services;
 
-import name.justinthomas.flower.analysis.authentication.UserAction;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Resource;
@@ -9,6 +8,7 @@ import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebService;
 import javax.xml.ws.WebServiceContext;
+import name.justinthomas.flower.analysis.authentication.UserAction;
 import name.justinthomas.flower.analysis.persistence.AlertManager;
 import name.justinthomas.flower.analysis.persistence.Constraints;
 import name.justinthomas.flower.analysis.persistence.ModSecurityAlert;

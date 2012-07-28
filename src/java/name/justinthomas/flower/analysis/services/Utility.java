@@ -1,12 +1,7 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package name.justinthomas.flower.analysis.services;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.List;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import name.justinthomas.flower.global.GlobalConfigurationManager;

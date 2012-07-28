@@ -1,10 +1,5 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package name.justinthomas.flower.analysis.persistence;
 
-import name.justinthomas.flower.global.GlobalConfigurationManager;
 import java.io.IOException;
 import java.util.List;
 import javax.naming.Context;
@@ -13,6 +8,7 @@ import javax.naming.NamingException;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.transaction.*;
+import name.justinthomas.flower.global.GlobalConfigurationManager;
 import name.justinthomas.flower.manager.services.CustomerAdministration.Customer;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;

@@ -1,12 +1,8 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package name.justinthomas.flower.analysis.logging;
 
 import java.io.IOException;
-import javax.ejb.Stateless;
 import javax.ejb.DependsOn;
+import javax.ejb.Stateless;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.servlet.http.HttpServlet;
